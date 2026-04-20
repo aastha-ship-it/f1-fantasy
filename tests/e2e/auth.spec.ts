@@ -97,8 +97,10 @@ test.describe("E2E auth", () => {
         }),
         page.getByRole("button", { name: /continue/i }).click(),
       ]);
-      await expect(page.getByText("Signed in as")).toBeVisible();
+      // Dashboard toolbar shows display name + email inline, with a
+      // Sign out button. Asserting on the email is the most precise check.
       await expect(page.getByText(email)).toBeVisible();
+      await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
     } finally {
       await cleanupUser(email);
     }
