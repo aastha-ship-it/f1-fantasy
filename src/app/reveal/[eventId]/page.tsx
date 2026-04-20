@@ -117,8 +117,8 @@ export default async function RevealPage({
           </p>
           <p className="mt-3 text-sm text-[color:var(--fg-muted)]">
             Auto-opens at{" "}
-            <span data-tabular>{formatLocal(new Date(fallbackAt))}</span> if the
-            admin doesn&rsquo;t trigger it first.
+            <span data-tabular>{formatLocal(new Date(fallbackAt))}</span>{" "}
+            if the admin doesn&rsquo;t trigger it first.
           </p>
           {myPick && drivers && (
             <div className="mt-6 border-t border-[color:var(--border)] pt-6">
