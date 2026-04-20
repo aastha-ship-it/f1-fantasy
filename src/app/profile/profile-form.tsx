@@ -79,7 +79,7 @@ export function ProfileForm({
           autoFocus={welcome}
           defaultValue={initial.display_name ?? ""}
           maxLength={30}
-          className="w-full rounded border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 text-[color:var(--fg)] outline-none focus:border-[color:var(--accent)]"
+          className="w-full max-w-md rounded border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 text-[color:var(--fg)] outline-none focus:border-[color:var(--accent)]"
         />
       </Field>
 
@@ -88,7 +88,7 @@ export function ProfileForm({
           id="favorite_team"
           name="favorite_team"
           defaultValue={initial.favorite_team ?? ""}
-          className="w-full rounded border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 text-[color:var(--fg)]"
+          className="w-full max-w-md rounded border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 text-[color:var(--fg)]"
         >
           <option value="">—</option>
           {teams.map((t) => (
@@ -104,7 +104,7 @@ export function ProfileForm({
           id="favorite_driver"
           name="favorite_driver"
           defaultValue={initial.favorite_driver ?? ""}
-          className="w-full rounded border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 text-[color:var(--fg)]"
+          className="w-full max-w-md rounded border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 text-[color:var(--fg)]"
         >
           <option value="">—</option>
           {drivers.map((d) => (
@@ -125,7 +125,7 @@ export function ProfileForm({
           name="favorite_past_driver"
           type="text"
           defaultValue={initial.favorite_past_driver ?? ""}
-          className="w-full rounded border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 text-[color:var(--fg)] outline-none focus:border-[color:var(--accent)]"
+          className="w-full max-w-md rounded border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 text-[color:var(--fg)] outline-none focus:border-[color:var(--accent)]"
         />
       </Field>
 
