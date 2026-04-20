@@ -66,15 +66,22 @@ export default async function RevealPage({
   ]);
 
   const me = currentUser.user?.id ?? null;
-  const friendPicks = (predictions ?? []).filter(
-    (p) => p.user_id !== me,
-  );
   const myPick = (predictions ?? []).find((p) => p.user_id === me) ?? null;
 
-  // "Gate" logic: show the reveal stage only if the user can see someone
-  // else's pick, or if they have no prediction at all (in which case there's
-  // nothing to gate — just show results once they exist).
-  const picksAreOpen = friendPicks.length > 0 || (!myPick && !!result);
+  // Gate logic keys off event state, not visible-pick count. With a 1-user
+  // league, "friend picks visible" is always 0 — so we check the actual
+  // reveal condition instead: admin-triggered `revealed_at`, OR the 10-min
+  // post-results fallback. `Date.now()` here is a request-time snapshot in
+  // a Server Component render — no client re-render tearing risk.
+  // eslint-disable-next-line react-hooks/purity
+  const nowMs = Date.now();
+  const revealedAtMs = event.revealed_at
+    ? new Date(event.revealed_at).getTime()
+    : null;
+  const fetchedAtMs = result ? new Date(result.fetched_at).getTime() : null;
+  const picksAreOpen =
+    (revealedAtMs !== null && nowMs >= revealedAtMs) ||
+    (fetchedAtMs !== null && nowMs - fetchedAtMs >= 10 * 60 * 1000);
 
   if (!result) {
     return (
