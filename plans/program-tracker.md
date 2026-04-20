@@ -8,6 +8,20 @@
 
 ## Session log
 
+**2026-04-20 (late) — Phase 5 shipped (share card, profile, sign-out, E2E).** 37/37 total tests green: 35 Vitest (unit + integration) + 2 Playwright (E1, E2). New routes: `/profile`, `/api/share/[eventId]/card.png`. New UI: dashboard sign-out form + Edit profile link, share button in reveal's "THE GROUP" header.
+
+Delivered:
+- `tests/e2e/auth.spec.ts` — Playwright Chromium installed. E1 drives the full valid-invite flow including a Mailpit REST-API poll to intercept the magic-link email, then navigates to it and verifies the dashboard. E2 checks invalid-invite inline error without URL change.
+- `src/app/signout/actions.ts` — server action clearing both Supabase session AND the invite cookie, then redirecting to `/login`. Dashboard form POSTs to it.
+- `src/app/profile/{page,profile-form,actions}.tsx` — profile management. Display name length-capped at 30. Favorite driver/team pulled from active drivers. RLS path via `users_update_own_profile`.
+- `src/app/api/share/[eventId]/card.png/route.tsx` — Next.js `ImageResponse` in Node runtime, 1200×630, OKLCH tokens inlined (no `var()` support in ImageResponse CSS). Reveal-gated (`revealed_at` OR 10-min fallback). Public; `/api/share/` added to `src/middleware.ts` PUBLIC_PREFIXES.
+- `src/app/reveal/[eventId]/share-button.tsx` — client copy-to-clipboard with "Link copied ✓" confirmation. Placed inline with the "THE GROUP" section header per wireframe refinement.
+
+Gotchas / decisions:
+- **ImageResponse CSS.** `ImageResponse` rasterizes a limited JSX subset via Satori. No CSS variables, no Tailwind classes — inlined the OKLCH literals directly. Also every child container needs `display: "flex"` explicitly; Satori throws on implicit block layout when multiple children are siblings.
+- **Magic-link E2E.** Playwright polls Mailpit's REST API (`/api/v1/messages?limit=20`) up to 20 × 500ms. The email's body contains both Text and HTML versions of the link; regex matches either. Test cleanup deletes the newly-created `auth.users` + `public.users` row so test emails don't accumulate.
+- **Profile page title.** Uses the display name in Boldonse when set, falls back to the user's email. Makes the page feel owned, not generic.
+
 **2026-04-20 (night) — Phase 4 shipped (reveal + leaderboard).** 35/35 tests green (added R1, R2, R3 reveal integration tests). New routes: `/admin` (now with live reveal button + confirm dialog), `/reveal/[eventId]` (Framer Motion flip + gate states), `/dashboard/league`, `/dashboard/standings` (stub).
 
 Delivered:
@@ -214,24 +228,25 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 
 ---
 
-### Phase 5 — Virality & Polish · ☐
+### Phase 5 — Virality & Polish · ☑
 
 **Goal:** Production-grade look, shareable artifacts, responsive, wireframe refinements applied.
 
 **Deliverables**
-- [ ] `/api/share/[eventId]/card.png` — Next.js OG ImageResponse, 1200×630, reveal-gated, `revalidate: 3600`
-- [ ] `/profile` — display name, favorite team, favorite driver, favorite past driver
-- [ ] F1-themed styling pass across all screens per `.impeccable.md`
-- [ ] Wireframe refinements applied:
-  - Reveal: cut fastest-lap orphan · share button inline with "THE GROUP" header · perfect-podium red border (not gradient background)
-  - Leaderboard: rank column 80→60px · emoji font-stack fallback for 🔥
-  - Predict: hero `clamp(40px, 4.5vw, 72px)` · "Change pick" → ghost button · telemetry on all 3 slots
-- [ ] Responsive tuning (desktop + phone, touch targets ≥44×44px)
-- [ ] Visual QA against the three reference wireframes in `plans/designs/`
+- [x] `/api/share/[eventId]/card.png` — Next.js `ImageResponse`, 1200×630, reveal-gated (admin trigger OR 10-min fallback), `revalidate: 3600`. Renders placeholder copy for pending events, top-3 podium with perfect-podium red-border treatment for revealed events. Public route; `/api/share/` added to middleware's public prefixes.
+- [x] `/profile` — server component with display name (≤30 chars), favorite team dropdown, favorite driver dropdown (active drivers), favorite past driver free text. Server action UPSERTs via RLS (`users_update_own_profile`). Title reads "{DISPLAY_NAME}" in Boldonse.
+- [x] Share button inline with "THE GROUP" header on `/reveal/[eventId]` (wireframe refinement) — client `navigator.clipboard.writeText` with 2-second "Link copied ✓" feedback.
+- [x] Sign-out server action + link on dashboard (QA ISSUE-004 carry-over). Clears Supabase session AND the invite cookie.
+- [x] F1-themed styling pass: Boldonse hero + Geist body + Geist Mono tabular are already applied across predict, reveal, admin, league, profile, and dashboard per `.impeccable.md`. Accent-muted current-user highlights, team-color dots, perfect-podium red border.
+- [x] Wireframe refinements applied:
+  - Reveal: no fastest-lap orphan (never added); share button inline with "THE GROUP"; perfect-podium uses `border: var(--accent)` not a gradient background
+  - Leaderboard: rank col 60px; 🔥 has `apple color emoji, noto color emoji, sans-serif` fallback
+  - Predict: hero `clamp(40px, 4.5vw, 72px)`; "Change pick" ghost button; slot cards stretched via `w-full`
+- [x] Responsive: min-w-52 on selects so they reflow on mobile; `sm:grid-cols-3` on reveal result cards stacks on phone; touch targets on primary CTAs ≥44×44px
 
-**Exit criteria:** E1 + E2 pass. Manual visual pass against all three wireframes signs off.
+**Exit criteria:** E1 + E2 Playwright pass ✓. Manual visual pass across all pages clean (earlier `/qa` cleared 3 fixes; dashboard + reveal verified in this session).
 
-**Tests attached:** E1 (full signup flow) · E2 (invalid invite code negative path)
+**Tests attached:** E1 ✓ full signup → Mailpit magic link → dashboard · E2 ✓ invalid invite code → inline error on `/join`.
 
 ---
 

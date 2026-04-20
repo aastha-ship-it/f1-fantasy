@@ -5,7 +5,15 @@ import { INVITE_COOKIE_NAME, isValidInviteCookie } from "@/lib/inviteCookie";
 const PUBLIC_PATHS = new Set(["/join", "/login"]);
 // /api/cron/* is gated by CRON_SECRET inside each route; the invite + session
 // middleware would block Vercel's cron requests (they have no user cookies).
-const PUBLIC_PREFIXES = ["/auth/", "/_next/", "/api/public/", "/api/cron/"];
+// /api/share/* is public (OG images for link-preview crawlers) — individual
+// routes under there gate themselves on event state + reveal status.
+const PUBLIC_PREFIXES = [
+  "/auth/",
+  "/_next/",
+  "/api/public/",
+  "/api/cron/",
+  "/api/share/",
+];
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;

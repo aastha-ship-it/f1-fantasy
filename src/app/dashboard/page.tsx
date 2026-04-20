@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatLocal, sessionLabel } from "@/lib/sessionLabel";
+import { signOutAction } from "@/app/signout/actions";
 
 /**
  * State-aware smart home.
@@ -110,10 +111,28 @@ export default async function DashboardPage() {
       >
         F1 FANTASY
       </h1>
-      <p className="text-sm text-[color:var(--fg-muted)]">
-        Signed in as{" "}
-        <span className="text-[color:var(--fg)]">{userData.user?.email}</span>
-      </p>
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-[color:var(--fg-muted)]">
+          Signed in as{" "}
+          <span className="text-[color:var(--fg)]">{userData.user?.email}</span>
+        </p>
+        <div className="flex items-center gap-3 text-sm">
+          <Link
+            href="/profile"
+            className="text-[color:var(--fg-muted)] hover:text-[color:var(--fg)]"
+          >
+            Edit profile
+          </Link>
+          <form action={signOutAction}>
+            <button
+              type="submit"
+              className="text-[color:var(--fg-subtle)] hover:text-[color:var(--fg)]"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
+      </div>
 
       {/* Primary card — reveal-waiting takes precedence over predict. */}
       {revealWaiting ? (

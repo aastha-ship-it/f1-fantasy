@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { ShareButton } from "./share-button";
 
 type Driver = { id: number; code: string; full_name: string; team: string };
 type User = { id: string; email: string; display_name: string | null };
@@ -135,13 +136,19 @@ export function RevealStage({
 
       {/* FRIEND PICKS */}
       <section>
-        <div className="mb-4 flex items-baseline justify-between">
+        <div className="mb-4 flex items-baseline justify-between gap-4">
           <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
             The group
           </p>
-          <p className="text-sm text-[color:var(--fg-subtle)]" data-tabular>
-            {friendRows.length} {friendRows.length === 1 ? "pick" : "picks"}
-          </p>
+          <div className="flex items-center gap-3">
+            <p
+              className="text-sm text-[color:var(--fg-subtle)]"
+              data-tabular
+            >
+              {friendRows.length} {friendRows.length === 1 ? "pick" : "picks"}
+            </p>
+            <ShareButton />
+          </div>
         </div>
         <ul className="flex flex-col gap-3">
           {friendRows.map((row, i) => {
