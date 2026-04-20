@@ -22,15 +22,19 @@ export function anonClient(): SupabaseClient {
   );
 }
 
+const TEST_DRIVER_IDS = [901, 902, 903];
+
 /**
  * Wipe only data that belongs to test fixtures:
  *   - users/auth.users with the test+*@f1fantasy.test email pattern
  *   - events in season 9999
  *   - predictions/scores/admins scoped to those test users
+ *   - test drivers 901/902/903
  *
- * Critically does NOT touch admins for real users — earlier versions ran
- * `delete from public.admins where true`, which wiped the developer's own
- * admin bootstrap every time the suite ran.
+ * Critically does NOT touch admins or drivers for real data — earlier versions
+ * ran `delete from public.admins where true`, which wiped the developer's own
+ * admin bootstrap, and left test drivers in the table where they leaked into
+ * the production driver dropdowns.
  */
 export async function resetTestData(): Promise<void> {
   const sql = postgres(process.env.DATABASE_URL!, { max: 1 });
@@ -50,6 +54,9 @@ export async function resetTestData(): Promise<void> {
     await sql`delete from public.events where season = 9999`;
     await sql`delete from public.users where email like 'test+%@f1fantasy.test'`;
     await sql`delete from auth.users where email like 'test+%@f1fantasy.test'`;
+    // Test driver roster — delete last so FK references (predictions, results)
+    // are already gone.
+    await sql`delete from public.drivers where id in ${sql(TEST_DRIVER_IDS)}`;
   } finally {
     await sql.end();
   }

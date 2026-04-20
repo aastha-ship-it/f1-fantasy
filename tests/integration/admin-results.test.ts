@@ -180,7 +180,8 @@ describe("writeResults", () => {
 
     const { count: resultsCount } = await svc
       .from("results")
-      .select("event_id", { count: "exact", head: true });
+      .select("event_id", { count: "exact", head: true })
+      .eq("event_id", event.id);
     expect(resultsCount).toBe(1);
 
     const { count: scoresCount } = await svc
