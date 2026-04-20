@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { formatLocal, sessionLabel } from "@/lib/sessionLabel";
 
 /**
  * Phase 0 stub dashboard — proves the auth + invite gate loop works.
@@ -41,10 +42,8 @@ export default async function DashboardPage() {
             {nextOpen.name.toUpperCase()}
           </p>
           <p className="mt-1 text-sm text-[color:var(--fg-muted)]">
-            {nextOpen.session_type} ·{" "}
-            <span data-tabular>
-              {new Date(nextOpen.session_start_at).toLocaleString()}
-            </span>
+            {sessionLabel(nextOpen.session_type)} ·{" "}
+            <span data-tabular>{formatLocal(nextOpen.session_start_at)}</span>
           </p>
           <Link
             href="/dashboard/predict"
