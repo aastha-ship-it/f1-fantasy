@@ -53,7 +53,8 @@ export default async function RevealPage({
       }>(),
     supabase
       .from("predictions")
-      .select("user_id, p1_driver_id, p2_driver_id, p3_driver_id"),
+      .select("user_id, p1_driver_id, p2_driver_id, p3_driver_id")
+      .eq("event_id", event.id),
     supabase
       .from("drivers")
       .select("id, code, full_name, team"),
