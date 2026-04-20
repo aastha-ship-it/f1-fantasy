@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0 and 1 shipped (2026-04-19).** Next.js 16 app scaffolded, local Supabase running, schema + RLS + triggers applied, calendar + drivers seeded, invite-gated magic-link auth working end-to-end. 23/23 tests green (12 unit U1–U12 + 11 integration I6/I7/I8 and regression guards).
+**Phases 0, 1, and 2 shipped (2026-04-20).** Auth + schema + RLS + predict loop live. 29/29 tests green across 5 files (12 unit U1–U12 + 11 integration I1–I8 with regression guards). Typecheck, lint, and production build all clean.
+
+Routes currently serving: `/`, `/join`, `/login`, `/auth/callback`, `/dashboard`, `/dashboard/predict` (session list), `/dashboard/predict/[eventId]` (picker).
 
 See `plans/program-tracker.md` for the live phase-by-phase status. See `plans/flickering-giggling-valley.md` for the authoritative plan.
 
@@ -184,6 +186,12 @@ INVITE_CODE=                    # shared secret for /join gate; HMAC'd into the 
 CRON_SECRET=                    # verifies Vercel cron calls (unused until Phase 3)
 # RESEND_API_KEY — deferred; Phase 3 currently logs to console instead
 ```
+
+### Vitest + local Supabase
+
+Integration tests share the local Supabase instance, so test *files* must run sequentially — `beforeEach(resetTestData)` races fatally against in-flight tests in another file otherwise. `vitest.config.ts` sets `test.fileParallelism: false`. Tests within one file already sequence via `beforeEach`, so this is the minimum needed. Don't try to enable file parallelism for integration tests without first giving each file its own schema/namespace.
+
+Vitest 4's config TS types reject `poolOptions.threads.singleThread` (runtime accepts it; types don't expose it). Use `fileParallelism: false` instead.
 
 ### Supabase local config footguns
 

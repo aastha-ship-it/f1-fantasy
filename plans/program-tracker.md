@@ -8,6 +8,20 @@
 
 ## Session log
 
+**2026-04-20 (PM) — Phase 2 shipped + small refactor.** Initial page had defaulted to the earliest unlocked session, which is Miami sprint_quali (correctly P1-only) — but the user wanted access to the main race's 3-slot picker. Split predict into a list route at `/dashboard/predict` (upcoming sessions grouped by round) and a picker at `/dashboard/predict/[eventId]`. 29/29 tests green (U1-U12, I1-I8, I5b, I8b, I8c). Typecheck clean, lint clean, build clean, all four routes serving (`/`, `/join`, `/login`, `/auth/callback`, `/dashboard`, `/dashboard/predict`).
+
+Delivered:
+- `src/lib/submitPrediction.ts` — pure pipeline: auth → event lookup → lock fast-fail → active-driver validation → UPSERT idempotent (on `(user_id, event_id)`). Trigger-based LOCKED rejection translated from the DB error string so racing-past-the-fast-fail surfaces the same error code.
+- `src/app/dashboard/predict/actions.ts` — thin server-action wrapper calling `submitPredictionWith(cookieBoundClient)`.
+- `src/app/dashboard/predict/lock-countdown.tsx` — client component, ticks every 250ms, three phases (normal / warning / closed) with tabular figures and 2Hz opacity pulse gated by `prefers-reduced-motion`.
+- `src/app/dashboard/predict/driver-picker.tsx` — 3-slot (or 1-slot for sprints) picker, dropdown per slot, "Change pick" ghost button, sticky lock bar, distinct-driver validation UI, swap-on-conflict behavior.
+- `src/app/dashboard/predict/page.tsx` — server component: fetches next unlocked event, active drivers, user's existing pick via RLS-scoped client.
+- Dashboard CTA linking to `/dashboard/predict`.
+
+Gotcha fixed during Phase 2:
+- **Vitest file parallelism vs. local Supabase.** Two integration test files sharing one DB ran in parallel, and each file's `beforeEach(resetTestData)` raced with the other's in-flight tests — so 8/23 tests started failing once `predictions.test.ts` joined `rls.test.ts`. Set `test.fileParallelism: false` in `vitest.config.ts`. Runs single-threaded now. (`poolOptions.threads.singleThread` is rejected by Vitest 4's config TS types — fileParallelism alone suffices.)
+- **React purity rule.** `Date.now()` called in a server component triggers `react-hooks/purity` lint error. Moved the "is closed" check from server render into the picker's client-side effect (it already ticks via `useEffect` for the countdown anyway).
+
 **2026-04-20 — Auth flow manually verified end-to-end.** `/join` → invite cookie set → `/login` → magic link arrives in Mailpit → click → `/auth/callback` exchanges code → session cookie set → lands on `/dashboard` with the seeded next-session card. Admin row inserted for Aastha (`4f6cc62f-0194-44c9-8a69-c271ca6f1ff5`). Two follow-up fixes:
 - **Supabase redirect allowlist.** `supabase/config.toml` originally had only `https://127.0.0.1:3000` in `additional_redirect_urls`, so Auth silently stripped our HTTP `emailRedirectTo` and fell back to bare site_url. Fixed by adding `http://127.0.0.1:3000/**`, `http://localhost:3000/**`, `https://127.0.0.1:3000/**`.
 - **Tailwind v4 spacing hijack.** Aliasing our custom `--space-*` tokens into `--spacing-*` in `@theme inline` collapsed `max-w-xl` to 24px (among other width utilities). Tailwind v4's `--spacing-*` namespace is shared across every size-based utility — removed the aliases; use `var(--space-lg)` or `p-[var(--space-lg)]` directly when semantic names are needed.
@@ -107,21 +121,24 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 
 ---
 
-### Phase 2 — Prediction Loop · ☐
+### Phase 2 — Prediction Loop · ☑
 
 **Goal:** Friends can pick P1/P2/P3, watch the countdown, and submit before the lock bell.
 
 **Deliverables**
-- [ ] `/dashboard/predict` lists upcoming events, renders 3-slot picker (P1-only for `sprint_quali` / `sprint_race`)
-- [ ] Lock countdown hero with urgency treatment at T-60s (amber pulse per `.impeccable.md` §Lock Countdown)
-- [ ] Submit disabled at T-5s, "Predictions closed" toast on late attempts
-- [ ] Server action UPSERTs predictions, fast-fails on `now() >= lock_at` before DB hit
-- [ ] Timezone-aware countdown via `Intl.DateTimeFormat`
-- [ ] Sprint variant hides P2/P3 entirely (not empty placeholders)
+- [x] `/dashboard/predict` lists all upcoming scoring sessions grouped by round (sprint_quali → sprint_race → quali → race per weekend), "Picks in" badge when user has already submitted for a session
+- [x] `/dashboard/predict/[eventId]` is the actual picker — 3-slot for race/quali, P1-only for sprint_quali/sprint_race
+- [x] Lock countdown hero with urgency treatment at T-60s (amber, 2Hz pulse, banner per `.impeccable.md` §Lock Countdown)
+- [x] Submit auto-disables at T-0, closed-state banner shows; late submits are server-rejected too
+- [x] `submitPredictionWith(client, input)` fast-fails on `now() >= lock_at` before hitting the DB; DB trigger is the ultimate guard
+- [x] Timezone-aware countdown via `Intl.DateTimeFormat`
+- [x] Sprint variant hides P2/P3 entirely (not empty placeholders)
+- [x] Duplicate-driver-across-slots UI guard (distinct picks enforced in picker + test I5b)
+- [x] Dashboard CTA "Lock in your picks →" linking to `/dashboard/predict`
 
-**Exit criteria:** A pick submitted at T-10s lands; at T-4s it gets 409; at T+1s it gets 409. Double-submit is idempotent.
+**Exit criteria:** A pick submitted before lock lands ✓ · submit at T-4s and T+1s are both rejected ✓ · double-submit idempotent ✓.
 
-**Tests attached:** U8 · U9 · U10 · I1 · I2 · I3 · I4 · I5
+**Tests attached:** U8 ✓ · U9 ✓ · U10 ✓ (from Phase 1) · I1 ✓ happy-path · I2 ✓ past-lock fast-fail · I3 ✓ session-started rejection · I4 ✓ unauthenticated · I5 ✓ UPSERT idempotent · I5b ✓ sprint-extra-slots validation guard.
 
 ---
 

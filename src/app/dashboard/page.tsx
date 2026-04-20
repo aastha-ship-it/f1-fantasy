@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -7,10 +8,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
-  const { data: nextEvent } = await supabase
+  const nowIso = new Date().toISOString();
+  const { data: nextOpen } = await supabase
     .from("events")
-    .select("name, session_type, session_start_at")
-    .gt("session_start_at", new Date().toISOString())
+    .select("id, name, session_type, session_start_at, lock_at")
+    .gt("lock_at", nowIso)
     .order("session_start_at", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -27,7 +29,7 @@ export default async function DashboardPage() {
         Signed in as{" "}
         <span className="text-[color:var(--fg)]">{data.user?.email}</span>
       </p>
-      {nextEvent && (
+      {nextOpen ? (
         <section className="mt-10 rounded border border-[color:var(--border)] bg-[color:var(--surface)] p-6">
           <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
             Next session
@@ -36,13 +38,25 @@ export default async function DashboardPage() {
             className="mt-2 text-3xl"
             style={{ fontFamily: "var(--font-boldonse), ui-sans-serif" }}
           >
-            {nextEvent.name.toUpperCase()}
+            {nextOpen.name.toUpperCase()}
           </p>
           <p className="mt-1 text-sm text-[color:var(--fg-muted)]">
-            {nextEvent.session_type} ·{" "}
+            {nextOpen.session_type} ·{" "}
             <span data-tabular>
-              {new Date(nextEvent.session_start_at).toLocaleString()}
+              {new Date(nextOpen.session_start_at).toLocaleString()}
             </span>
+          </p>
+          <Link
+            href="/dashboard/predict"
+            className="mt-6 inline-block rounded bg-[color:var(--accent)] px-5 py-3 font-medium text-black transition-colors hover:bg-[color:var(--accent-hover)]"
+          >
+            Lock in your picks →
+          </Link>
+        </section>
+      ) : (
+        <section className="mt-10 rounded border border-[color:var(--border)] bg-[color:var(--surface)] p-6">
+          <p className="text-sm text-[color:var(--fg-muted)]">
+            No open sessions right now.
           </p>
         </section>
       )}

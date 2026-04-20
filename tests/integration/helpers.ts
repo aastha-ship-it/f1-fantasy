@@ -72,8 +72,17 @@ export async function createTestUser(
   return { id: userId, email, client };
 }
 
+export type TestSessionType =
+  | "race"
+  | "quali"
+  | "sprint_race"
+  | "sprint_quali";
+
 export async function createTestEvent(
-  opts: { lockInFuture?: boolean } = {},
+  opts: {
+    lockInFuture?: boolean;
+    sessionType?: TestSessionType;
+  } = {},
 ): Promise<{ id: string }> {
   const svc = serviceClient();
   const futureStart = new Date(Date.now() + 60 * 60 * 1000).toISOString();
@@ -86,7 +95,7 @@ export async function createTestEvent(
       round: Math.floor(Math.random() * 1000) + 1,
       name: "Test Grand Prix",
       circuit: "Testopolis",
-      session_type: "race",
+      session_type: opts.sessionType ?? "race",
       session_start_at: opts.lockInFuture === false ? pastStart : futureStart,
     })
     .select("id")

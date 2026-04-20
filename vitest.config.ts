@@ -12,6 +12,11 @@ export default defineConfig({
     include: ["src/**/*.{test,spec}.{ts,tsx}", "tests/integration/**/*.test.ts"],
     exclude: ["**/node_modules/**", "**/tests/e2e/**", "**/.next/**"],
     setupFiles: ["./vitest.setup.ts"],
+    // Integration tests share a local Supabase instance — running them in
+    // parallel means beforeEach(resetTestData) stomps on in-flight tests.
+    // Disabling file-level parallelism is enough; within a file, tests
+    // already sequence via beforeEach.
+    fileParallelism: false,
   },
   resolve: {
     alias: {
