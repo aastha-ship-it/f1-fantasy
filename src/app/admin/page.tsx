@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { currentAdmin } from "@/lib/adminGuard";
+import { revealEventAction } from "./actions";
+import { RevealButton } from "./reveal-button";
 
 type AwaitingRow = {
   id: string;
@@ -150,9 +152,7 @@ export default async function AdminHomePage() {
             key={r.id}
             row={r}
             cta={
-              <span className="rounded bg-[color:var(--surface-2)] px-3 py-2 text-xs uppercase tracking-wider text-[color:var(--fg-muted)]">
-                Reveal (Phase 4)
-              </span>
+              <RevealButton eventId={r.id} action={revealEventAction} />
             }
           />
         ))}
@@ -165,9 +165,12 @@ export default async function AdminHomePage() {
             key={r.id}
             row={r}
             cta={
-              <span className="rounded bg-[color:var(--surface-2)] px-3 py-2 text-xs uppercase tracking-wider text-[color:var(--success)]">
-                Live
-              </span>
+              <Link
+                href={`/reveal/${r.id}`}
+                className="rounded bg-[color:var(--surface-2)] px-3 py-2 text-xs uppercase tracking-wider text-[color:var(--success)] hover:bg-[color:var(--border)]"
+              >
+                View reveal →
+              </Link>
             }
           />
         ))}

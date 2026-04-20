@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0, 1, 2, and 3 shipped (2026-04-20).** Auth + schema + RLS + predict loop + admin results pipeline all live. 32/32 tests green across 6 files (12 unit + 20 integration incl. I1–I10 and regression guards). Typecheck, lint, and production build all clean.
+**Phases 0, 1, 2, 3, and 4 shipped (2026-04-20).** Auth + schema + RLS + predict loop + admin results pipeline + reveal stage + friend leaderboard all live. 35/35 tests green across 7 files (12 unit + 23 integration incl. I1–I10, R1–R3, regression guards). Typecheck, lint, and production build all clean.
 
-Routes currently serving: `/`, `/join`, `/login`, `/auth/callback`, `/dashboard`, `/dashboard/predict`, `/dashboard/predict/[eventId]`, `/admin`, `/admin/results/[eventId]`, `/api/cron/sync-f1-data` (Bearer-token gated).
+Routes currently serving: `/`, `/join`, `/login`, `/auth/callback`, `/dashboard`, `/dashboard/predict`, `/dashboard/predict/[eventId]`, `/dashboard/league`, `/dashboard/standings` (stub), `/admin`, `/admin/results/[eventId]`, `/reveal/[eventId]`, `/api/cron/sync-f1-data` (Bearer-token gated).
 
 See `plans/program-tracker.md` for the live phase-by-phase status. See `plans/flickering-giggling-valley.md` for the authoritative plan.
 

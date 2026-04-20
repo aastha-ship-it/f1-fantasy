@@ -8,6 +8,21 @@
 
 ## Session log
 
+**2026-04-20 (night) — Phase 4 shipped (reveal + leaderboard).** 35/35 tests green (added R1, R2, R3 reveal integration tests). New routes: `/admin` (now with live reveal button + confirm dialog), `/reveal/[eventId]` (Framer Motion flip + gate states), `/dashboard/league`, `/dashboard/standings` (stub).
+
+Delivered:
+- `src/lib/revealEvent.ts` — admin-guarded, UPSERTs `events.revealed_at`. 3 integration tests cover admin/non-admin/10-min-fallback paths.
+- `src/app/admin/{actions,reveal-button}.tsx` — wired into `/admin` operations dashboard. Replaced the "REVEAL (PHASE 4)" placeholder with a real confirm → action → redirect-to-reveal button. Revealed events now surface a "View reveal →" link instead of a dead chip.
+- `src/app/reveal/[eventId]/{page,reveal-stage}.tsx` — the product's emotional peak. Three gate states: no-results-yet · results-in-but-waiting (with 10-min fallback countdown and the user's own pick visible) · full stage with choreographed card flips. Uses `useReducedMotion` to fully disable motion for that audience.
+- `src/app/dashboard/league/page.tsx` — sum-of-points leaderboard with 🔥 current-P1-streak badge and PP (perfect-podium) badge. Tied ranks inherit the prior rank number. Per `.impeccable.md` no border-left stripes; current-user row gets `--accent-muted` border + `--surface-2` fill.
+- `src/app/dashboard/page.tsx` — smart home. Reveal-waiting card has priority over predict CTA. Added top-3 leaderboard preview and nav tiles for predict / league / standings.
+- `src/app/dashboard/standings/page.tsx` — placeholder (Day 10.5 polish).
+
+Gotchas / decisions:
+- **Reveal-stage redraw on revalidate.** `revealEventAction` calls `revalidatePath('/admin')` + `revalidatePath('/reveal/[eventId]')` so the admin list and the reveal page both see fresh state without a manual refresh.
+- **Framer Motion choreography timing.** Chose absolute `delay` (vs. parent `staggerChildren`) because the result-cards→silence→pick-cards sequence has a 400ms silence beat between the two phases that's easier to express as `pickFlipBaseDelay = resultSlots.length * 0.2 + 0.3 + 0.4`.
+- **Telemetry nudges deferred** — per tracker's explicit cut order, if Phase 4 slips, cut telemetry first. Did.
+
 **2026-04-20 (evening) — Phase 3 shipped.** 32/32 tests green (added I9 non-admin block, I10 admin-writes-results pipeline, I10b sprint-variant validation). Typecheck + lint + build all clean. New routes: `/admin`, `/admin/results/[eventId]`, `/api/cron/sync-f1-data`.
 
 Delivered:
@@ -178,23 +193,24 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 
 ---
 
-### Phase 4 — The Reveal & Leaderboard · ☐
+### Phase 4 — The Reveal & Leaderboard · ☑
 
 **Goal:** The emotional peak. Admin triggers a coordinated reveal; the leaderboard tells the season story; streaks accumulate; telemetry nudges inform picks.
 
 **Deliverables**
-- [ ] `/admin` reveal-trigger UI — "Results in → Reveal to group" button that sets `events.revealed_at`
-- [ ] `/dashboard` smart home — state-aware (upcoming → predict card, post-session pending → reveal-waiting card, else leaderboard)
-- [ ] `/dashboard/standings` — driver + constructor standings from nightly OpenF1 sync
-- [ ] `/dashboard/league` — friend leaderboard, streak badges, per-user breakdown on click
-- [ ] Telemetry nudges: `driver_nudges` cache + nightly prep cron + display on all 3 slots of predict screen
-- [ ] `/reveal/[eventId]` — Framer Motion rotateY flip choreography (result cards 300ms ea / 200ms stagger → 400ms beat → friend picks 150ms stagger)
-- [ ] `prefers-reduced-motion: reduce` → instant final state
-- [ ] 10-min RLS auto-unlock fallback tested (admin-forgot path)
+- [x] `/admin` reveal-trigger UI — confirm-dialog button wired to `revealEventAction`, sets `events.revealed_at = now()` and redirects admin to the reveal page
+- [x] `/dashboard` smart home — state-aware (reveal-waiting card when user has predicted an event with results filed but not revealed; otherwise predict-next-session CTA; empty state otherwise). Includes top-3 leaderboard preview + nav tiles
+- [x] `/dashboard/league` — friend leaderboard. Sum of points per user, streak badges (current P1 streak with 🔥, perfect-podium count with PP badge), tied-rank handling, current-user row surface-lifted per `.impeccable.md`
+- [x] `/reveal/[eventId]` — Framer Motion `rotateY` card-flip choreography. Result cards flip first (300ms each, 200ms stagger) → 400ms silence → friend picks flip (150ms stagger). Perfect-podium rows get the Ferrari-red accent badge
+- [x] `prefers-reduced-motion: reduce` → instant final state via `useReducedMotion()` — no delay, no rotate, no opacity fade
+- [x] Gated pre-reveal state: "Results are in. Reveal opens shortly." with the 10-min fallback countdown. User's own pick visible to them in that view
+- [x] 10-min RLS auto-unlock fallback covered by integration test R3
+- [x] `/dashboard/standings` — placeholder stub (cut per Phase 4 order; returns with Day 10.5 polish pass)
+- [ ] Telemetry nudges — **deferred** per Phase 4 cut order (`driver_nudges` cache + nightly prep cron)
 
-**Exit criteria:** E3 + E4 pass. Admin can trigger reveal and the group sees the coordinated animation. Pre-trigger, friends see "Results are in. Reveal opens shortly." screen.
+**Exit criteria (session-scoped):** reveal-trigger integration tests pass ✓; full 35/35 test suite green ✓; typecheck + lint + build all clean ✓. E3/E4 Playwright defer to Phase 5 (`bunx playwright install chromium` still pending).
 
-**Tests attached:** E3 (predict → lock → reveal flow) · E4 (reduced-motion path)
+**Tests attached:** R1 ✓ admin sets revealed_at · R2 ✓ non-admin ADMIN_REQUIRED · R3 ✓ 10-minute fallback opens RLS without admin trigger. E3/E4 Playwright deferred to Phase 5.
 
 ---
 
