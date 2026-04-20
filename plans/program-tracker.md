@@ -8,6 +8,22 @@
 
 ## Session log
 
+**2026-04-20 (evening) — Phase 3 shipped.** 32/32 tests green (added I9 non-admin block, I10 admin-writes-results pipeline, I10b sprint-variant validation). Typecheck + lint + build all clean. New routes: `/admin`, `/admin/results/[eventId]`, `/api/cron/sync-f1-data`.
+
+Delivered:
+- `src/lib/writeResults.ts` — pipeline orchestrator. Caller auth check, admin check via `isAdmin(svc, uid)`, event lookup, sprint-vs-race shape validation, UPSERT `results` on `event_id`, walk every prediction for the event (service-role read bypasses RLS), `computeScore` per prediction, UPSERT `scores` on `(user_id, event_id)`. Final pass: `recomputeStreaksFor(userId)` walks the user's entire scoring history in chronological order and UPSERTs fresh streak counters — makes the whole chain idempotent end-to-end.
+- `src/lib/adminGuard.ts` — `isAdmin(svc, uid)` + `currentAdmin()` helper for server components.
+- `src/lib/supabase/service.ts` — service-role client factory (server-only; throws if imported into Edge).
+- `src/app/admin/page.tsx` — operations list bucketing sessions into "Awaiting results" / "Ready to reveal" (Phase 4 trigger lands there) / "Revealed".
+- `src/app/admin/results/[eventId]/{page,actions,results-form}.tsx` — admin form. Non-admins see a 403-style copy.
+- `src/lib/sync/{syncCalendar,syncDrivers,openf1}.ts` — refactored the existing seed-script logic into importable functions so both the CLI scripts AND the cron route call the same code path.
+- `src/app/api/cron/sync-f1-data/route.ts` — `Bearer $CRON_SECRET` gated handler, runs both syncs, returns JSON summary. Verified 401 on missing/wrong token.
+- `src/middleware.ts` — added `/api/cron/` to PUBLIC_PREFIXES so Vercel cron (no user cookies) isn't bounced to /join before the route's token check runs.
+
+Gotchas solved:
+- **Supabase builder overload.** `.update().select("id", { count: "exact", head: true })` is rejected by the JS client's TS types. Switched to `.select("id")` and used `data?.length` for the deactivation count.
+- **Streak idempotency.** Naive "increment on each score-write" double-counts if results are re-filed. Solution: on every score write, re-derive the user's streak counters by walking ALL their scores + events + predictions + results in chronological order. Pure function of DB state.
+
 **2026-04-20 (PM) — Phase 2 shipped + small refactor.** Initial page had defaulted to the earliest unlocked session, which is Miami sprint_quali (correctly P1-only) — but the user wanted access to the main race's 3-slot picker. Split predict into a list route at `/dashboard/predict` (upcoming sessions grouped by round) and a picker at `/dashboard/predict/[eventId]`. 29/29 tests green (U1-U12, I1-I8, I5b, I8b, I8c). Typecheck clean, lint clean, build clean, all four routes serving (`/`, `/join`, `/login`, `/auth/callback`, `/dashboard`, `/dashboard/predict`).
 
 Delivered:
@@ -142,22 +158,23 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 
 ---
 
-### Phase 3 — Results & Scoring · ☐
+### Phase 3 — Results & Scoring · ☑
 
 **Goal:** Results land (auto if viable, manual always), scores compute, DNF rule enforced, idempotent.
 
 **Deliverables**
-- [ ] `lib/computeScores.ts` — DNF-aware, sprint-aware, pure function
-- [ ] Score writer uses `INSERT … ON CONFLICT (user_id, event_id) DO UPDATE`
-- [ ] `user_streaks` UPSERT in the same score pipeline
-- [ ] `/admin/results/[eventId]` — admin-gated manual entry (three driver dropdowns) → writes `results` → triggers compute
-- [ ] Resend email alert on fetch failure
-- [ ] `/api/cron/fetch-results` — **only if Phase 0 latency gate passes**. Otherwise skip entirely.
-- [ ] `/api/cron/sync-f1-data` — nightly calendar + drivers reconciliation
+- [x] `lib/computeScores.ts` — DNF-aware, sprint-aware, pure function (Phase 1)
+- [x] `lib/writeResults.ts` — admin-guarded pipeline: UPSERT `results` → iterate predictions → UPSERT `scores` → recompute `user_streaks` per affected user (idempotent, walks history in chronological order)
+- [x] `/admin` operations dashboard — past sessions bucketed by results status (awaiting / ready-to-reveal / revealed)
+- [x] `/admin/results/[eventId]` — admin-gated manual entry form (three driver dropdowns, 1 for sprints) wired to `fileResultsAction`
+- [x] `src/lib/sync/{syncCalendar,syncDrivers,openf1}.ts` — shared sync primitives, refactored out of the CLI scripts so CLI + cron share code
+- [x] `/api/cron/sync-f1-data` — Bearer-token gated route handler that runs the nightly reconciliation. Verified 401 on unauthorized calls. Vercel cron config deferred to Phase 6.
+- [ ] Resend email alert on fetch failure — **deferred** per session-1 decision; `/api/cron/sync-f1-data` currently console-logs errors and returns 500 JSON
+- [ ] `/api/cron/fetch-results` — **skipped** per Phase 0 latency gate (manual admin entry is primary path; rerun latency after Miami race to revisit)
 
-**Exit criteria:** Seeded completed-event fixture → scores table populated with correct values per U1–U7. Re-running the pipeline produces identical rows. Manual path works indistinguishably from cron path.
+**Exit criteria:** I9 + I10 green ✓. Seeded completed-event fixture → scores + streaks populated per U1–U7 ✓. Re-running produces identical row counts + values ✓. Sprint event rejects race-shape results ✓.
 
-**Tests attached:** U1–U7 · I9 · I10 · (I11 · I12 · I13 only if cron wired)
+**Tests attached:** U1–U7 ✓ (Phase 1) · I9 ✓ non-admin ADMIN_REQUIRED · I10 ✓ admin writes results → scores + streaks + idempotent · I10b ✓ sprint variant validation guard.
 
 ---
 

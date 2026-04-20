@@ -3,7 +3,9 @@ import { createServerClient } from "@supabase/ssr";
 import { INVITE_COOKIE_NAME, isValidInviteCookie } from "@/lib/inviteCookie";
 
 const PUBLIC_PATHS = new Set(["/join", "/login"]);
-const PUBLIC_PREFIXES = ["/auth/", "/_next/", "/api/public/"];
+// /api/cron/* is gated by CRON_SECRET inside each route; the invite + session
+// middleware would block Vercel's cron requests (they have no user cookies).
+const PUBLIC_PREFIXES = ["/auth/", "/_next/", "/api/public/", "/api/cron/"];
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;

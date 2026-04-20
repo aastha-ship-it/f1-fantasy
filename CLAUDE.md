@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0, 1, and 2 shipped (2026-04-20).** Auth + schema + RLS + predict loop live. 29/29 tests green across 5 files (12 unit U1–U12 + 11 integration I1–I8 with regression guards). Typecheck, lint, and production build all clean.
+**Phases 0, 1, 2, and 3 shipped (2026-04-20).** Auth + schema + RLS + predict loop + admin results pipeline all live. 32/32 tests green across 6 files (12 unit + 20 integration incl. I1–I10 and regression guards). Typecheck, lint, and production build all clean.
 
-Routes currently serving: `/`, `/join`, `/login`, `/auth/callback`, `/dashboard`, `/dashboard/predict` (session list), `/dashboard/predict/[eventId]` (picker).
+Routes currently serving: `/`, `/join`, `/login`, `/auth/callback`, `/dashboard`, `/dashboard/predict`, `/dashboard/predict/[eventId]`, `/admin`, `/admin/results/[eventId]`, `/api/cron/sync-f1-data` (Bearer-token gated).
 
 See `plans/program-tracker.md` for the live phase-by-phase status. See `plans/flickering-giggling-valley.md` for the authoritative plan.
 
@@ -100,15 +100,17 @@ bun --env-file=.env.local run scripts/seed-calendar.ts  # 2026 schedule
 bun --env-file=.env.local run scripts/seed-drivers.ts   # current drivers
 ```
 
-### Admin bootstrap (run once after first magic-link sign-in)
+### Admin bootstrap
 
-Open Studio at http://127.0.0.1:54423, go to Table Editor → `auth.users`, copy your row's `id`, then in SQL Editor:
+Recommended: set `ADMIN_EMAIL=<your-email>` in `.env.local`. The `/auth/callback` route auto-UPSERTs that user into `public.admins` on every magic-link sign-in. That makes the bootstrap self-healing — a `supabase db reset` (which wipes `public.admins`) becomes a non-event; next sign-in restores admin.
+
+Manual fallback (if you don't want to set the env var): paste your uuid into Studio's SQL editor:
 
 ```sql
 insert into public.admins (user_id) values ('<your-uuid-here>');
 ```
 
-Never ship a UI for granting admin — this stays DB-side forever.
+Never ship a UI for granting admin — this stays DB-side / env-side forever.
 
 ## Architecture — the 5 things you need to know before writing code
 
@@ -192,6 +194,20 @@ CRON_SECRET=                    # verifies Vercel cron calls (unused until Phase
 Integration tests share the local Supabase instance, so test *files* must run sequentially — `beforeEach(resetTestData)` races fatally against in-flight tests in another file otherwise. `vitest.config.ts` sets `test.fileParallelism: false`. Tests within one file already sequence via `beforeEach`, so this is the minimum needed. Don't try to enable file parallelism for integration tests without first giving each file its own schema/namespace.
 
 Vitest 4's config TS types reject `poolOptions.threads.singleThread` (runtime accepts it; types don't expose it). Use `fileParallelism: false` instead.
+
+### Cron endpoints
+
+`/api/cron/*` is **exempted from the invite + session middleware** (see `PUBLIC_PREFIXES` in `src/middleware.ts`) because Vercel cron requests have no user cookies. Every route under `/api/cron/` must verify `Authorization: Bearer ${process.env.CRON_SECRET}` inside the handler — the middleware will not do it for you. A missing or wrong token returns 401.
+
+To trigger a sync locally:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" \
+  'http://localhost:3000/api/cron/sync-f1-data'
+# Optional: ?season=2027
+```
+
+CLI seed scripts and the cron endpoint share the same lib functions in `src/lib/sync/`. If you change the sync logic, update one place; both paths benefit.
 
 ### Supabase local config footguns
 

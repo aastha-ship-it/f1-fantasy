@@ -22,14 +22,32 @@ export function anonClient(): SupabaseClient {
   );
 }
 
+/**
+ * Wipe only data that belongs to test fixtures:
+ *   - users/auth.users with the test+*@f1fantasy.test email pattern
+ *   - events in season 9999
+ *   - predictions/scores/admins scoped to those test users
+ *
+ * Critically does NOT touch admins for real users — earlier versions ran
+ * `delete from public.admins where true`, which wiped the developer's own
+ * admin bootstrap every time the suite ran.
+ */
 export async function resetTestData(): Promise<void> {
   const sql = postgres(process.env.DATABASE_URL!, { max: 1 });
   try {
-    await sql`delete from public.predictions where true`;
-    await sql`delete from public.scores where true`;
-    await sql`delete from public.results where true`;
+    const testUserIds = await sql<{ id: string }[]>`
+      select id from auth.users where email like 'test+%@f1fantasy.test'
+    `;
+    const ids = testUserIds.map((u) => u.id);
+
+    await sql`delete from public.results where event_id in (select id from public.events where season = 9999)`;
+    await sql`delete from public.scores where event_id in (select id from public.events where season = 9999)`;
+    await sql`delete from public.predictions where event_id in (select id from public.events where season = 9999)`;
+    if (ids.length > 0) {
+      await sql`delete from public.admins where user_id in ${sql(ids)}`;
+      await sql`delete from public.user_streaks where user_id in ${sql(ids)}`;
+    }
     await sql`delete from public.events where season = 9999`;
-    await sql`delete from public.admins where true`;
     await sql`delete from public.users where email like 'test+%@f1fantasy.test'`;
     await sql`delete from auth.users where email like 'test+%@f1fantasy.test'`;
   } finally {
