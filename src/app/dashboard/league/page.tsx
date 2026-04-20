@@ -43,7 +43,6 @@ export default async function LeaguePage() {
     (streaks ?? []).map((s) => [s.user_id as string, s as StreakRow]),
   );
 
-  // Aggregate points + perfect podiums per user.
   const totals = new Map<
     string,
     { points: number; perfects: number; events: number }
@@ -59,7 +58,6 @@ export default async function LeaguePage() {
     if (s.perfect_bonus) t.perfects += 1;
     totals.set(s.user_id, t);
   }
-  // Include every league member, even if they haven't scored yet.
   for (const u of users ?? []) {
     if (!totals.has(u.id as string)) {
       totals.set(u.id as string, { points: 0, perfects: 0, events: 0 });
@@ -82,15 +80,19 @@ export default async function LeaguePage() {
       );
     });
 
-  // Compute ranks, honoring ties.
   const ranked = rows.map((r, i, arr) => {
     let rank = i + 1;
-    if (i > 0 && arr[i - 1].points === r.points && arr[i - 1].perfects === r.perfects) {
-      // Tied — inherit prior rank.
+    if (
+      i > 0 &&
+      arr[i - 1].points === r.points &&
+      arr[i - 1].perfects === r.perfects
+    ) {
       rank = (arr[i - 1] as typeof r & { rank?: number }).rank ?? rank;
     }
     return { ...r, rank };
   });
+
+  const myRow = ranked.find((r) => r.userId === me);
 
   return (
     <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
@@ -113,85 +115,183 @@ export default async function LeaguePage() {
         LEADERBOARD
       </h1>
 
-      {ranked.length === 0 ? (
-        <p className="text-[color:var(--fg-muted)]">
-          Nobody&rsquo;s on the board yet. The leaderboard lights up after the
-          first reveal.
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {ranked.map((r) => {
-            const isMe = r.userId === me;
-            return (
-              <li
-                key={r.userId}
-                className={`grid grid-cols-[60px_1fr_auto_auto] items-center gap-4 rounded-lg border px-5 py-4 ${
-                  isMe
-                    ? "border-[color:var(--accent-muted)] bg-[color:var(--surface-2)]"
-                    : "border-[color:var(--border)] bg-[color:var(--surface)]"
-                }`}
-              >
-                <span
-                  className="text-2xl leading-none"
-                  style={{
-                    fontFamily: "var(--font-boldonse), ui-sans-serif",
-                  }}
-                  data-tabular
-                >
-                  {r.rank}
-                </span>
-                <div className="flex flex-col gap-1">
-                  <p className="text-base text-[color:var(--fg)]">
-                    {displayName(r.user!, isMe)}
-                  </p>
-                  {r.events > 0 ? (
-                    <p className="text-xs text-[color:var(--fg-subtle)]" data-tabular>
-                      {r.events} event{r.events === 1 ? "" : "s"}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-[color:var(--fg-subtle)]">
-                      No scored events yet
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-[color:var(--fg-muted)]">
-                  {r.streak?.current_p1_streak ? (
-                    <span
-                      className="rounded bg-[color:var(--surface-2)] px-2 py-1"
-                      title={`${r.streak.current_p1_streak} consecutive correct P1`}
-                      style={{
-                        fontFamily:
-                          "apple color emoji, noto color emoji, sans-serif",
-                      }}
-                    >
-                      🔥<span data-tabular className="ml-1">{r.streak.current_p1_streak}</span>
-                    </span>
-                  ) : null}
-                  {r.perfects > 0 && (
-                    <span className="rounded border border-[color:var(--accent)] px-2 py-1 text-[color:var(--accent)]">
-                      <span data-tabular>{r.perfects}</span> PP
-                    </span>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p
-                    className="text-2xl"
-                    data-tabular
-                    style={{
-                      fontFamily: "var(--font-mono), ui-monospace, monospace",
-                    }}
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+        {/* Leaderboard table — capped at a readable width inside the wider shell. */}
+        <div className="max-w-4xl">
+          {ranked.length === 0 ? (
+            <p className="text-[color:var(--fg-muted)]">
+              Nobody&rsquo;s on the board yet. The leaderboard lights up after
+              the first reveal.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {ranked.map((r) => {
+                const isMe = r.userId === me;
+                return (
+                  <li
+                    key={r.userId}
+                    className={`grid grid-cols-[56px_minmax(0,1fr)_auto_120px] items-center gap-4 rounded-lg border px-5 py-4 ${
+                      isMe
+                        ? "border-[color:var(--accent-muted)] bg-[color:var(--surface-2)]"
+                        : "border-[color:var(--border)] bg-[color:var(--surface)]"
+                    }`}
                   >
-                    {r.points}
-                  </p>
-                  <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
-                    pts
-                  </p>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                    <span
+                      className="text-2xl leading-none"
+                      style={{
+                        fontFamily: "var(--font-boldonse), ui-sans-serif",
+                      }}
+                      data-tabular
+                    >
+                      {r.rank}
+                    </span>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <p className="truncate text-base text-[color:var(--fg)]">
+                        {displayName(r.user!, isMe)}
+                      </p>
+                      {r.events > 0 ? (
+                        <p
+                          className="text-xs text-[color:var(--fg-subtle)]"
+                          data-tabular
+                        >
+                          {r.events} event{r.events === 1 ? "" : "s"}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-[color:var(--fg-subtle)]">
+                          No scored events yet
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-[color:var(--fg-muted)]">
+                      {r.streak?.current_p1_streak ? (
+                        <span
+                          className="rounded bg-[color:var(--surface-2)] px-2 py-1"
+                          title={`${r.streak.current_p1_streak} consecutive correct P1`}
+                          style={{
+                            fontFamily:
+                              "apple color emoji, noto color emoji, sans-serif",
+                          }}
+                        >
+                          🔥
+                          <span data-tabular className="ml-1">
+                            {r.streak.current_p1_streak}
+                          </span>
+                        </span>
+                      ) : null}
+                      {r.perfects > 0 && (
+                        <span className="rounded border border-[color:var(--accent)] px-2 py-1 text-[color:var(--accent)]">
+                          <span data-tabular>{r.perfects}</span> PP
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p
+                        className="text-2xl"
+                        data-tabular
+                        style={{
+                          fontFamily: "var(--font-mono), ui-monospace, monospace",
+                        }}
+                      >
+                        {r.points}
+                      </p>
+                      <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
+                        pts
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Your position — sticky sidebar card. */}
+        {myRow && (
+          <aside className="flex flex-col gap-4 lg:sticky lg:top-6 lg:self-start">
+            <div className="rounded-lg border border-[color:var(--accent-muted)] bg-[color:var(--surface)] p-5">
+              <p className="text-xs uppercase tracking-wider text-[color:var(--accent)]">
+                Your position
+              </p>
+              <div className="mt-3 flex items-baseline gap-3">
+                <span
+                  className="text-5xl leading-none"
+                  data-tabular
+                  style={{ fontFamily: "var(--font-boldonse), ui-sans-serif" }}
+                >
+                  #{myRow.rank}
+                </span>
+                <span className="text-sm text-[color:var(--fg-subtle)]">
+                  of {ranked.length}
+                </span>
+              </div>
+              <dl className="mt-6 grid grid-cols-3 gap-3 text-center">
+                <Stat
+                  label="Pts"
+                  value={myRow.points}
+                />
+                <Stat
+                  label="Events"
+                  value={myRow.events}
+                />
+                <Stat
+                  label="PP"
+                  value={myRow.perfects}
+                  hint="Perfect podiums"
+                />
+              </dl>
+              {myRow.streak?.current_p1_streak ? (
+                <p
+                  className="mt-4 flex items-center gap-2 text-sm text-[color:var(--fg-muted)]"
+                  style={{
+                    fontFamily:
+                      "apple color emoji, noto color emoji, sans-serif",
+                  }}
+                >
+                  🔥
+                  <span data-tabular>
+                    {myRow.streak.current_p1_streak}
+                  </span>
+                  <span className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
+                    consecutive P1 calls
+                  </span>
+                </p>
+              ) : null}
+              {myRow.streak?.longest_p1_streak &&
+              myRow.streak.longest_p1_streak > 0 ? (
+                <p className="mt-2 text-xs text-[color:var(--fg-subtle)]">
+                  Longest P1 streak:{" "}
+                  <span data-tabular>{myRow.streak.longest_p1_streak}</span>
+                </p>
+              ) : null}
+            </div>
+          </aside>
+        )}
+      </div>
     </main>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: number;
+  hint?: string;
+}) {
+  return (
+    <div title={hint}>
+      <dt className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
+        {label}
+      </dt>
+      <dd
+        className="mt-1 text-2xl"
+        data-tabular
+        style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}
+      >
+        {value}
+      </dd>
+    </div>
   );
 }
