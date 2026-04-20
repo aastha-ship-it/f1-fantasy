@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>F1 Fantasy — Reveal / Miami GP 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Boldonse&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         oklch(16% 0.012 27);
+    --surface:    oklch(21% 0.015 27);
+    --surface-2:  oklch(26% 0.018 27);
+    --border:     oklch(34% 0.020 27);
+    --fg:         oklch(96% 0.008 27);
+    --fg-muted:   oklch(72% 0.015 27);
+    --fg-subtle:  oklch(52% 0.018 27);
+    --accent:     oklch(62% 0.22 27);
+    --team-mclaren: oklch(72% 0.17 55);
+    --team-ferrari: oklch(58% 0.22 27);
+    --team-redbull: oklch(38% 0.16 265);
+    --team-merc:    oklch(78% 0.08 180);
+    --team-aston:   oklch(50% 0.15 165);
+    --team-williams: oklch(58% 0.14 245);
+
+    --f-display: 'Boldonse', system-ui, sans-serif;
+    --f-body:    'Geist', system-ui, sans-serif;
+    --f-mono:    'Geist Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--fg); font-family: var(--f-body); min-height: 100vh; }
+  body { padding: 48px 64px; font-variant-numeric: tabular-nums; }
+
+  header.meta {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding-bottom: 24px; border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+  .event-name {
+    font-family: var(--f-display);
+    font-size: clamp(32px, 4vw, 56px);
+    letter-spacing: -0.01em;
+    line-height: 0.95;
+    text-transform: uppercase;
+  }
+  .event-subtle {
+    font-family: var(--f-mono); font-size: 13px; color: var(--fg-subtle);
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+
+  /* RESULT ROW — asymmetric, top-left anchored */
+  .result-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr auto;
+    gap: 16px;
+    align-items: stretch;
+    margin-bottom: 80px;
+  }
+  .result-card {
+    background: var(--surface);
+    padding: 32px 28px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    min-height: 220px;
+    position: relative;
+  }
+  .result-card.p1 { background: var(--surface-2); }
+  .pos {
+    font-family: var(--f-display);
+    font-size: 96px; line-height: 0.85;
+    color: var(--fg);
+  }
+  .result-card.p1 .pos { font-size: 144px; }
+  .driver-meta { display: flex; flex-direction: column; gap: 4px; }
+  .driver-code {
+    font-family: var(--f-display);
+    font-size: 24px; letter-spacing: 0.02em;
+  }
+  .driver-name {
+    font-family: var(--f-body); font-weight: 500;
+    font-size: 15px; color: var(--fg-muted);
+  }
+  .team-chip {
+    display: inline-block;
+    font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 3px 8px;
+    margin-top: 8px;
+    border: 1px solid var(--border);
+  }
+  .team-chip.mclaren  { color: var(--team-mclaren); border-color: var(--team-mclaren); }
+  .team-chip.ferrari  { color: var(--team-ferrari); border-color: var(--team-ferrari); }
+  .team-chip.redbull  { color: var(--team-redbull); border-color: var(--team-redbull); }
+  .team-chip.merc     { color: var(--team-merc); border-color: var(--team-merc); }
+  .team-chip.aston    { color: var(--team-aston); border-color: var(--team-aston); }
+  .team-chip.williams { color: var(--team-williams); border-color: var(--team-williams); }
+
+  .result-marker {
+    font-family: var(--f-mono); font-size: 11px; color: var(--fg-subtle);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    align-self: flex-start;
+  }
+
+  /* FRIEND PICKS GRID — asymmetric */
+  .friends-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 24px;
+  }
+  .friends-title {
+    font-family: var(--f-display);
+    font-size: 28px; letter-spacing: -0.01em;
+    text-transform: uppercase;
+  }
+  .friends-count {
+    font-family: var(--f-mono); font-size: 12px; color: var(--fg-subtle);
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .friends-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+  }
+  .friend-card {
+    background: var(--surface);
+    padding: 24px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .friend-card.perfect {
+    background: linear-gradient(to bottom, oklch(24% 0.04 27), var(--surface) 40%);
+  }
+  .friend-top {
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .friend-name {
+    font-family: var(--f-body); font-weight: 600; font-size: 18px;
+  }
+  .friend-points {
+    font-family: var(--f-mono); font-weight: 500; font-size: 24px;
+    color: var(--fg);
+  }
+  .friend-picks {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .pick-slot {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .pick-pos {
+    font-family: var(--f-mono); font-size: 10px;
+    color: var(--fg-subtle); letter-spacing: 0.08em;
+  }
+  .pick-code {
+    font-family: var(--f-display); font-size: 16px; letter-spacing: 0.02em;
+  }
+  .pick-code.exact { color: var(--fg); }
+  .pick-code.slot  { color: var(--fg-muted); }
+  .pick-code.miss  { color: var(--fg-subtle); text-decoration: line-through; }
+
+  .friend-breakdown {
+    font-family: var(--f-mono); font-size: 11px; color: var(--fg-muted);
+    letter-spacing: 0.04em;
+  }
+
+  .perfect-badge {
+    font-family: var(--f-mono); font-size: 11px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--accent);
+    padding: 4px 10px;
+    border: 1px solid var(--accent);
+    align-self: flex-start;
+    margin-top: 4px;
+  }
+
+  /* SHARE BAR */
+  .share-bar {
+    position: fixed; bottom: 32px; right: 32px;
+    display: flex; gap: 12px;
+  }
+  .btn-share {
+    font-family: var(--f-body); font-weight: 500;
+    padding: 12px 20px;
+    background: transparent; color: var(--fg);
+    border: 1px solid var(--border);
+    font-size: 14px; letter-spacing: 0.02em;
+    cursor: pointer;
+  }
+  .btn-share:hover { border-color: var(--fg-muted); }
+</style>
+</head>
+<body>
+
+<header class="meta">
+  <div>
+    <div class="event-subtle">Round 6 · Race · Revealed 2 min ago</div>
+    <div class="event-name">Miami<br/>Grand Prix 2026</div>
+  </div>
+  <div class="event-subtle">Sunday 04 May · 20:04 local</div>
+</header>
+
+<!-- RESULT ROW -->
+<section class="result-row">
+  <div class="result-card p1">
+    <div>
+      <div class="result-marker">Classified P1</div>
+      <div class="pos" style="margin-top:16px;">1</div>
+    </div>
+    <div class="driver-meta">
+      <div class="driver-code">PIA</div>
+      <div class="driver-name">Oscar Piastri</div>
+      <span class="team-chip mclaren">McLaren</span>
+    </div>
+  </div>
+  <div class="result-card">
+    <div>
+      <div class="result-marker">P2</div>
+      <div class="pos" style="margin-top:16px;">2</div>
+    </div>
+    <div class="driver-meta">
+      <div class="driver-code">LEC</div>
+      <div class="driver-name">Charles Leclerc</div>
+      <span class="team-chip ferrari">Ferrari</span>
+    </div>
+  </div>
+  <div class="result-card">
+    <div>
+      <div class="result-marker">P3</div>
+      <div class="pos" style="margin-top:16px;">3</div>
+    </div>
+    <div class="driver-meta">
+      <div class="driver-code">NOR</div>
+      <div class="driver-name">Lando Norris</div>
+      <span class="team-chip mclaren">McLaren</span>
+    </div>
+  </div>
+  <div style="align-self:end; padding:0 8px;">
+    <div class="event-subtle" style="margin-bottom:4px;">Fastest lap</div>
+    <div class="driver-code" style="font-size:18px;">VER · 1:29.284</div>
+  </div>
+</section>
+
+<!-- FRIEND PICKS -->
+<section>
+  <div class="friends-header">
+    <div class="friends-title">The Group</div>
+    <div class="friends-count">8 Friends · 5 Picks Revealed · 3 Perfect Podiums This Season</div>
+  </div>
+
+  <div class="friends-grid">
+
+    <!-- Perfect podium -->
+    <article class="friend-card perfect">
+      <div class="friend-top">
+        <div class="friend-name">Aastha</div>
+        <div class="friend-points">18</div>
+      </div>
+      <div class="friend-picks">
+        <div class="pick-slot">
+          <span class="pick-pos">P1</span>
+          <span class="pick-code exact">PIA</span>
+        </div>
+        <div class="pick-slot">
+          <span class="pick-pos">P2</span>
+          <span class="pick-code exact">LEC</span>
+        </div>
+        <div class="pick-slot">
+          <span class="pick-pos">P3</span>
+          <span class="pick-code exact">NOR</span>
+        </div>
+      </div>
+      <div class="friend-breakdown">3 exact · 0 slot · 0 dnf · +3 bonus</div>
+      <span class="perfect-badge">Perfect Podium</span>
+    </article>
+
+    <article class="friend-card">
+      <div class="friend-top">
+        <div class="friend-name">Vineet</div>
+        <div class="friend-points">7</div>
+      </div>
+      <div class="friend-picks">
+        <div class="pick-slot"><span class="pick-pos">P1</span><span class="pick-code exact">PIA</span></div>
+        <div class="pick-slot"><span class="pick-pos">P2</span><span class="pick-code slot">NOR</span></div>
+        <div class="pick-slot"><span class="pick-pos">P3</span><span class="pick-code miss">VER</span></div>
+      </div>
+      <div class="friend-breakdown">1 exact · 1 slot · 1 dnf-zero</div>
+    </article>
+
+    <article class="friend-card">
+      <div class="friend-top">
+        <div class="friend-name">Priya</div>
+        <div class="friend-points">5</div>
+      </div>
+      <div class="friend-picks">
+        <div class="pick-slot"><span class="pick-pos">P1</span><span class="pick-code exact">PIA</span></div>
+        <div class="pick-slot"><span class="pick-pos">P2</span><span class="pick-code miss">RUS</span></div>
+        <div class="pick-slot"><span class="pick-pos">P3</span><span class="pick-code miss">SAI</span></div>
+      </div>
+      <div class="friend-breakdown">1 exact · 0 slot · 2 miss</div>
+    </article>
+
+    <article class="friend-card">
+      <div class="friend-top">
+        <div class="friend-name">Rohan</div>
+        <div class="friend-points">4</div>
+      </div>
+      <div class="friend-picks">
+        <div class="pick-slot"><span class="pick-pos">P1</span><span class="pick-code miss">VER</span></div>
+        <div class="pick-slot"><span class="pick-pos">P2</span><span class="pick-code slot">PIA</span></div>
+        <div class="pick-slot"><span class="pick-pos">P3</span><span class="pick-code slot">LEC</span></div>
+      </div>
+      <div class="friend-breakdown">0 exact · 2 slot · 1 miss</div>
+    </article>
+
+    <article class="friend-card">
+      <div class="friend-top">
+        <div class="friend-name">Nikhil</div>
+        <div class="friend-points">2</div>
+      </div>
+      <div class="friend-picks">
+        <div class="pick-slot"><span class="pick-pos">P1</span><span class="pick-code miss">VER</span></div>
+        <div class="pick-slot"><span class="pick-pos">P2</span><span class="pick-code miss">HAM</span></div>
+        <div class="pick-slot"><span class="pick-pos">P3</span><span class="pick-code slot">PIA</span></div>
+      </div>
+      <div class="friend-breakdown">0 exact · 1 slot · 2 miss</div>
+    </article>
+
+    <article class="friend-card">
+      <div class="friend-top">
+        <div class="friend-name">Tara</div>
+        <div class="friend-points">0</div>
+      </div>
+      <div class="friend-picks">
+        <div class="pick-slot"><span class="pick-pos">P1</span><span class="pick-code miss">VER</span></div>
+        <div class="pick-slot"><span class="pick-pos">P2</span><span class="pick-code miss">RUS</span></div>
+        <div class="pick-slot"><span class="pick-pos">P3</span><span class="pick-code miss">ALO</span></div>
+      </div>
+      <div class="friend-breakdown">0 exact · 0 slot · 3 miss — rough week</div>
+    </article>
+
+    <article class="friend-card">
+      <div class="friend-top">
+        <div class="friend-name">Kunal</div>
+        <div class="friend-points">9</div>
+      </div>
+      <div class="friend-picks">
+        <div class="pick-slot"><span class="pick-pos">P1</span><span class="pick-code slot">LEC</span></div>
+        <div class="pick-slot"><span class="pick-pos">P2</span><span class="pick-code exact">LEC</span></div>
+        <div class="pick-slot"><span class="pick-pos">P3</span><span class="pick-code slot">PIA</span></div>
+      </div>
+      <div class="friend-breakdown">1 exact · 2 slot · 0 miss</div>
+    </article>
+
+    <article class="friend-card">
+      <div class="friend-top">
+        <div class="friend-name">Dev</div>
+        <div class="friend-points">5</div>
+      </div>
+      <div class="friend-picks">
+        <div class="pick-slot"><span class="pick-pos">P1</span><span class="pick-code exact">PIA</span></div>
+        <div class="pick-slot"><span class="pick-pos">P2</span><span class="pick-code miss">VER</span></div>
+        <div class="pick-slot"><span class="pick-pos">P3</span><span class="pick-code miss">SAI</span></div>
+      </div>
+      <div class="friend-breakdown">1 exact · 0 slot · 2 miss</div>
+    </article>
+
+  </div>
+</section>
+
+<!-- FLOATING SHARE BAR -->
+<div class="share-bar">
+  <button class="btn-share">Share Card →</button>
+</div>
+
+</body>
+</html>

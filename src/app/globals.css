@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+/*
+ * F1 Fantasy — OKLCH tokens (see .impeccable.md for rationale).
+ * Dark theme default. All neutrals tinted toward F1-red hue (27°).
+ */
+:root {
+  /* Core surfaces */
+  --bg: oklch(16% 0.012 27);
+  --surface: oklch(21% 0.015 27);
+  --surface-2: oklch(26% 0.018 27);
+  --border: oklch(34% 0.020 27);
+
+  /* Text */
+  --fg: oklch(96% 0.008 27);
+  --fg-muted: oklch(72% 0.015 27);
+  --fg-subtle: oklch(52% 0.018 27);
+
+  /* Brand accent — reserved for 10% of pixels */
+  --accent: oklch(62% 0.22 27);
+  --accent-hover: oklch(68% 0.22 27);
+  --accent-muted: oklch(48% 0.15 27);
+
+  /* State */
+  --success: oklch(68% 0.18 150);
+  --warning: oklch(74% 0.18 70);
+  --error: oklch(60% 0.22 15);
+
+  /* Team chips */
+  --team-mclaren: oklch(72% 0.17 55);
+  --team-ferrari: oklch(58% 0.22 27);
+  --team-mercedes: oklch(78% 0.08 180);
+  --team-redbull: oklch(38% 0.16 265);
+  --team-aston: oklch(50% 0.15 165);
+  --team-williams: oklch(58% 0.14 245);
+  --team-haas: oklch(88% 0.01 27);
+  --team-kick: oklch(60% 0.20 145);
+  --team-alpine: oklch(58% 0.18 260);
+  --team-vcarb: oklch(45% 0.12 260);
+
+  /* Spacing scale (4pt base) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+  --space-4xl: 64px;
+
+  /* Motion */
+  --ease-out-quart: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-muted: var(--accent-muted);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-team-mclaren: var(--team-mclaren);
+  --color-team-ferrari: var(--team-ferrari);
+  --color-team-mercedes: var(--team-mercedes);
+  --color-team-redbull: var(--team-redbull);
+  --color-team-aston: var(--team-aston);
+  --color-team-williams: var(--team-williams);
+  --color-team-haas: var(--team-haas);
+  --color-team-kick: var(--team-kick);
+  --color-team-alpine: var(--team-alpine);
+  --color-team-vcarb: var(--team-vcarb);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-boldonse);
+
+  /*
+   * Tailwind v4's --spacing-* namespace is shared by p/m/gap/w/h/max-w/max-h
+   * utilities. Defining --spacing-xl here would hijack max-w-xl, so we keep
+   * our semantic space tokens under the separate --space-* namespace and
+   * reference them explicitly via `style={{ padding: "var(--space-lg)" }}`
+   * or Tailwind arbitrary values `p-[var(--space-lg)]` when needed.
+   */
+
+  --ease-quart: var(--ease-out-quart);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv01";
+}
+
+/* Mandatory tabular figures for anything resembling numerics */
+.tabular,
+[data-tabular] {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+/* Respect reduced motion: no pulses, no flips */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

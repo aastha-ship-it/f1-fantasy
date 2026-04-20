@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>F1 Fantasy — Predict / Miami Race</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Boldonse&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         oklch(16% 0.012 27);
+    --surface:    oklch(21% 0.015 27);
+    --surface-2:  oklch(26% 0.018 27);
+    --border:     oklch(34% 0.020 27);
+    --fg:         oklch(96% 0.008 27);
+    --fg-muted:   oklch(72% 0.015 27);
+    --fg-subtle:  oklch(52% 0.018 27);
+    --accent:     oklch(62% 0.22 27);
+    --warning:    oklch(74% 0.18 70);
+    --team-mclaren: oklch(72% 0.17 55);
+    --team-ferrari: oklch(58% 0.22 27);
+    --team-redbull: oklch(38% 0.16 265);
+    --team-merc:    oklch(78% 0.08 180);
+    --f-display:  'Boldonse', system-ui, sans-serif;
+    --f-body:     'Geist', system-ui, sans-serif;
+    --f-mono:     'Geist Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--fg); font-family: var(--f-body); min-height: 100vh; }
+  body { padding: 48px 64px 160px; font-variant-numeric: tabular-nums; }
+
+  .hero {
+    display: grid; grid-template-columns: 1.4fr 1fr;
+    gap: 48px; margin-bottom: 48px;
+    padding-bottom: 24px; border-bottom: 1px solid var(--border);
+  }
+  .hero .eyebrow {
+    font-family: var(--f-mono); font-size: 12px; letter-spacing: 0.08em;
+    color: var(--fg-subtle); text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .hero h1 {
+    font-family: var(--f-display);
+    font-size: clamp(48px, 5vw, 88px); line-height: 0.9;
+    letter-spacing: -0.015em; text-transform: uppercase;
+  }
+  .hero-side {
+    display: flex; flex-direction: column; align-items: flex-end;
+    justify-content: flex-end; gap: 6px;
+  }
+  .countdown-label {
+    font-family: var(--f-mono); font-size: 11px;
+    color: var(--fg-subtle); letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .countdown {
+    font-family: var(--f-mono);
+    font-size: 56px; font-weight: 500; line-height: 1;
+    color: var(--fg);
+  }
+  .countdown-sub {
+    font-family: var(--f-mono); font-size: 12px;
+    color: var(--fg-muted);
+    letter-spacing: 0.04em;
+  }
+
+  /* SLOT PICKERS */
+  .slots {
+    display: grid; grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 1px; background: var(--border);
+    border: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .slot {
+    background: var(--surface);
+    padding: 32px 28px;
+    min-height: 240px;
+    display: flex; flex-direction: column; gap: 20px;
+    position: relative;
+  }
+  .slot.p1 { background: var(--surface-2); }
+  .slot-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+  .slot-pos {
+    font-family: var(--f-display); font-size: 64px; line-height: 0.85;
+  }
+  .slot.p1 .slot-pos { font-size: 96px; }
+  .slot-state {
+    font-family: var(--f-mono); font-size: 10px;
+    color: var(--fg-subtle); letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .slot-state.filled { color: var(--fg-muted); }
+
+  .slot-filled {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .filled-code {
+    font-family: var(--f-display); font-size: 28px;
+    letter-spacing: 0.02em;
+  }
+  .filled-name {
+    font-family: var(--f-body); font-weight: 500;
+    font-size: 14px; color: var(--fg-muted);
+  }
+  .filled-chip {
+    font-family: var(--f-mono); font-size: 10px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 3px 8px; margin-top: 6px;
+    border: 1px solid var(--border);
+    display: inline-block;
+    align-self: flex-start;
+  }
+  .filled-chip.mclaren { color: var(--team-mclaren); border-color: var(--team-mclaren); }
+  .filled-chip.ferrari { color: var(--team-ferrari); border-color: var(--team-ferrari); }
+  .filled-chip.redbull { color: var(--team-redbull); border-color: var(--team-redbull); }
+  .filled-chip.merc    { color: var(--team-merc); border-color: var(--team-merc); }
+
+  .slot-empty {
+    font-family: var(--f-body); font-weight: 500; font-size: 15px;
+    color: var(--fg-muted);
+    font-style: italic;
+  }
+
+  .nudge {
+    margin-top: auto;
+    font-family: var(--f-mono); font-size: 11px;
+    color: var(--fg-muted);
+    line-height: 1.4;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .nudge strong { color: var(--fg); font-weight: 500; }
+
+  .change-pick {
+    font-family: var(--f-mono); font-size: 11px;
+    color: var(--fg-muted);
+    letter-spacing: 0.04em;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    align-self: flex-start;
+  }
+
+  /* LOCK BAR — bottom sticky */
+  .lock-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface-2);
+    border-top: 1px solid var(--border);
+    padding: 20px 64px;
+    display: grid; grid-template-columns: 1fr auto; gap: 32px;
+    align-items: center;
+  }
+  .lock-status {
+    font-family: var(--f-mono); font-size: 13px;
+    color: var(--fg-muted);
+    letter-spacing: 0.04em;
+  }
+  .lock-status strong { color: var(--fg); }
+
+  .btn-primary {
+    font-family: var(--f-display); letter-spacing: 0.02em;
+    text-transform: uppercase;
+    padding: 18px 40px;
+    background: var(--accent); color: var(--fg);
+    border: none; font-size: 16px;
+    cursor: pointer;
+  }
+  .btn-primary.locked-soon {
+    background: var(--warning);
+  }
+
+  /* METADATA STRIP (top) */
+  .meta-strip {
+    display: flex; justify-content: space-between;
+    font-family: var(--f-mono); font-size: 12px;
+    color: var(--fg-subtle); letter-spacing: 0.04em;
+    padding-bottom: 24px;
+    text-transform: uppercase;
+  }
+  .meta-strip span strong { color: var(--fg-muted); }
+</style>
+</head>
+<body>
+
+<div class="meta-strip">
+  <span>F1 Fantasy · <strong>The Group</strong> · 2026</span>
+  <span>Logged in as <strong>Aastha</strong></span>
+</div>
+
+<section class="hero">
+  <div>
+    <div class="eyebrow">Round 6 · Race · Picks needed</div>
+    <h1>Miami<br/>Grand Prix</h1>
+  </div>
+  <div class="hero-side">
+    <div class="countdown-label">Locks in</div>
+    <div class="countdown">2d 14h 23m</div>
+    <div class="countdown-sub">Sun 04 May · 20:00 IST · Miami Int. Autodrome</div>
+  </div>
+</section>
+
+<section class="slots">
+  <div class="slot p1">
+    <div class="slot-head">
+      <span class="slot-pos">1</span>
+      <span class="slot-state filled">Picked</span>
+    </div>
+    <div class="slot-filled">
+      <span class="filled-code">PIA</span>
+      <span class="filled-name">Oscar Piastri</span>
+      <span class="filled-chip mclaren">McLaren</span>
+    </div>
+    <span class="change-pick">Change pick</span>
+    <div class="nudge">
+      <strong>Piastri</strong> has finished podium in <strong>3 of last 5 races</strong>. Won here in 2025. Quali avg: P3.
+    </div>
+  </div>
+
+  <div class="slot">
+    <div class="slot-head">
+      <span class="slot-pos">2</span>
+      <span class="slot-state filled">Picked</span>
+    </div>
+    <div class="slot-filled">
+      <span class="filled-code">LEC</span>
+      <span class="filled-name">Charles Leclerc</span>
+      <span class="filled-chip ferrari">Ferrari</span>
+    </div>
+    <span class="change-pick">Change pick</span>
+    <div class="nudge">
+      <strong>Leclerc</strong>: 2 podiums, 1 DNF in Miami last 3 years. Street-circuit specialist.
+    </div>
+  </div>
+
+  <div class="slot">
+    <div class="slot-head">
+      <span class="slot-pos">3</span>
+      <span class="slot-state">Tap to pick</span>
+    </div>
+    <div class="slot-empty">Who's on the podium?</div>
+    <div class="nudge" style="margin-top:auto;">
+      Common P3 picks in the group this week: <strong>NOR</strong> · <strong>VER</strong> · <strong>RUS</strong>.
+    </div>
+  </div>
+</section>
+
+<div class="lock-bar">
+  <div class="lock-status">
+    2 of 3 slots picked · Your picks save as you go · Final lock in <strong>2d 14h 23m</strong>
+  </div>
+  <button class="btn-primary">Lock in picks</button>
+</div>
+
+</body>
+</html>
