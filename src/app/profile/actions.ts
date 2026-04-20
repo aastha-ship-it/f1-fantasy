@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type UpdateProfileResult =
-  | { ok: true }
+  | { ok: true; welcome: boolean; next: string }
   | { ok: false; error: string };
 
 function trimOrNull(v: FormDataEntryValue | null): string | null {
@@ -29,7 +30,11 @@ export async function updateProfileAction(
   }
 
   const displayName = trimOrNull(formData.get("display_name"));
-  if (displayName && displayName.length > 30) {
+  // Display name is required — in welcome mode and forever after.
+  if (!displayName) {
+    return { ok: false, error: "Display name is required" };
+  }
+  if (displayName.length > 30) {
     return { ok: false, error: "Display name must be 30 characters or fewer" };
   }
 
@@ -44,7 +49,21 @@ export async function updateProfileAction(
     .eq("id", userData.user.id);
 
   if (error) return { ok: false, error: error.message };
+
   revalidatePath("/profile");
   revalidatePath("/dashboard");
-  return { ok: true };
+
+  const welcome = formData.get("welcome") === "1";
+  const nextRaw = formData.get("next");
+  const next =
+    typeof nextRaw === "string" && nextRaw.startsWith("/")
+      ? nextRaw
+      : "/dashboard";
+  if (welcome) {
+    // Server-side redirect — cleaner than round-tripping through the client
+    // router, and avoids the dashboard defensive-guard race where the
+    // client navigates before its cached data sees the new display_name.
+    redirect(next);
+  }
+  return { ok: true, welcome, next };
 }

@@ -109,7 +109,7 @@ export default async function AdminHomePage() {
   const done = completed.filter((r) => r.results && r.revealed_at);
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-10">
+    <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
       <p className="mb-4 text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
         Admin
       </p>

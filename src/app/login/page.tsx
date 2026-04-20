@@ -1,5 +1,4 @@
-import { requestMagicLink } from "./actions";
-import { LoginForm } from "./login-form";
+import { GoogleSignInButton } from "./google-button";
 
 export default async function LoginPage({
   searchParams,
@@ -7,6 +6,7 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const params = await searchParams;
+  const next = params.next ?? "/dashboard";
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-6 py-12">
       <h1
@@ -16,9 +16,9 @@ export default async function LoginPage({
         SIGN IN
       </h1>
       <p className="mb-10 text-sm text-[color:var(--fg-muted)]">
-        Enter your email — we&rsquo;ll send you a magic link.
+        One tap with your Google account. No passwords, no waiting for emails.
       </p>
-      <LoginForm action={requestMagicLink} next={params.next ?? "/dashboard"} />
+      <GoogleSignInButton next={next} />
     </main>
   );
 }

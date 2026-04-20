@@ -8,6 +8,19 @@
 
 ## Session log
 
+**2026-04-20 (very late) — UX pass: Google OAuth + fluid layout + welcome setup.** Two real usage issues surfaced: (a) narrow 768px column on desktop monitors, and (b) signing out left the user locked out of `/join` on next sign-in. Fixed both plus added the long-missing first-time profile-setup flow.
+
+Delivered:
+- **Magic-link auth removed, replaced with Google OAuth.** `src/app/login/page.tsx` now renders only a **Sign in with Google** button (`src/app/login/google-button.tsx`, client component calling `supabase.auth.signInWithOAuth({ provider: 'google' })`). Deleted `login-form.tsx` + `login/actions.ts`. `supabase/config.toml` has `[auth.external.google]` enabled with `skip_nonce_check = true` for local PKCE.
+- **Invite cookie is now sticky across sign-outs.** `src/app/signout/actions.ts` no longer deletes the invite cookie. Reasoning: it's a device-level capability token, not a session token. Returning users skip `/join` automatically.
+- **First-time profile setup is mandatory.** `/auth/callback` checks for a null `display_name` and redirects to `/profile?welcome=1`. The welcome mode (`src/app/profile/{page,profile-form,actions}.tsx`) shows a friendly onboarding copy, hides the back link, and requires `display_name`. Server action uses `redirect()` (not client-side router) so the dashboard's defensive guard doesn't race with the DB write. Dashboard has a defensive redirect too, so direct navigation can't bypass setup.
+- **Fluid full-screen layout.** 8 content pages (dashboard, predict list + picker, league, standings, admin, admin results, reveal) moved from `max-w-3xl`/`4xl` to `max-w-[1600px]` with responsive `px-6 sm:px-8 lg:px-12 xl:px-16`. Auth pages stay centered (`max-w-xl`). Profile bumped to `max-w-2xl`. Dashboard promoted to 2-col grid (`lg:grid-cols-[2fr_1fr]`) so the wider canvas actually gets used.
+- **E1 rewritten.** Google OAuth can't be scripted. Added a test-only `/api/test/sign-in-password` route (404 in production) that uses Supabase's password grant to establish a session + mirrors `public.users`. E1 now exercises: invite → programmatic session → `/dashboard` → welcome redirect → fill name → `/dashboard`. E2 unchanged.
+
+37/37 tests green (35 Vitest + 2 Playwright). Typecheck + lint + build clean.
+
+Setup carrying forward: user needs to create a Google OAuth 2.0 Client in Google Cloud Console and paste `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` into `.env.local`. Steps documented in `CLAUDE.md`. Until those are set, `/login` button will error when clicked.
+
 **2026-04-20 (late) — Phase 5 shipped (share card, profile, sign-out, E2E).** 37/37 total tests green: 35 Vitest (unit + integration) + 2 Playwright (E1, E2). New routes: `/profile`, `/api/share/[eventId]/card.png`. New UI: dashboard sign-out form + Edit profile link, share button in reveal's "THE GROUP" header.
 
 Delivered:

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatLocal, sessionLabel } from "@/lib/sessionLabel";
 import { signOutAction } from "@/app/signout/actions";
@@ -38,6 +39,20 @@ export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
   const { data: userData } = await supabase.auth.getUser();
   const myId = userData.user?.id ?? null;
+
+  // Defensive guard: anyone without a display_name gets pushed into the
+  // first-time profile setup flow, even if they navigate here directly.
+  if (myId) {
+    const { data: me } = await supabase
+      .from("users")
+      .select("display_name")
+      .eq("id", myId)
+      .maybeSingle<{ display_name: string | null }>();
+    if (!me?.display_name?.trim()) {
+      redirect("/profile?welcome=1");
+    }
+  }
+
   const nowIso = new Date().toISOString();
 
   // Next unlocked session (primary CTA candidate).
@@ -104,7 +119,7 @@ export default async function DashboardPage() {
     .slice(0, 3);
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-10">
+    <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
       <h1
         className="mb-4 text-5xl leading-none"
         style={{ fontFamily: "var(--font-boldonse), ui-sans-serif" }}
@@ -134,9 +149,10 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      <div className="mt-10 grid gap-6 lg:grid-cols-[2fr_1fr]">
       {/* Primary card — reveal-waiting takes precedence over predict. */}
       {revealWaiting ? (
-        <section className="mt-10 rounded-lg border border-[color:var(--accent-muted)] bg-[color:var(--surface)] p-6">
+        <section className="rounded-lg border border-[color:var(--accent-muted)] bg-[color:var(--surface)] p-6">
           <p className="text-xs uppercase tracking-wider text-[color:var(--accent)]">
             Reveal waiting
           </p>
@@ -158,7 +174,7 @@ export default async function DashboardPage() {
           </Link>
         </section>
       ) : nextOpen ? (
-        <section className="mt-10 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-6">
+        <section className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-6">
           <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
             Next session
           </p>
@@ -180,7 +196,7 @@ export default async function DashboardPage() {
           </Link>
         </section>
       ) : (
-        <section className="mt-10 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-6">
+        <section className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-6">
           <p className="text-sm text-[color:var(--fg-muted)]">
             No open sessions right now.
           </p>
@@ -188,7 +204,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Leaderboard preview */}
-      <section className="mt-10">
+      <section>
         <div className="mb-3 flex items-baseline justify-between">
           <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
             The group
@@ -245,6 +261,7 @@ export default async function DashboardPage() {
           </ul>
         )}
       </section>
+      </div>
 
       <nav className="mt-10 flex flex-wrap gap-3 text-sm">
         <Link

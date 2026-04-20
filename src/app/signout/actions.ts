@@ -1,18 +1,19 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { INVITE_COOKIE_NAME } from "@/lib/inviteCookie";
 
 /**
- * Clears the Supabase session AND the invite-gate cookie, then bounces to
- * /login. Invoked from a simple form on /dashboard.
+ * Clears the Supabase session, then bounces to /login.
+ *
+ * We intentionally do NOT delete the invite cookie — it's a device-level
+ * capability token ("this browser was invited once"), not a user session.
+ * Keeping it sticky means a returning user after sign-out doesn't have to
+ * re-enter the invite code; they just sign in with Google and land on the
+ * dashboard.
  */
 export async function signOutAction() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
-  const cookieStore = await cookies();
-  cookieStore.delete(INVITE_COOKIE_NAME);
   redirect("/login");
 }

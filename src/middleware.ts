@@ -13,6 +13,7 @@ const PUBLIC_PREFIXES = [
   "/api/public/",
   "/api/cron/",
   "/api/share/",
+  "/api/test/",
 ];
 
 function isPublicPath(pathname: string): boolean {

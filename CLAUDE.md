@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0–5 shipped (2026-04-20).** Auth + schema + RLS + predict loop + admin results pipeline + reveal stage + friend leaderboard + profile + OG share card + sign-out all live. **37/37 tests green:** 35 Vitest (12 unit, 23 integration incl. I1–I10, R1–R3, regression guards) + 2 Playwright E2E (E1 full signup, E2 invalid invite). Typecheck, lint, and production build all clean.
+**Phases 0–5 shipped (2026-04-20) + UX pass.** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **37/37 tests green:** 35 Vitest + 2 Playwright (E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
 
-Routes currently serving: `/`, `/join`, `/login`, `/auth/callback`, `/dashboard`, `/dashboard/predict`, `/dashboard/predict/[eventId]`, `/dashboard/league`, `/dashboard/standings` (stub), `/profile`, `/admin`, `/admin/results/[eventId]`, `/reveal/[eventId]`, `/api/cron/sync-f1-data` (Bearer-token gated), `/api/share/[eventId]/card.png` (public OG image).
+Routes currently serving: `/`, `/join`, `/login` (Google button), `/auth/callback`, `/dashboard`, `/dashboard/predict`, `/dashboard/predict/[eventId]`, `/dashboard/league`, `/dashboard/standings` (stub), `/profile` (supports `?welcome=1`), `/admin`, `/admin/results/[eventId]`, `/reveal/[eventId]`, `/api/cron/sync-f1-data` (Bearer-gated), `/api/share/[eventId]/card.png` (public OG), `/api/test/sign-in-password` (non-prod only).
 
 See `plans/program-tracker.md` for the live phase-by-phase status. See `plans/flickering-giggling-valley.md` for the authoritative plan.
 
@@ -100,9 +100,29 @@ bun --env-file=.env.local run scripts/seed-calendar.ts  # 2026 schedule
 bun --env-file=.env.local run scripts/seed-drivers.ts   # current drivers
 ```
 
+### Google OAuth setup (one-time per environment)
+
+Local sign-in requires real Google OAuth credentials. Without them the **Sign in with Google** button throws an error from Supabase.
+
+1. Go to Google Cloud Console → APIs & Services → Credentials → **Create Credentials → OAuth 2.0 Client ID**.
+   - Application type: Web application
+   - Authorized redirect URIs:
+     - `http://127.0.0.1:54421/auth/v1/callback` (local Supabase)
+     - `https://<project>.supabase.co/auth/v1/callback` (prod, once deployed)
+2. Copy the Client ID + Secret.
+3. Paste into `.env.local`:
+   ```
+   GOOGLE_CLIENT_ID=...apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=GOCSPX-...
+   ```
+4. `supabase stop && supabase start` to pick up the new config.
+5. For prod: Supabase dashboard → Auth → Providers → Google → paste Client ID + Secret.
+
+The local Supabase config already has `[auth.external.google]` enabled with `skip_nonce_check = true` (required for local dev with PKCE).
+
 ### Admin bootstrap
 
-Recommended: set `ADMIN_EMAIL=<your-email>` in `.env.local`. The `/auth/callback` route auto-UPSERTs that user into `public.admins` on every magic-link sign-in. That makes the bootstrap self-healing — a `supabase db reset` (which wipes `public.admins`) becomes a non-event; next sign-in restores admin.
+Recommended: set `ADMIN_EMAIL=<your-email>` in `.env.local`. The `/auth/callback` route auto-UPSERTs that user into `public.admins` on every sign-in. That makes the bootstrap self-healing — a `supabase db reset` (which wipes `public.admins`) becomes a non-event; next sign-in restores admin.
 
 Manual fallback (if you don't want to set the env var): paste your uuid into Studio's SQL editor:
 
@@ -144,11 +164,20 @@ Idempotent via `INSERT ... ON CONFLICT (user_id, event_id) DO UPDATE`. Safe to r
 
 **DNF rule:** if a predicted driver is not in the classified P1/P2/P3, that slot scores 0. Not "right driver wrong slot" — just zero. Otherwise exact=5, slot_match=2, perfect_podium=+3. Max per race event: 18 pts. Sprint events only score P1 (max 5 pts).
 
-### 5. Invite-code gate + magic-link auth
+### 5. Invite-code gate + Google OAuth
 
-`/join` gates entry via a shared invite code in `INVITE_CODE` env var. Past the gate, users enter email → Supabase magic-link auth → auto-create `users` row on first login → profile setup.
+`/join` gates entry via a shared invite code in `INVITE_CODE` env var. The invite cookie is a **device-level capability token** (HMAC'd with the service-role key). It sticks across sign-outs so returning users on the same browser never see `/join` again — only new devices do.
 
-No email allowlist. Trust-based for the friend group. Rotate `INVITE_CODE` if leaked publicly — existing sessions stay valid.
+Past the gate, `/login` shows a single **Sign in with Google** button. Supabase handles the OAuth round-trip and returns via `/auth/callback`, which:
+1. Exchanges the code for a session
+2. Mirrors `auth.users` → `public.users` (first-login hook)
+3. Self-heals `admins` if `ADMIN_EMAIL` matches
+4. If `display_name` is null → redirects to `/profile?welcome=1` for required profile setup
+5. Otherwise → redirects to `?next` (default `/dashboard`)
+
+The dashboard has a **defensive guard** that redirects anyone with a null `display_name` back to `/profile?welcome=1`, so users can't skip profile setup by navigating directly.
+
+No email allowlist — anyone with a Gmail account + the invite code can sign in. Trust-based for the friend group. Rotate `INVITE_CODE` if leaked publicly; existing sessions stay valid.
 
 ## Testing approach
 
