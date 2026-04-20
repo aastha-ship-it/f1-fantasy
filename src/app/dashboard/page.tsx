@@ -4,19 +4,6 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatLocal, sessionLabel } from "@/lib/sessionLabel";
 import { signOutAction } from "@/app/signout/actions";
 
-/**
- * State-aware smart home.
- *
- *   1. If the user has a prediction for an event with results filed but the
- *      reveal not yet triggered, show a "Reveal waiting" card.
- *   2. Otherwise, if there's an upcoming unlocked session, show the predict
- *      card with the "Lock in your picks" CTA.
- *   3. Otherwise, quiet empty state.
- *
- * Below the primary card: a condensed top-3 leaderboard preview + links to
- * the full league + standings pages.
- */
-
 type EventLite = {
   id: string;
   name: string;
@@ -26,7 +13,7 @@ type EventLite = {
   revealed_at: string | null;
 };
 
-type ScoreLite = { user_id: string; points: number };
+type ScoreLite = { user_id: string; points: number; event_id: string };
 type UserLite = { id: string; email: string; display_name: string | null };
 
 function personName(u: UserLite | undefined, isMe: boolean): string {
@@ -42,13 +29,15 @@ export default async function DashboardPage() {
 
   // Defensive guard: anyone without a display_name gets pushed into the
   // first-time profile setup flow, even if they navigate here directly.
+  let myDisplayName = "";
   if (myId) {
     const { data: me } = await supabase
       .from("users")
       .select("display_name")
       .eq("id", myId)
       .maybeSingle<{ display_name: string | null }>();
-    if (!me?.display_name?.trim()) {
+    myDisplayName = me?.display_name?.trim() ?? "";
+    if (!myDisplayName) {
       redirect("/profile?welcome=1");
     }
   }
@@ -96,11 +85,20 @@ export default async function DashboardPage() {
     }
   }
 
-  // Top-3 leaderboard preview.
-  const [{ data: scores }, { data: users }] = await Promise.all([
-    supabase.from("scores").select("user_id, points"),
-    supabase.from("users").select("id, email, display_name"),
-  ]);
+  // Top-3 leaderboard preview + recently-revealed list (last 3).
+  const [{ data: scores }, { data: users }, { data: revealed }] =
+    await Promise.all([
+      supabase
+        .from("scores")
+        .select("user_id, points, event_id"),
+      supabase.from("users").select("id, email, display_name"),
+      supabase
+        .from("events")
+        .select("id, name, session_type, revealed_at")
+        .not("revealed_at", "is", null)
+        .order("revealed_at", { ascending: false })
+        .limit(3),
+    ]);
   const usersById = new Map(
     (users ?? []).map((u) => [u.id as string, u as UserLite]),
   );
@@ -118,20 +116,44 @@ export default async function DashboardPage() {
     .sort((a, b) => b.points - a.points)
     .slice(0, 3);
 
+  // My score per revealed event (to render as a small badge on the
+  // "Recently revealed" card).
+  const myScoreByEvent = new Map<string, number>();
+  for (const s of (scores ?? []) as ScoreLite[]) {
+    if (s.user_id === myId) myScoreByEvent.set(s.event_id, Number(s.points));
+  }
+
+  const primary = revealWaiting
+    ? ({ kind: "reveal", event: revealWaiting.event } as const)
+    : nextOpen
+      ? ({ kind: "predict", event: nextOpen } as const)
+      : ({ kind: "empty" } as const);
+
+  // Server-render snapshot — the countdown isn't live; it shows a fresh
+  // delta on each request. Real-time ticking lives on the predict page.
+  // eslint-disable-next-line react-hooks/purity
+  const nowMs = Date.now();
+  const nextLockCountdown = nextOpen
+    ? formatDelta(new Date(nextOpen.lock_at).getTime() - nowMs)
+    : null;
+
   return (
-    <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
-      <h1
-        className="mb-4 text-5xl leading-none"
-        style={{ fontFamily: "var(--font-boldonse), ui-sans-serif" }}
-      >
-        F1 FANTASY
-      </h1>
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-[color:var(--fg-muted)]">
-          Signed in as{" "}
-          <span className="text-[color:var(--fg)]">{userData.user?.email}</span>
-        </p>
-        <div className="flex items-center gap-3 text-sm">
+    <main className="mx-auto w-full max-w-[1600px] px-6 py-8 sm:px-8 lg:px-12 xl:px-16">
+      {/* Compact top toolbar — wordmark left, user cluster right. */}
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[color:var(--border)] pb-6">
+        <h1
+          className="text-2xl leading-none sm:text-3xl"
+          style={{ fontFamily: "var(--font-boldonse), ui-sans-serif" }}
+        >
+          F1 FANTASY
+        </h1>
+        <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-baseline gap-2 text-[color:var(--fg-muted)]">
+            <span className="text-[color:var(--fg)]">{myDisplayName}</span>
+            <span className="hidden text-[color:var(--fg-subtle)] sm:inline">
+              · {userData.user?.email}
+            </span>
+          </div>
           <Link
             href="/profile"
             className="text-[color:var(--fg-muted)] hover:text-[color:var(--fg)]"
@@ -147,142 +169,274 @@ export default async function DashboardPage() {
             </button>
           </form>
         </div>
+      </header>
+
+      {/* Dense 3-col hero row: primary CTA | leaderboard preview | recently revealed. */}
+      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        {/* Primary card */}
+        {primary.kind === "reveal" ? (
+          <PrimaryCard
+            tone="accent"
+            eyebrow="Reveal waiting"
+            title={primary.event.name}
+            subtitle={`${sessionLabel(primary.event.session_type)} · results filed · waiting on admin.`}
+            href={`/reveal/${primary.event.id}`}
+            cta="Open reveal →"
+          />
+        ) : primary.kind === "predict" ? (
+          <PrimaryCard
+            tone="default"
+            eyebrow="Next session"
+            title={primary.event.name}
+            subtitle={`${sessionLabel(primary.event.session_type)} · ${formatLocal(primary.event.session_start_at)}`}
+            href="/dashboard/predict"
+            cta="Lock in your picks →"
+            countdown={nextLockCountdown}
+          />
+        ) : (
+          <EmptyPrimary />
+        )}
+
+        {/* Leaderboard preview */}
+        <section className="flex min-h-full flex-col rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-5">
+          <div className="mb-3 flex items-baseline justify-between">
+            <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
+              The group
+            </p>
+            <Link
+              href="/dashboard/league"
+              className="text-xs text-[color:var(--fg-muted)] hover:text-[color:var(--fg)]"
+            >
+              Full →
+            </Link>
+          </div>
+          {topThree.length === 0 ? (
+            <p className="text-sm text-[color:var(--fg-subtle)]">
+              Leaderboard lights up after the first reveal.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {topThree.map((r, i) => {
+                const isMe = r.userId === myId;
+                return (
+                  <li
+                    key={r.userId}
+                    className={`grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 rounded px-2 py-2 ${
+                      isMe
+                        ? "bg-[color:var(--surface-2)]"
+                        : ""
+                    }`}
+                  >
+                    <span
+                      data-tabular
+                      className="text-lg"
+                      style={{
+                        fontFamily: "var(--font-boldonse), ui-sans-serif",
+                      }}
+                    >
+                      {i + 1}
+                    </span>
+                    <span className="truncate text-sm text-[color:var(--fg)]">
+                      {personName(r.user, isMe)}
+                    </span>
+                    <span
+                      className="text-lg"
+                      data-tabular
+                      style={{
+                        fontFamily:
+                          "var(--font-mono), ui-monospace, monospace",
+                      }}
+                    >
+                      {r.points}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        {/* Recently revealed */}
+        <section className="flex min-h-full flex-col rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-5">
+          <div className="mb-3 flex items-baseline justify-between">
+            <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
+              Recently revealed
+            </p>
+          </div>
+          {(revealed ?? []).length === 0 ? (
+            <p className="text-sm text-[color:var(--fg-subtle)]">
+              Nothing yet. First reveal lights this up.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {(revealed ?? []).map((e) => {
+                const myPoints = myScoreByEvent.get(e.id as string);
+                return (
+                  <li
+                    key={e.id as string}
+                    className="flex items-center justify-between gap-3 rounded px-2 py-2 hover:bg-[color:var(--surface-2)]"
+                  >
+                    <Link
+                      href={`/reveal/${e.id}`}
+                      className="flex min-w-0 flex-1 flex-col gap-0.5"
+                    >
+                      <span className="truncate text-sm text-[color:var(--fg)]">
+                        {e.name as string}
+                      </span>
+                      <span className="text-xs text-[color:var(--fg-subtle)]">
+                        {sessionLabel(e.session_type as string)}
+                      </span>
+                    </Link>
+                    {typeof myPoints === "number" && (
+                      <span
+                        data-tabular
+                        className="rounded bg-[color:var(--surface-2)] px-2 py-1 text-xs text-[color:var(--fg-muted)]"
+                        title="Your points for this event"
+                      >
+                        {myPoints} pt
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       </div>
 
-      <div className="mt-10 grid gap-6 lg:grid-cols-[2fr_1fr]">
-      {/* Primary card — reveal-waiting takes precedence over predict. */}
-      {revealWaiting ? (
-        <section className="rounded-lg border border-[color:var(--accent-muted)] bg-[color:var(--surface)] p-6">
-          <p className="text-xs uppercase tracking-wider text-[color:var(--accent)]">
-            Reveal waiting
-          </p>
-          <p
-            className="mt-2 text-3xl"
-            style={{ fontFamily: "var(--font-boldonse), ui-sans-serif" }}
-          >
-            {revealWaiting.event.name.toUpperCase()}
-          </p>
-          <p className="mt-1 text-sm text-[color:var(--fg-muted)]">
-            {sessionLabel(revealWaiting.event.session_type)} · results filed ·
-            waiting on admin to trigger the group reveal.
-          </p>
-          <Link
-            href={`/reveal/${revealWaiting.event.id}`}
-            className="mt-6 inline-block rounded bg-[color:var(--accent)] px-5 py-3 font-medium text-black transition-colors hover:bg-[color:var(--accent-hover)]"
-          >
-            Open reveal →
-          </Link>
-        </section>
-      ) : nextOpen ? (
-        <section className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-6">
-          <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
-            Next session
-          </p>
-          <p
-            className="mt-2 text-3xl"
-            style={{ fontFamily: "var(--font-boldonse), ui-sans-serif" }}
-          >
-            {nextOpen.name.toUpperCase()}
-          </p>
-          <p className="mt-1 text-sm text-[color:var(--fg-muted)]">
-            {sessionLabel(nextOpen.session_type)} ·{" "}
-            <span data-tabular>{formatLocal(nextOpen.session_start_at)}</span>
-          </p>
+      {/* Inline footer nav: section links + live countdown pinned right. */}
+      <nav className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-[color:var(--border)] pt-6 text-sm">
+        <div className="flex flex-wrap items-center gap-6">
           <Link
             href="/dashboard/predict"
-            className="mt-6 inline-block rounded bg-[color:var(--accent)] px-5 py-3 font-medium text-black transition-colors hover:bg-[color:var(--accent-hover)]"
+            className="text-[color:var(--fg-muted)] hover:text-[color:var(--fg)]"
           >
-            Lock in your picks →
+            Upcoming sessions
           </Link>
-        </section>
-      ) : (
-        <section className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-6">
-          <p className="text-sm text-[color:var(--fg-muted)]">
-            No open sessions right now.
-          </p>
-        </section>
-      )}
-
-      {/* Leaderboard preview */}
-      <section>
-        <div className="mb-3 flex items-baseline justify-between">
-          <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
-            The group
-          </p>
           <Link
             href="/dashboard/league"
-            className="text-sm text-[color:var(--fg-muted)] hover:text-[color:var(--fg)]"
+            className="text-[color:var(--fg-muted)] hover:text-[color:var(--fg)]"
           >
-            Full leaderboard →
+            Leaderboard
+          </Link>
+          <Link
+            href="/dashboard/standings"
+            className="text-[color:var(--fg-muted)] hover:text-[color:var(--fg)]"
+          >
+            F1 standings
           </Link>
         </div>
-        {topThree.length === 0 ? (
-          <p className="text-sm text-[color:var(--fg-subtle)]">
-            Leaderboard lights up after the first reveal.
+        {nextLockCountdown && (
+          <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
+            Next lock in{" "}
+            <span
+              data-tabular
+              className="ml-1 text-[color:var(--fg-muted)]"
+            >
+              {nextLockCountdown}
+            </span>
           </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {topThree.map((r, i) => {
-              const isMe = r.userId === myId;
-              return (
-                <li
-                  key={r.userId}
-                  className={`grid grid-cols-[40px_1fr_auto] items-center gap-4 rounded-lg border px-4 py-3 ${
-                    isMe
-                      ? "border-[color:var(--accent-muted)] bg-[color:var(--surface-2)]"
-                      : "border-[color:var(--border)] bg-[color:var(--surface)]"
-                  }`}
-                >
-                  <span
-                    data-tabular
-                    className="text-xl"
-                    style={{
-                      fontFamily: "var(--font-boldonse), ui-sans-serif",
-                    }}
-                  >
-                    {i + 1}
-                  </span>
-                  <span className="text-[color:var(--fg)]">
-                    {personName(r.user, isMe)}
-                  </span>
-                  <span
-                    className="text-xl"
-                    data-tabular
-                    style={{
-                      fontFamily:
-                        "var(--font-mono), ui-monospace, monospace",
-                    }}
-                  >
-                    {r.points}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
         )}
-      </section>
-      </div>
-
-      <nav className="mt-10 flex flex-wrap gap-3 text-sm">
-        <Link
-          href="/dashboard/predict"
-          className="rounded border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-2 text-[color:var(--fg-muted)] hover:border-[color:var(--fg-muted)] hover:text-[color:var(--fg)]"
-        >
-          Upcoming sessions →
-        </Link>
-        <Link
-          href="/dashboard/league"
-          className="rounded border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-2 text-[color:var(--fg-muted)] hover:border-[color:var(--fg-muted)] hover:text-[color:var(--fg)]"
-        >
-          Leaderboard →
-        </Link>
-        <Link
-          href="/dashboard/standings"
-          className="rounded border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-2 text-[color:var(--fg-muted)] hover:border-[color:var(--fg-muted)] hover:text-[color:var(--fg)]"
-        >
-          F1 standings →
-        </Link>
       </nav>
     </main>
   );
+}
+
+function PrimaryCard({
+  tone,
+  eyebrow,
+  title,
+  subtitle,
+  href,
+  cta,
+  countdown,
+}: {
+  tone: "accent" | "default";
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  href: string;
+  cta: string;
+  countdown?: string | null;
+}) {
+  const border =
+    tone === "accent"
+      ? "border-[color:var(--accent-muted)]"
+      : "border-[color:var(--border)]";
+  const eyebrowColor =
+    tone === "accent"
+      ? "text-[color:var(--accent)]"
+      : "text-[color:var(--fg-subtle)]";
+  return (
+    <section
+      className={`flex flex-col justify-between gap-6 rounded-lg border ${border} bg-[color:var(--surface)] p-6 lg:p-8`}
+    >
+      <div>
+        <p
+          className={`text-xs uppercase tracking-wider ${eyebrowColor}`}
+        >
+          {eyebrow}
+        </p>
+        <p
+          className="mt-3 text-4xl leading-none lg:text-5xl"
+          style={{ fontFamily: "var(--font-boldonse), ui-sans-serif" }}
+        >
+          {title.toUpperCase()}
+        </p>
+        <p className="mt-3 text-sm text-[color:var(--fg-muted)]">
+          <span data-tabular>{subtitle}</span>
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-4">
+        <Link
+          href={href}
+          className="rounded bg-[color:var(--accent)] px-5 py-3 font-medium text-black transition-colors hover:bg-[color:var(--accent-hover)]"
+        >
+          {cta}
+        </Link>
+        {countdown && (
+          <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
+            Lock in{" "}
+            <span
+              data-tabular
+              className="ml-1 text-[color:var(--fg-muted)]"
+            >
+              {countdown}
+            </span>
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function EmptyPrimary() {
+  return (
+    <section className="flex flex-col justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-6 lg:p-8">
+      <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
+        Quiet week
+      </p>
+      <p
+        className="mt-3 text-3xl leading-none"
+        style={{ fontFamily: "var(--font-boldonse), ui-sans-serif" }}
+      >
+        NO OPEN SESSIONS
+      </p>
+      <p className="mt-3 text-sm text-[color:var(--fg-muted)]">
+        The next predict window opens when the following round&rsquo;s
+        schedule lands.
+      </p>
+    </section>
+  );
+}
+
+function formatDelta(msUntil: number): string {
+  if (msUntil <= 0) return "Locked";
+  const totalSec = Math.floor(msUntil / 1000);
+  const days = Math.floor(totalSec / 86_400);
+  const hours = Math.floor((totalSec % 86_400) / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  if (days > 0) return `${days}d ${hours.toString().padStart(2, "0")}h`;
+  if (hours > 0) return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
+  return `${minutes}m`;
 }
