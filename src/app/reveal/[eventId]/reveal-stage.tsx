@@ -80,14 +80,13 @@ export function RevealStage({
   const scoreByUser = new Map(scores.map((s) => [s.user_id, s]));
 
   const resultSlots = isSprint
-    ? [{ label: "P1", id: result.p1_driver_id }]
+    ? [{ label: "P1", id: result.p1_driver_id, tier: "hero" as const }]
     : [
-        { label: "P1", id: result.p1_driver_id },
-        { label: "P2", id: result.p2_driver_id },
-        { label: "P3", id: result.p3_driver_id },
+        { label: "P1", id: result.p1_driver_id, tier: "hero" as const },
+        { label: "P2", id: result.p2_driver_id, tier: "second" as const },
+        { label: "P3", id: result.p3_driver_id, tier: "third" as const },
       ];
 
-  // Friend picks sorted by points desc, then by display name.
   const friendRows = predictions
     .map((p) => ({
       prediction: p,
@@ -98,7 +97,9 @@ export function RevealStage({
       const aPts = a.score?.points ?? 0;
       const bPts = b.score?.points ?? 0;
       if (aPts !== bPts) return bPts - aPts;
-      return displayName(a.user, false).localeCompare(displayName(b.user, false));
+      return displayName(a.user, false).localeCompare(
+        displayName(b.user, false),
+      );
     });
 
   const RESULT_DURATION = reduce ? 0 : 0.3;
@@ -112,29 +113,71 @@ export function RevealStage({
 
   return (
     <div className="flex flex-col gap-12">
-      {/* RESULT CARDS */}
+      {/* RESULT CARDS — asymmetric: P1 hero left, P2/P3 stepped right. */}
       <section>
         <p className="mb-4 text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
           Classified
         </p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {resultSlots.map((slot, i) => {
-            const d = slot.id !== null ? driverById.get(slot.id) : null;
-            return (
-              <FlipCard
-                key={slot.label}
-                reduce={reduce}
-                delay={i * RESULT_STAGGER}
-                duration={RESULT_DURATION}
-              >
-                <ResultCard label={slot.label} driver={d} />
-              </FlipCard>
-            );
-          })}
-        </div>
+        {isSprint ? (
+          <div className="max-w-2xl">
+            {resultSlots.map((slot, i) => {
+              const d = slot.id !== null ? driverById.get(slot.id) : null;
+              return (
+                <FlipCard
+                  key={slot.label}
+                  reduce={reduce}
+                  delay={i * RESULT_STAGGER}
+                  duration={RESULT_DURATION}
+                >
+                  <ResultCard label={slot.label} driver={d} tier="hero" />
+                </FlipCard>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-end">
+            {/* P1 — hero card, left column, tallest */}
+            {(() => {
+              const slot = resultSlots[0];
+              const d = slot.id !== null ? driverById.get(slot.id) : null;
+              return (
+                <FlipCard
+                  key={slot.label}
+                  reduce={reduce}
+                  delay={0 * RESULT_STAGGER}
+                  duration={RESULT_DURATION}
+                >
+                  <ResultCard label={slot.label} driver={d} tier="hero" />
+                </FlipCard>
+              );
+            })()}
+            {/* P2 + P3 — right column, stacked with podium-step offsets */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+              {resultSlots.slice(1).map((slot, i) => {
+                const d = slot.id !== null ? driverById.get(slot.id) : null;
+                const stepOffset =
+                  slot.tier === "second"
+                    ? "lg:translate-y-4"
+                    : "lg:translate-y-8";
+                return (
+                  <FlipCard
+                    key={slot.label}
+                    reduce={reduce}
+                    delay={(i + 1) * RESULT_STAGGER}
+                    duration={RESULT_DURATION}
+                  >
+                    <div className={`transform transition-transform ${stepOffset}`}>
+                      <ResultCard label={slot.label} driver={d} tier={slot.tier} />
+                    </div>
+                  </FlipCard>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </section>
 
-      {/* FRIEND PICKS */}
+      {/* FRIEND PICKS — card gallery, not a table. */}
       <section>
         <div className="mb-4 flex items-baseline justify-between gap-4">
           <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
@@ -150,33 +193,34 @@ export function RevealStage({
             <ShareButton />
           </div>
         </div>
-        <ul className="flex flex-col gap-3">
-          {friendRows.map((row, i) => {
-            const isMe = row.user?.id === currentUserId;
-            return (
-              <FlipCard
-                key={row.prediction.user_id}
-                reduce={reduce}
-                delay={pickFlipBaseDelay + i * PICK_STAGGER}
-                duration={PICK_DURATION}
-              >
-                <FriendRow
-                  user={row.user}
-                  isMe={isMe}
-                  prediction={row.prediction}
-                  score={row.score}
-                  driverById={driverById}
-                  isSprint={isSprint}
-                />
-              </FlipCard>
-            );
-          })}
-          {friendRows.length === 0 && (
-            <li className="rounded border border-dashed border-[color:var(--border)] px-5 py-4 text-sm text-[color:var(--fg-subtle)]">
-              No one submitted a pick for this session.
-            </li>
-          )}
-        </ul>
+        {friendRows.length === 0 ? (
+          <div className="rounded border border-dashed border-[color:var(--border)] px-5 py-4 text-sm text-[color:var(--fg-subtle)]">
+            No one submitted a pick for this session.
+          </div>
+        ) : (
+          <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {friendRows.map((row, i) => {
+              const isMe = row.user?.id === currentUserId;
+              return (
+                <FlipCard
+                  key={row.prediction.user_id}
+                  reduce={reduce}
+                  delay={pickFlipBaseDelay + i * PICK_STAGGER}
+                  duration={PICK_DURATION}
+                >
+                  <FriendCard
+                    user={row.user}
+                    isMe={isMe}
+                    prediction={row.prediction}
+                    score={row.score}
+                    driverById={driverById}
+                    isSprint={isSprint}
+                  />
+                </FlipCard>
+              );
+            })}
+          </ul>
+        )}
       </section>
     </div>
   );
@@ -219,34 +263,59 @@ function FlipCard({
 function ResultCard({
   label,
   driver,
+  tier,
 }: {
   label: string;
   driver: Driver | null | undefined;
+  tier: "hero" | "second" | "third";
 }) {
+  const padding = tier === "hero" ? "p-6 lg:p-10" : "p-5";
+  const minHeight = tier === "hero" ? "lg:min-h-[280px]" : "";
+  const labelSize = tier === "hero" ? "text-sm" : "text-xs";
+  const nameSize =
+    tier === "hero"
+      ? "text-3xl sm:text-4xl lg:text-6xl"
+      : "text-2xl lg:text-3xl";
+  const codeSize = tier === "hero" ? "text-lg" : "text-sm";
   return (
-    <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-5">
-      <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]" data-tabular>
+    <div
+      className={`flex h-full flex-col rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] ${padding} ${minHeight}`}
+    >
+      <p
+        className={`${labelSize} uppercase tracking-wider text-[color:var(--fg-subtle)]`}
+        data-tabular
+      >
         {label}
       </p>
       {driver ? (
-        <>
-          <div className="mt-3 flex items-center gap-2">
+        <div
+          className={`flex flex-1 flex-col gap-2 ${tier === "hero" ? "justify-end" : "mt-3"}`}
+        >
+          <div className="flex items-center gap-2">
             <span
               aria-hidden
-              className="inline-block size-3 rounded-full"
+              className={`inline-block rounded-full ${tier === "hero" ? "size-4" : "size-3"}`}
               style={{ background: teamDot(driver.team) }}
             />
-            <p className="text-sm uppercase tracking-wider text-[color:var(--fg-muted)]" data-tabular>
+            <p
+              className={`${codeSize} uppercase tracking-wider text-[color:var(--fg-muted)]`}
+              data-tabular
+            >
               {driver.code}
             </p>
+            {tier === "hero" && (
+              <p className="ml-auto text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
+                {driver.team}
+              </p>
+            )}
           </div>
           <p
-            className="mt-1 text-2xl leading-tight"
+            className={`${nameSize} leading-none`}
             style={{ fontFamily: "var(--font-boldonse), ui-sans-serif" }}
           >
             {driver.full_name.toUpperCase()}
           </p>
-        </>
+        </div>
       ) : (
         <p className="mt-3 text-[color:var(--fg-muted)]">—</p>
       )}
@@ -254,7 +323,7 @@ function ResultCard({
   );
 }
 
-function FriendRow({
+function FriendCard({
   user,
   isMe,
   prediction,
@@ -279,52 +348,51 @@ function FriendRow({
       ];
   const points = score?.points ?? 0;
   const perfect = score?.perfect_bonus ?? false;
+  const containerClasses = perfect
+    ? "rounded-lg border border-[color:var(--accent)] bg-[color:var(--surface)] p-5 shadow-[inset_0_0_0_1px_oklch(62%_0.22_27_/_0.35)]"
+    : isMe
+      ? "rounded-lg border border-[color:var(--accent-muted)] bg-[color:var(--surface-2)] p-5"
+      : "rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-5";
   return (
-    <li
-      className={`rounded-lg border p-5 ${
-        isMe
-          ? "border-[color:var(--accent-muted)] bg-[color:var(--surface-2)]"
-          : "border-[color:var(--border)] bg-[color:var(--surface)]"
-      }`}
-    >
-      <div className="mb-3 flex items-baseline justify-between gap-4">
+    <li className={containerClasses}>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
         <p
-          className="text-xl"
+          className="truncate text-xl"
           style={{ fontFamily: "var(--font-boldonse), ui-sans-serif" }}
         >
           {name.toUpperCase()}
         </p>
-        <div className="flex items-center gap-3">
-          {perfect && (
-            <span className="rounded border border-[color:var(--accent)] px-2 py-1 text-xs uppercase tracking-wider text-[color:var(--accent)]">
-              Perfect podium
-            </span>
-          )}
-          <p
-            className="text-2xl"
+        <div className="flex items-baseline gap-1">
+          <span
+            className="text-3xl"
             data-tabular
             style={{
               fontFamily: "var(--font-mono), ui-monospace, monospace",
             }}
           >
             {points}
-          </p>
-          <p className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
+          </span>
+          <span className="text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
             pts
-          </p>
+          </span>
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      {perfect && (
+        <p className="mb-3 inline-block rounded border border-[color:var(--accent)] px-2 py-0.5 text-xs uppercase tracking-wider text-[color:var(--accent)]">
+          Perfect podium
+        </p>
+      )}
+      <ul className="flex flex-col gap-1.5">
         {picks.map((p) => {
           const d = p.id !== null ? driverById.get(p.id) : null;
           return (
-            <div
+            <li
               key={p.label}
               className="flex items-center gap-3 rounded border border-[color:var(--border)] bg-[color:var(--bg)] px-3 py-2"
             >
               <span
                 data-tabular
-                className="w-6 text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]"
+                className="w-6 shrink-0 text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]"
               >
                 {p.label}
               </span>
@@ -332,20 +400,20 @@ function FriendRow({
                 <>
                   <span
                     aria-hidden
-                    className="inline-block size-2.5 rounded-full"
+                    className="inline-block size-2.5 shrink-0 rounded-full"
                     style={{ background: teamDot(d.team) }}
                   />
-                  <span className="text-sm text-[color:var(--fg)]">
+                  <span className="truncate text-sm text-[color:var(--fg)]">
                     {d.full_name}
                   </span>
                 </>
               ) : (
                 <span className="text-sm text-[color:var(--fg-subtle)]">—</span>
               )}
-            </div>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </li>
   );
 }
