@@ -8,6 +8,30 @@
 
 ## Session log
 
+**2026-04-30 — Phase 9 shipped: reveal-discovery surfaces (banner + tab + grouped index).** Closes the "how do offline users know a reveal is live?" gap from the deploy-prep conversation. Three new surfaces working together; no schema changes, no push notifications, just better discovery.
+
+Delivered:
+- **Dashboard fresh-reveals banner** — new `src/app/dashboard/reveal-notice.tsx` client component. Server query on `/dashboard/page.tsx` joins `predictions` → `events` and pulls events `revealed_at >= now() - 7 days` where the user has a prediction (`limit 5`, ordered most-recent first). Banner mounts between TopBar and the dashboard hero: full-width Ferrari-red strip with a small inverted-color `<TrackDiagram>` thumbnail, "RESULTS REVEALED" Boldonse + "R03 · CHINESE GRAND PRIX · QUALIFYING" mono subline + "Tap to watch →" CTA + "+N more →" link to `/dashboard/predict` when 2+ candidates remain + ✕ close. Click-through OR ✕ pushes the event id into `localStorage.f1_dismissed_reveals` so the banner is per-event ephemeral (doesn't follow the user around after they've watched). Framer Motion `AnimatePresence` slide-in matches the existing PICKS LOCKED IN / PROFILE SAVED banners.
+- **New REVEAL tab in TopBar** — slotted between PREDICT and STANDINGS so the nav reads as the natural pick → watch outcome → check standings flow. Tab union extended to `"calendar" | "predict" | "reveal" | "standings" | "league" | "profile"`. The cinematic detail page (`/reveal/[eventId]`) and gated-shell variants now pass `active="reveal"` so the tab highlights correctly while watching a cinematic.
+- **New /reveal index page (`src/app/reveal/page.tsx`)** — server component, "SHOW REEL" hero with total points + perfect-podium count + round/session counts. Below: list grouped by round (one row per Grand Prix, not per session — avoids "Sprint Quali (China), Sprint (China), Quali (China), Race (China)" clutter on sprint weekends). Each round row: round number + track diagram + country flag + GP name + circuit + relative "Latest Xh ago" timestamp + **session pills** + Σ round-total. Pills are uniformly accent-red bordered with intensity-scaled fill — perfect podium = 28% accent tint, ≥10 pts = 18%, default = 10% — so the row reads as a brand-consistent strip while standout sessions still pop. Each pill is its own clickable target → `/reveal/[eventId]` for that specific session. Empty state offers a CTA back to `/dashboard/predict`.
+
+Files added / changed:
+- `src/app/dashboard/reveal-notice.tsx` (new — 156 lines)
+- `src/app/dashboard/page.tsx` — supabase query + RevealNotice mount
+- `src/components/TopBar.tsx` — REVEAL tab added to TABS array, Tab union widened
+- `src/app/reveal/page.tsx` (new — 290 lines incl. groupByRound + pill rendering)
+- `src/app/reveal/[eventId]/page.tsx` — `active="calendar"` → `active="reveal"` (×2)
+
+Verification: lint + typecheck clean. 117/118 vitest unchanged (pure UI / no schema). The pre-existing I6 RLS flake still fails for the same fixture-pollution reason logged earlier.
+
+Gotchas:
+- The dashboard banner uses **deferred hydration** — `useEffect` reads `localStorage` post-mount and only then calls `setDismissed`/`setHydrated`. SSR markup renders empty (returns `null` until `hydrated === true`) so server / client trees don't diverge on the dismissed-event set. The `react-hooks/set-state-in-effect` lint rule fires here; an inline `eslint-disable` block documents the intent — the hydration pattern is exactly what the rule warns against, but this is one of the legitimate cases.
+- `Date.now()` in the dashboard server-component body for the `sevenDaysAgo` cutoff trips `react-hooks/purity`. Single-line disable on the `Date.now()` call only (matches the established pattern from other server components — `dashboard/predict/page.tsx` etc.).
+- The `/reveal/[eventId]` cinematic page now reports `active="reveal"` on both its happy-path TopBar and the gated-shell TopBar for unrevealed/un-resulted events — both call sites need to stay in sync if a future refactor adds a third shell variant.
+- `groupByRound` in `/reveal/page.tsx` is a local helper, not the shared `src/lib/predict/groupByRound.ts`. Reasons: this one operates on `EventRow[]` already known to be revealed (no lock-status filtering needed), needs per-session score totals, and uses a different sort anchor (`latestRevealedAt` desc, not `weekendStart`). Not worth the extra abstraction layer for one extra caller.
+
+---
+
 **2026-04-30 — Phase 8.5 shipped: at-track wins/podiums split + telemetry readability redesign.** Closes three issues surfaced during Phase 8 manual test of `/dashboard/predict/[eventId]`.
 
 Delivered:

@@ -192,7 +192,7 @@ export default async function RevealPage({
 
   return (
     <>
-      <TopBar active="calendar" displayName={myDisplayName} email={userData.user?.email ?? null} />
+      <TopBar active="reveal" displayName={myDisplayName} email={userData.user?.email ?? null} />
       <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
         <RevealStage
           event={event}
@@ -226,7 +226,7 @@ function GatedShell({
   const meta = circuitMeta(event.ergast_circuit_id ?? event.circuit);
   return (
     <>
-      <TopBar active="calendar" displayName={displayName} email={email} />
+      <TopBar active="reveal" displayName={displayName} email={email} />
       <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
         <section className="grid items-end gap-8 border-b border-[color:var(--border)] pb-8 lg:grid-cols-[1.4fr_1fr_1fr]">
           <div>

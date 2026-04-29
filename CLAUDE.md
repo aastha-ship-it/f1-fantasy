@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign — 2026-04-30).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **99/99 tests green:** 97 Vitest + 2 Playwright (E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
+**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces — dashboard banner + REVEAL tab + grouped /reveal index — 2026-04-30).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **99/99 tests green:** 97 Vitest + 2 Playwright (E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
 
 ### Design system (Pass 1–4 shipped 2026-04-28)
 
@@ -18,7 +18,7 @@ Foundation modules in `src/lib/design/`:
 - `tracks.ts` — 12 stylized SVG track paths lifted from the design canvas, alias-resolved between OpenF1 short names and Jolpica `circuit_id`.
 
 Reusable components in `src/components/`:
-- `TopBar.tsx` — used on every authenticated screen. 4 tabs (Calendar/Predict/F1 Standings/The Group) + user initial + sign-out.
+- `TopBar.tsx` — used on every authenticated screen. 6 tabs (Calendar / Predict / Reveal / Standings / League / Profile) + user initial + sign-out.
 - `TrackDiagram.tsx` — 200×120 SVG, alias-resolved, configurable size + stroke.
 - `DriverPortrait.tsx` — image when asset exists, initial-letter avatar tinted with team hex when not.
 
@@ -26,7 +26,7 @@ Asset directory at `public/assets/{drivers,drivers-portrait,cars,logos}/` (~36MB
 
 Boldonse line-height fix: a global `[style*="Boldonse"]` selector in `globals.css` adds 0.12em top padding + 1.05 line-height to absorb the font's deep ascenders. Use `data-tight` attribute to opt out (cinematic display titles).
 
-Routes currently serving: `/`, `/join`, `/login` (split-layout cinematic Google button), `/auth/callback`, `/dashboard`, `/dashboard/predict`, `/dashboard/predict/round/[round]` (per-round session list), `/dashboard/predict/[eventId]`, `/dashboard/league`, `/dashboard/standings`, `/profile` (supports `?welcome=1`), `/admin`, `/admin/results/round/[round]` (per-round admin overview), `/admin/results/[eventId]`, `/reveal/[eventId]`, `/api/cron/sync-f1-data` (Bearer-gated), `/api/cron/fetch-results` (Bearer-gated), `/api/cron/refresh-jolpica-current` (Bearer-gated), `/api/cron/refresh-nudges` (Bearer-gated), `/api/share/[eventId]/card.png` (public OG), `/api/test/sign-in-password` (non-prod only).
+Routes currently serving: `/`, `/join`, `/login` (split-layout cinematic Google button), `/auth/callback`, `/dashboard`, `/dashboard/predict`, `/dashboard/predict/round/[round]` (per-round session list), `/dashboard/predict/[eventId]`, `/dashboard/league`, `/dashboard/standings`, `/profile` (supports `?welcome=1`), `/admin`, `/admin/results/round/[round]` (per-round admin overview), `/admin/results/[eventId]`, `/reveal` (show-reel index, grouped by round), `/reveal/[eventId]`, `/api/cron/sync-f1-data` (Bearer-gated), `/api/cron/fetch-results` (Bearer-gated), `/api/cron/refresh-jolpica-current` (Bearer-gated), `/api/cron/refresh-nudges` (Bearer-gated), `/api/share/[eventId]/card.png` (public OG), `/api/test/sign-in-password` (non-prod only).
 
 ### Two-source data identity (Jolpica + OpenF1)
 

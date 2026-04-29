@@ -9,6 +9,7 @@ import { teamMeta } from "@/lib/design/teams";
 import { shortEventName } from "@/lib/design/eventName";
 import { circuitMeta } from "@/lib/design/circuits";
 import { formatDateRange } from "@/lib/design/dateRange";
+import { RevealNotice, type RevealCandidate } from "./reveal-notice";
 
 type EventLite = {
   id: string;
@@ -67,6 +68,55 @@ export default async function DashboardPage() {
 
   const nowIso = new Date().toISOString();
   const currentSeason = new Date().getUTCFullYear();
+
+  // Fresh reveals — every event from the last 7 days that's been revealed AND
+  // the user has a prediction for. Surfaced via the top-of-dashboard banner so
+  // friends not in the app at admin-reveal-time still see "results are live"
+  // when they next open up. Per-event localStorage dismissal lives client-side.
+  const sevenDaysAgo = new Date(
+    // eslint-disable-next-line react-hooks/purity
+    Date.now() - 7 * 24 * 60 * 60 * 1000,
+  ).toISOString();
+  type FreshRevealRow = {
+    event_id: string;
+    events: {
+      id: string;
+      name: string;
+      round: number;
+      session_type: "race" | "quali" | "sprint_race" | "sprint_quali";
+      revealed_at: string;
+      circuit: string;
+      ergast_circuit_id: string | null;
+    } | null;
+  };
+  const freshRevealsResp = myId
+    ? await supabase
+        .from("predictions")
+        .select(
+          "event_id, events!inner(id, name, round, session_type, revealed_at, ergast_circuit_id, circuit)",
+        )
+        .eq("user_id", myId)
+        .not("events.revealed_at", "is", null)
+        .gte("events.revealed_at", sevenDaysAgo)
+        .order("revealed_at", {
+          referencedTable: "events",
+          ascending: false,
+        })
+        .limit(5)
+        .returns<FreshRevealRow[]>()
+    : { data: null };
+  const revealCandidates: RevealCandidate[] = (freshRevealsResp.data ?? [])
+    .filter((r): r is FreshRevealRow & { events: NonNullable<FreshRevealRow["events"]> } =>
+      r.events !== null,
+    )
+    .map((r) => ({
+      event_id: r.event_id,
+      name: r.events.name,
+      round: r.events.round,
+      session_type: r.events.session_type,
+      circuit: r.events.circuit,
+      ergast_circuit_id: r.events.ergast_circuit_id,
+    }));
 
   // Next session (primary CTA)
   const { data: nextOpen } = await supabase
@@ -173,6 +223,7 @@ export default async function DashboardPage() {
         displayName={myDisplayName}
         email={userData.user?.email ?? null}
       />
+      <RevealNotice candidates={revealCandidates} />
       <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
         {/* Hero — next race */}
         {nextOpen ? (

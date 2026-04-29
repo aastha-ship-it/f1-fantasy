@@ -9,11 +9,18 @@ import { signOutAction } from "@/app/signout/actions";
  *   F1Mark | nav tabs ............................. season label · user · ⏻
  */
 
-type Tab = "calendar" | "predict" | "standings" | "league" | "profile";
+type Tab =
+  | "calendar"
+  | "predict"
+  | "reveal"
+  | "standings"
+  | "league"
+  | "profile";
 
 const TABS: { id: Tab; label: string; href: string }[] = [
   { id: "calendar", label: "Calendar", href: "/dashboard" },
   { id: "predict", label: "Predict", href: "/dashboard/predict" },
+  { id: "reveal", label: "Reveal", href: "/reveal" },
   { id: "standings", label: "Standings", href: "/dashboard/standings" },
   { id: "league", label: "League", href: "/dashboard/league" },
   { id: "profile", label: "Profile", href: "/profile" },
