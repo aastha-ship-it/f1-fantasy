@@ -8,6 +8,26 @@
 
 ## Session log
 
+**2026-04-30 — Phase 9.5 shipped: 2026 grid corrected (Audi rebrand + Cadillac as 11th constructor).** User flagged `/dashboard/standings` showed only 10 constructors and listed "Kick Sauber" instead of the 2026-rebrand "Audi". Fixed at the metadata + zero-fill layer; deferred the Jolpica official-standings cache (Tier B in `~/.claude/plans/go-through-plans-program-tracker-md-and-lively-sunbeam.md`) as it adds schema + cron complexity right before deploy.
+
+Delivered:
+- **`src/lib/design/teams.ts`** — `kick.name` "Kick Sauber" → "Audi"; `short` "KIC" → "AUD". Slug stays `kick` so CSS vars (`--team-kick`, `--team-kick-hex`) and asset filenames (`logos/kick.png`, `cars/kick.png`) don't ripple. Real Audi 2026 livery / asset swap is a future concern.
+- **`src/lib/design/teams.ts`** — new `cadillac` slug + entry: `name: "Cadillac F1 Team"`, `short: "CAD"`, `hex: "#9B0D2D"` (crest red), placeholder `logoSrc` / `carSrc`. Aliases: `cadillac`, `cadillac f1`, `cadillac f1 team`, `general motors`, `gm cadillac`. `ALL_TEAMS` now reports 11.
+- **`src/app/globals.css`** — added `--team-cadillac: oklch(48% 0.18 22)`, `--team-cadillac-hex: #9B0D2D`, and the `--color-team-cadillac` mapping inside `@theme inline`.
+- **`public/assets/logos/cadillac.png` + `public/assets/cars/cadillac.png`** — transparent 1×1 PNGs as placeholders so `<Image>` doesn't 404. Real liveries land later.
+- **`src/lib/design/teams.test.ts`** — D2 extended to assert "Audi → kick slug, name=Audi" + Cadillac alias resolution; D6 updated from 10 → 11.
+- **DB re-seed** via `bun --env-file=.env.local run scripts/seed-drivers.ts`. OpenF1 reports the 2026 grid as Alpine, Aston Martin, **Audi**, **Cadillac**, Ferrari, Haas F1 Team, McLaren, Mercedes, Racing Bulls, Red Bull Racing, Williams — exactly 11 distinct team strings, 22 active drivers (2 per team). All resolve cleanly via `teamMeta()`.
+- **`src/app/dashboard/standings/page.tsx`** — after `combineStandings()`, union every distinct `drivers.team` into the constructor map with 0-pt fallback so the table always shows the full grid even when an entrant (Aston, Cadillac at this point in the season) hasn't scored yet. Sort stays "points desc, alpha tiebreak" via the same comparator.
+
+Verification: lint + typecheck clean. 117/118 vitest unchanged (pre-existing I6 RLS flake; teams.test.ts went 6/6 after the D2/D6 updates). Constructor table renders 11 rows with Cadillac + Aston Martin listed at 0 pts; Audi shows wherever Bortoleto/Hülkenberg appear. CSS token + alias work: any `teamMeta("audi")?.hex` consumer downstream picks up automatically (driver-picker badge, league row, predict slot, reveal podium).
+
+Gotchas:
+- The 2026 Audi livery in real life is dark green/red. The kick slug's lime-green CSS token + asset bundle stays for v1 because swapping it touches 6 places (`--team-kick`, `--team-kick-hex`, `kick.png` ×2, livery tuple, hex literal). Mark the swap as a Phase 10+ asset-only change.
+- `combineStandings()` itself was NOT changed — the zero-fill is in the page consumer. This avoids a behavior change to the pure helper which is unit-tested elsewhere; the page is the appropriate place to enforce "show every entrant".
+- Tier B (cache table for Jolpica's `/f1/{season}/driverStandings.json` + `/constructorStandings.json` endpoints, plus a 04:25 UTC cron) is fully designed in the plan doc but not shipped — recommended only if drift between Jolpica delta + OpenF1 backstop becomes a visible problem post-deploy.
+
+---
+
 **2026-04-30 — Phase 9 shipped: reveal-discovery surfaces (banner + tab + grouped index).** Closes the "how do offline users know a reveal is live?" gap from the deploy-prep conversation. Three new surfaces working together; no schema changes, no push notifications, just better discovery.
 
 Delivered:

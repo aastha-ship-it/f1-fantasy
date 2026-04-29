@@ -37,6 +37,7 @@
   --team-kick: oklch(60% 0.20 145);
   --team-alpine: oklch(58% 0.18 260);
   --team-vcarb: oklch(45% 0.12 260);
+  --team-cadillac: oklch(48% 0.18 22);
 
   /* Team hex (for inline drop-shadows, livery gradient stops, accent bars
    * — places where OKLCH is awkward, e.g. text-shadow / box-shadow that mix
@@ -52,6 +53,7 @@
   --team-kick-hex: #52E252;
   --team-alpine-hex: #0093CC;
   --team-vcarb-hex: #6692FF;
+  --team-cadillac-hex: #9B0D2D;
 
   /* Spacing scale (4pt base) */
   --space-xs: 4px;
@@ -115,6 +117,7 @@
   --color-team-kick: var(--team-kick);
   --color-team-alpine: var(--team-alpine);
   --color-team-vcarb: var(--team-vcarb);
+  --color-team-cadillac: var(--team-cadillac);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

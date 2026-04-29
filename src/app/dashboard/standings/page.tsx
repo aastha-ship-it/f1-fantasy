@@ -126,8 +126,25 @@ export default async function StandingsPage() {
     }),
   );
 
-  const { drivers: driverStandings, constructors: constructorStandings } =
+  const { drivers: driverStandings, constructors: combinedConstructors } =
     combineStandings(jolpicaTotals, backstopRows, driverInfos);
+
+  // Force all rostered teams onto the constructor table — drivers who haven't
+  // scored yet (or new entrants like Cadillac at the start of a season) must
+  // still appear with 0 pts. `combineStandings` only emits teams that produced
+  // points; we union in every distinct `drivers.team` so the table is the
+  // canonical 2026 grid (11 teams).
+  const constructorByTeam = new Map(
+    combinedConstructors.map((c) => [c.team, c]),
+  );
+  for (const d of driverInfos) {
+    if (!constructorByTeam.has(d.team)) {
+      constructorByTeam.set(d.team, { team: d.team, points: 0 });
+    }
+  }
+  const constructorStandings = [...constructorByTeam.values()].sort(
+    (a, b) => b.points - a.points || a.team.localeCompare(b.team),
+  );
 
   // Wins / podiums tallies — race wins only (not sprint), classified P1/P3.
   const winsByDriver = new Map<number, number>();

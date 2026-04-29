@@ -19,7 +19,8 @@ export type TeamSlug =
   | "haas"
   | "kick"
   | "alpine"
-  | "vcarb";
+  | "vcarb"
+  | "cadillac";
 
 export type TeamMeta = {
   slug: TeamSlug;
@@ -96,10 +97,13 @@ const TEAMS: Record<TeamSlug, TeamMeta> = {
     logoSrc: "/assets/logos/haas.jpg",
     carSrc: "/assets/cars/haas.png",
   },
+  // 2026 rebrand — Sauber's works partner is now Audi. Slug stays `kick` so
+  // CSS vars (--team-kick / --team-kick-hex) and asset filenames don't ripple.
+  // Real Audi 2026 livery + assets can land later as a swap.
   kick: {
     slug: "kick",
-    name: "Kick Sauber",
-    short: "KIC",
+    name: "Audi",
+    short: "AUD",
     hex: "#52E252",
     livery: ["#52E252", "#0a1a0a", "#0a0a0a"],
     logoSrc: "/assets/logos/kick.png",
@@ -122,6 +126,17 @@ const TEAMS: Record<TeamSlug, TeamMeta> = {
     livery: ["#6692FF", "#0a0c1a", "#E8002D"],
     logoSrc: "/assets/logos/vcarb.png",
     carSrc: "/assets/cars/vcarb.png",
+  },
+  // New 2026 entrant — 11th constructor. Crest red + matte black, GM-backed.
+  // Logo + car assets are placeholders until the real liveries ship.
+  cadillac: {
+    slug: "cadillac",
+    name: "Cadillac F1 Team",
+    short: "CAD",
+    hex: "#9B0D2D",
+    livery: ["#9B0D2D", "#0c0c0c", "#FFFFFF"],
+    logoSrc: "/assets/logos/cadillac.png",
+    carSrc: "/assets/cars/cadillac.png",
   },
 };
 
@@ -147,6 +162,11 @@ const TEAM_ALIASES: Record<string, TeamSlug> = {
   "rb f1 team": "vcarb",
   rb: "vcarb",
   vcarb: "vcarb",
+  cadillac: "cadillac",
+  "cadillac f1": "cadillac",
+  "cadillac f1 team": "cadillac",
+  "general motors": "cadillac",
+  "gm cadillac": "cadillac",
 };
 
 export function teamMeta(team: string | null | undefined): TeamMeta | null {
