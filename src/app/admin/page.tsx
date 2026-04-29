@@ -3,36 +3,106 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { currentAdmin } from "@/lib/adminGuard";
 import { revealEventAction } from "./actions";
 import { RevealButton } from "./reveal-button";
+import { TrackDiagram } from "@/components/TrackDiagram";
+import { AdminStrip } from "./admin-strip";
+import { shortEventName, eventCountry } from "@/lib/design/eventName";
+import { countryFlag } from "@/lib/design/drivers";
+import { listLatestCronRuns } from "@/lib/cron/recordRun";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
-type AwaitingRow = {
+type SessionType = "race" | "quali" | "sprint_race" | "sprint_quali";
+
+type EventRow = {
   id: string;
   name: string;
+  circuit: string;
   round: number;
-  session_type: "race" | "quali" | "sprint_race" | "sprint_quali";
+  season: number;
+  session_type: SessionType;
   session_start_at: string;
-};
-
-type CompletedRow = AwaitingRow & {
-  results: { event_id: string } | null;
   revealed_at: string | null;
+  ergast_circuit_id: string | null;
 };
 
-const SESSION_LABEL: Record<AwaitingRow["session_type"], string> = {
-  race: "Race",
-  quali: "Qualifying",
-  sprint_race: "Sprint",
-  sprint_quali: "Sprint Qualifying",
+type RoundState = "future" | "pending" | "entered" | "revealed" | "mixed";
+
+type RoundEntry = {
+  round: number;
+  name: string;
+  circuit: string;
+  ergast_circuit_id: string | null;
+  hasSprint: boolean;
+  weekendStart: string;
+  raceSession: EventRow | null;
+  sessions: EventRow[];
+  state: RoundState;
+  /** The session admin should act on next (race > sprint > quali). */
+  actionSessionId: string | null;
+  pickCount: number; // friends who submitted picks for the race session
 };
 
-function fmt(date: string): string {
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date(date));
-  } catch {
-    return date;
+const STATE_META: Record<
+  RoundState,
+  { label: string; color: string; bg: string; action: string }
+> = {
+  pending: {
+    label: "Results pending",
+    color: "var(--accent)",
+    bg: "color-mix(in oklch, var(--accent) 8%, transparent)",
+    action: "Enter results →",
+  },
+  entered: {
+    label: "Entered · Not revealed",
+    color: "var(--warning)",
+    bg: "color-mix(in oklch, var(--warning) 8%, transparent)",
+    action: "Reveal to group →",
+  },
+  revealed: {
+    label: "Revealed",
+    color: "var(--success)",
+    bg: "transparent",
+    action: "View reveal",
+  },
+  future: {
+    label: "Future",
+    color: "var(--fg-subtle)",
+    bg: "transparent",
+    action: "View picks",
+  },
+  mixed: {
+    label: "In progress",
+    color: "var(--fg-muted)",
+    bg: "transparent",
+    action: "View picks",
+  },
+};
+
+const CRON_SCHEDULE = [
+  { path: "sync-f1-data", time: "04:00 UTC", label: "OpenF1 calendar + drivers" },
+  { path: "fetch-results", time: "04:15 UTC", label: "Auto-fetch results" },
+  { path: "refresh-jolpica-current", time: "04:20 UTC", label: "Jolpica delta" },
+  { path: "refresh-nudges", time: "04:30 UTC", label: "Predict nudges" },
+];
+
+function formatRunTime(iso: string): string {
+  const d = new Date(iso);
+  const sameDay =
+    new Date().toISOString().slice(0, 10) === iso.slice(0, 10);
+  if (sameDay) {
+    return d
+      .toLocaleTimeString(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "UTC",
+      })
+      .concat(" UTC");
   }
+  // Older runs — collapse to "MMM D".
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export default async function AdminHomePage() {
@@ -62,194 +132,397 @@ export default async function AdminHomePage() {
   }
 
   const supabase = await createSupabaseServerClient();
+  const svc = createSupabaseServiceClient();
+  const currentSeason = new Date().getUTCFullYear();
   const nowIso = new Date().toISOString();
 
-  const { data: awaiting } = await supabase
-    .from("events")
-    .select("id, name, round, session_type, session_start_at")
-    .lt("session_start_at", nowIso)
-    .order("session_start_at", { ascending: false })
-    .limit(20);
+  // Latest run per cron path. The strip renders the actual ran_at +
+  // success/error chip when present, falling back to the static schedule
+  // copy for paths that haven't reported yet.
+  const latestByPath = await listLatestCronRuns(
+    svc,
+    CRON_SCHEDULE.map((c) => c.path),
+  );
 
-  const awaitingRows = (awaiting ?? []) as AwaitingRow[];
-  const awaitingIds = awaitingRows.map((r) => r.id);
+  const [{ data: allSessions }, { data: results }, { data: predictionsAll }] =
+    await Promise.all([
+      supabase
+        .from("events")
+        .select(
+          "id, name, circuit, round, season, session_type, session_start_at, revealed_at, ergast_circuit_id",
+        )
+        .eq("season", currentSeason)
+        .order("round", { ascending: true }),
+      supabase.from("results").select("event_id"),
+      supabase.from("predictions").select("event_id"),
+    ]);
 
-  const { data: results } = await supabase
-    .from("results")
-    .select("event_id")
-    .in(
-      "event_id",
-      awaitingIds.length > 0
-        ? awaitingIds
-        : ["00000000-0000-0000-0000-000000000000"],
+  const sessions = (allSessions ?? []) as EventRow[];
+  const haveResults = new Set(
+    (results ?? []).map((r) => r.event_id as string),
+  );
+  const predictionCountByEvent = new Map<string, number>();
+  for (const p of (predictionsAll ?? []) as { event_id: string }[]) {
+    predictionCountByEvent.set(
+      p.event_id,
+      (predictionCountByEvent.get(p.event_id) ?? 0) + 1,
     );
-  const haveResults = new Set((results ?? []).map((r) => r.event_id as string));
+  }
 
-  const { data: revealed } = await supabase
-    .from("events")
-    .select("id, revealed_at")
-    .in(
-      "id",
-      awaitingIds.length > 0
-        ? awaitingIds
-        : ["00000000-0000-0000-0000-000000000000"],
+  // Aggregate sessions by round.
+  const byRound = new Map<number, EventRow[]>();
+  for (const s of sessions) {
+    const list = byRound.get(s.round) ?? [];
+    list.push(s);
+    byRound.set(s.round, list);
+  }
+
+  function deriveState(round: EventRow[]): {
+    state: RoundState;
+    actionId: string | null;
+  } {
+    const race = round.find((s) => s.session_type === "race") ?? null;
+    if (!race) return { state: "future", actionId: null };
+    const inFuture = race.session_start_at >= nowIso;
+    if (inFuture) return { state: "future", actionId: race.id };
+
+    // Past race. Look at race-only state for the dominant cell.
+    if (!haveResults.has(race.id)) {
+      return { state: "pending", actionId: race.id };
+    }
+    if (!race.revealed_at) {
+      return { state: "entered", actionId: race.id };
+    }
+    // Race is revealed. Check if any sibling sessions still need results entered
+    // (rare — sprint with no results filed). If so, "mixed". Else "revealed".
+    const siblingPending = round.find(
+      (s) =>
+        s.session_type !== "race" &&
+        s.session_start_at < nowIso &&
+        !haveResults.has(s.id),
     );
-  const revealedAt = new Map<string, string | null>();
-  for (const r of revealed ?? [])
-    revealedAt.set(r.id as string, (r.revealed_at as string | null) ?? null);
+    if (siblingPending) {
+      return { state: "mixed", actionId: siblingPending.id };
+    }
+    return { state: "revealed", actionId: race.id };
+  }
 
-  const completed: CompletedRow[] = awaitingRows.map((r) => ({
-    ...r,
-    results: haveResults.has(r.id) ? { event_id: r.id } : null,
-    revealed_at: revealedAt.get(r.id) ?? null,
-  }));
+  const rounds: RoundEntry[] = [...byRound.entries()]
+    .map(([round, list]) => {
+      list.sort(
+        (a, b) =>
+          new Date(a.session_start_at).getTime() -
+          new Date(b.session_start_at).getTime(),
+      );
+      const race = list.find((s) => s.session_type === "race") ?? null;
+      const { state, actionId } = deriveState(list);
+      return {
+        round,
+        name: race?.name ?? list[0]!.name,
+        circuit: race?.circuit ?? list[0]!.circuit,
+        ergast_circuit_id:
+          race?.ergast_circuit_id ?? list[0]!.ergast_circuit_id ?? null,
+        hasSprint: list.some(
+          (s) =>
+            s.session_type === "sprint_race" ||
+            s.session_type === "sprint_quali",
+        ),
+        weekendStart: list[0]!.session_start_at,
+        raceSession: race,
+        sessions: list,
+        state,
+        actionSessionId: actionId,
+        pickCount: race ? predictionCountByEvent.get(race.id) ?? 0 : 0,
+      };
+    })
+    .sort((a, b) => a.round - b.round);
 
-  const pending = completed.filter((r) => !r.results);
-  const reveal = completed.filter((r) => r.results && !r.revealed_at);
-  const done = completed.filter((r) => r.results && r.revealed_at);
+  const attentionCount = rounds.filter(
+    (r) => r.state === "pending" || r.state === "entered",
+  ).length;
 
   return (
-    <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
-      <p className="mb-4 text-xs uppercase tracking-wider text-[color:var(--fg-subtle)]">
-        Admin
-      </p>
-      <h1
-        className="mb-10 leading-none"
-        style={{
-          fontFamily: "var(--font-boldonse), ui-sans-serif",
-          fontSize: "clamp(40px, 4.5vw, 72px)",
-        }}
-      >
-        OPERATIONS
-      </h1>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Section title="Awaiting results" count={pending.length}>
-          {pending.length === 0 && (
-            <EmptyLine>All completed sessions have results filed.</EmptyLine>
-          )}
-          {pending.map((r) => (
-            <SessionRow
-              key={r.id}
-              row={r}
-              cta={
-                <Link
-                  href={`/admin/results/${r.id}`}
-                  className="rounded bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-black transition-colors hover:bg-[color:var(--accent-hover)]"
-                >
-                  File →
-                </Link>
-              }
-            />
-          ))}
-        </Section>
-
-        <Section title="Ready to reveal" count={reveal.length}>
-          {reveal.length === 0 && (
-            <EmptyLine>No events waiting to be revealed.</EmptyLine>
-          )}
-          {reveal.map((r) => (
-            <SessionRow
-              key={r.id}
-              row={r}
-              cta={<RevealButton eventId={r.id} action={revealEventAction} />}
-            />
-          ))}
-        </Section>
-
-        <Section title="Revealed" count={done.length}>
-          {done.length === 0 && <EmptyLine>Nothing revealed yet.</EmptyLine>}
-          {done.map((r) => (
-            <SessionRow
-              key={r.id}
-              row={r}
-              cta={
-                <Link
-                  href={`/reveal/${r.id}`}
-                  className="rounded bg-[color:var(--surface-2)] px-3 py-1.5 text-xs uppercase tracking-wider text-[color:var(--success)] hover:bg-[color:var(--border)]"
-                >
-                  View →
-                </Link>
-              }
-            />
-          ))}
-        </Section>
-      </div>
-
-      <Link
-        href="/dashboard"
-        className="mt-12 inline-block text-sm text-[color:var(--fg-subtle)] hover:text-[color:var(--fg)]"
-      >
-        ← Back to dashboard
-      </Link>
-    </main>
-  );
-}
-
-function Section({
-  title,
-  count,
-  children,
-}: {
-  title: string;
-  count: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="flex flex-col rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-5">
-      <div className="mb-4 flex items-baseline justify-between">
-        <h2 className="text-xs uppercase tracking-wider text-[color:var(--fg-muted)]">
-          {title}
-        </h2>
-        <span
-          className="rounded bg-[color:var(--surface-2)] px-2 py-0.5 text-xs text-[color:var(--fg-subtle)]"
-          data-tabular
-        >
-          {count}
-        </span>
-      </div>
-      <ul className="flex max-h-[520px] flex-col gap-2 overflow-y-auto pr-1">
-        {children}
-      </ul>
-    </section>
-  );
-}
-
-function EmptyLine({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="rounded border border-dashed border-[color:var(--border)] px-3 py-3 text-xs text-[color:var(--fg-subtle)]">
-      {children}
-    </li>
-  );
-}
-
-function SessionRow({
-  row,
-  cta,
-}: {
-  row: AwaitingRow;
-  cta: React.ReactNode;
-}) {
-  return (
-    <li className="flex items-center justify-between gap-3 rounded border border-[color:var(--border)] bg-[color:var(--bg)] px-3 py-2.5">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <p className="truncate text-sm text-[color:var(--fg)]">
-          <span
-            data-tabular
-            className="mr-2 text-[color:var(--fg-subtle)]"
-          >
-            R{row.round.toString().padStart(2, "0")}
-          </span>
-          {row.name}
-        </p>
+    <>
+      <AdminStrip current="events" displayName={guard.displayName ?? null} />
+      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
         <p
-          className="truncate text-xs text-[color:var(--fg-subtle)]"
+          className="mb-3 flex items-center gap-2 text-xs uppercase text-[color:var(--accent)]"
+          style={{ letterSpacing: "0.18em" }}
           data-tabular
         >
-          {SESSION_LABEL[row.session_type]} · {fmt(row.session_start_at)}
+          <span
+            aria-hidden
+            className="inline-block size-2 bg-[color:var(--accent)]"
+          />
+          Admin ·{" "}
+          {attentionCount > 0
+            ? `${attentionCount} attention needed`
+            : "All clear"}
         </p>
-      </div>
-      {cta}
-    </li>
+        <h1
+          className="m-0 leading-[0.9]"
+          style={{
+            fontFamily: "var(--font-boldonse), ui-sans-serif",
+            fontSize: "clamp(48px, 7vw, 88px)",
+            letterSpacing: "-0.015em",
+          }}
+        >
+          EVENT CONTROL
+        </h1>
+
+        {/* System status strip — schedule + last-revealed signal. We don't
+            persist cron run timestamps, so the strip shows the configured
+            schedule from vercel.json plus the latest reveal as a soft signal
+            that the chain has been running. */}
+        <section
+          className="mt-10 grid border border-[color:var(--border)]"
+          style={{
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 1,
+            background: "var(--border)",
+          }}
+        >
+          {CRON_SCHEDULE.map((c) => {
+            const last = latestByPath.get(c.path);
+            const dotColor = !last
+              ? "var(--fg-subtle)"
+              : last.status === "success"
+                ? "var(--success)"
+                : "var(--error)";
+            const headline = last ? formatRunTime(last.ran_at) : c.time;
+            const subline = last
+              ? last.status === "success"
+                ? `${c.label} · ✓ success${last.duration_ms ? ` · ${last.duration_ms}ms` : ""}`
+                : `${c.label} · ✗ ${last.error?.slice(0, 60) ?? "error"}`
+              : `${c.label} · scheduled`;
+            return (
+              <div key={c.path} className="bg-[color:var(--surface)] p-5">
+                <p
+                  className="flex items-center gap-1.5 text-[10px] uppercase text-[color:var(--fg-subtle)]"
+                  style={{ letterSpacing: "0.14em" }}
+                  data-tabular
+                >
+                  <span
+                    aria-hidden
+                    className="inline-block size-1.5 rounded-full"
+                    style={{ background: dotColor }}
+                  />
+                  {c.path}
+                </p>
+                <p
+                  className="mt-2 leading-none"
+                  style={{
+                    fontFamily: "var(--font-boldonse), ui-sans-serif",
+                    fontSize: 28,
+                    color:
+                      last?.status === "error" ? "var(--error)" : "var(--fg)",
+                  }}
+                  data-tabular
+                >
+                  {headline}
+                </p>
+                <p
+                  className="mt-1 text-xs text-[color:var(--fg-muted)]"
+                  style={{ letterSpacing: "0.04em" }}
+                  title={last?.error ?? undefined}
+                >
+                  {subline}
+                </p>
+              </div>
+            );
+          })}
+        </section>
+
+        {/* Events table */}
+        <h2
+          className="mt-12 mb-5 text-2xl"
+          style={{
+            fontFamily: "var(--font-boldonse), ui-sans-serif",
+            letterSpacing: "-0.005em",
+          }}
+        >
+          EVENTS · {rounds.length}
+        </h2>
+
+        {/* Header row */}
+        <div
+          className="grid items-center gap-3 border-b border-[color:var(--border)] px-3 py-2 text-[10px] uppercase text-[color:var(--fg-subtle)]"
+          style={{
+            gridTemplateColumns:
+              "32px 80px 32px minmax(0,1fr) 100px 96px 140px minmax(0,1fr) 200px",
+            letterSpacing: "0.12em",
+          }}
+          data-tabular
+        >
+          <span>R</span>
+          <span></span>
+          <span></span>
+          <span>Event</span>
+          <span>Date</span>
+          <span>Sessions</span>
+          <span>State</span>
+          <span>Picks</span>
+          <span className="text-right">Action</span>
+        </div>
+
+        <ul>
+          {rounds.map((r) => {
+            const stateMeta = STATE_META[r.state];
+            const eventName = shortEventName(r.name);
+            const actionHref =
+              r.state === "revealed" && r.raceSession
+                ? `/reveal/${r.raceSession.id}`
+                : r.state === "pending" || r.state === "mixed"
+                  ? `/admin/results/round/${r.round}`
+                  : r.state === "entered" && r.actionSessionId
+                    ? `/admin/results/${r.actionSessionId}`
+                    : `/admin/results/round/${r.round}`;
+            const flagEmoji = countryFlag(eventCountry(r.name));
+            const date = new Date(r.weekendStart).toLocaleDateString(
+              undefined,
+              { month: "short", day: "numeric" },
+            );
+            const sessionsLabel = r.hasSprint ? "Q · SQ · S · R" : "Q · R";
+            const totalSessions = r.sessions.length;
+            const sessionsWithResults = r.sessions.filter((s) =>
+              haveResults.has(s.id),
+            ).length;
+            return (
+              <li
+                key={r.round}
+                className="grid items-center gap-3 border-b border-[color:var(--border)] px-3 py-3.5"
+                style={{
+                  gridTemplateColumns:
+                    "32px 80px 32px minmax(0,1fr) 100px 96px 140px minmax(0,1fr) 200px",
+                  background: stateMeta.bg,
+                }}
+              >
+                <span
+                  className="leading-none"
+                  style={{
+                    fontFamily: "var(--font-boldonse), ui-sans-serif",
+                    fontSize: 18,
+                  }}
+                  data-tabular
+                >
+                  {r.round}
+                </span>
+                <TrackDiagram
+                  circuit={r.ergast_circuit_id ?? r.circuit}
+                  size={68}
+                  stroke="var(--fg-subtle)"
+                  strokeWidth={1.5}
+                />
+                <span aria-hidden style={{ fontSize: 22, lineHeight: 1 }}>
+                  {flagEmoji}
+                </span>
+                <div className="min-w-0">
+                  <p
+                    className="truncate text-sm leading-tight"
+                    style={{
+                      fontFamily: "var(--font-boldonse), ui-sans-serif",
+                      letterSpacing: "0.02em",
+                    }}
+                  >
+                    {eventName.toUpperCase()}
+                  </p>
+                  <p
+                    className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
+                    style={{ letterSpacing: "0.06em" }}
+                    data-tabular
+                  >
+                    {r.circuit}
+                  </p>
+                </div>
+                <span
+                  className="text-xs text-[color:var(--fg-muted)]"
+                  style={{ letterSpacing: "0.04em" }}
+                  data-tabular
+                >
+                  {date}
+                </span>
+                <span
+                  className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
+                  style={{ letterSpacing: "0.06em" }}
+                  data-tabular
+                >
+                  {sessionsLabel}
+                </span>
+                <span
+                  className="text-[10px] uppercase font-semibold"
+                  style={{
+                    color: stateMeta.color,
+                    letterSpacing: "0.08em",
+                  }}
+                  data-tabular
+                >
+                  ● {stateMeta.label}
+                </span>
+                <span
+                  className="text-[11px] text-[color:var(--fg-muted)]"
+                  data-tabular
+                >
+                  {r.state === "future" ? (
+                    <span className="text-[color:var(--fg-subtle)]">
+                      — picks open T-7d
+                    </span>
+                  ) : (
+                    <>
+                      {r.pickCount} pick{r.pickCount === 1 ? "" : "s"}
+                      {totalSessions > 1 && (
+                        <span className="ml-1 text-[color:var(--fg-subtle)]">
+                          · {sessionsWithResults}/{totalSessions} results
+                        </span>
+                      )}
+                    </>
+                  )}
+                </span>
+                <div className="flex justify-end">
+                  {r.state === "entered" && r.raceSession ? (
+                    <RevealButton
+                      eventId={r.raceSession.id}
+                      action={revealEventAction}
+                    />
+                  ) : (
+                    <Link
+                      href={actionHref}
+                      className="px-4 py-2 text-[11px] uppercase transition-colors"
+                      style={{
+                        background:
+                          r.state === "pending" || r.state === "mixed"
+                            ? "var(--accent)"
+                            : "transparent",
+                        color:
+                          r.state === "pending" || r.state === "mixed"
+                            ? "#000"
+                            : "var(--fg)",
+                        border:
+                          r.state === "pending" || r.state === "mixed"
+                            ? "none"
+                            : "1px solid var(--border)",
+                        fontFamily:
+                          "var(--font-mono), ui-monospace, monospace",
+                        letterSpacing: "0.08em",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {stateMeta.action}
+                    </Link>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
+        <Link
+          href="/dashboard"
+          className="mt-12 inline-block text-sm text-[color:var(--fg-subtle)] hover:text-[color:var(--fg)]"
+          style={{ letterSpacing: "0.06em" }}
+        >
+          ← Back to dashboard
+        </Link>
+      </main>
+    </>
   );
 }

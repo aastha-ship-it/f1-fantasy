@@ -5,6 +5,12 @@ Thumbs.db
 # Ad-hoc screenshots the user drops into the repo root for reference
 Screenshot*.png
 Screenshot*.jpg
+# Debug / one-off screenshots dropped at the repo root during dev — keep
+# them local rather than committing huge binaries on every iteration.
+/dashboard-*.png
+/predict-*.png
+/profile-portraits-*.png
+/standings-*.png
 
 # Editors
 .vscode/
@@ -39,6 +45,10 @@ dist/
 /blob-report/
 /playwright/.cache/
 
+# Design-handoff capture artifacts (per .claude/skills/design-handoff)
+**/_capture.spec.ts
+plans/designs/**/implementation.png
+
 # Coverage
 coverage/
 *.lcov
@@ -62,3 +72,13 @@ next-env.d.ts
 
 # Claude local (may contain hooks / settings.local.json)
 .claude/settings.local.json
+
+# Playwright MCP scratch dir (session-local, not checked in)
+.playwright-mcp/
+
+# Claude per-session state — do not commit. settings.json (project-level
+# hooks shared by the team) lives separately and should be committed if it
+# exists; everything else under .claude/ is local.
+.claude/cache/
+.claude/memory/
+.claude/projects/

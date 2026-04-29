@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 /**
  * TEST-ONLY password sign-in endpoint.
@@ -36,10 +37,33 @@ export async function POST(request: NextRequest) {
   const { email, password } = body as { email: string; password: string };
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
+  let { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
+
+  // Auto-create the user if they don't exist yet. This endpoint is test-only
+  // (404 in production), so the create-if-missing behavior is purely a dev
+  // convenience for spinning up multiple friend accounts without seeding.
+  if (error && /invalid login credentials/i.test(error.message)) {
+    const svc = createSupabaseServiceClient();
+    const { error: createErr } = await svc.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+    if (createErr) {
+      return NextResponse.json(
+        { ok: false, error: `createUser: ${createErr.message}` },
+        { status: 500 },
+      );
+    }
+    ({ data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    }));
+  }
+
   if (error) {
     return NextResponse.json(
       { ok: false, error: error.message },
@@ -55,6 +79,18 @@ export async function POST(request: NextRequest) {
       { id: data.user.id, email: data.user.email! },
       { onConflict: "id" },
     );
+    // Mirror the /auth/callback admin self-heal so test sign-ins for the
+    // configured ADMIN_EMAIL land in public.admins and can drive the admin UI.
+    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+    if (
+      adminEmail &&
+      data.user.email?.toLowerCase().trim() === adminEmail
+    ) {
+      const svc = createSupabaseServiceClient();
+      await svc
+        .from("admins")
+        .upsert({ user_id: data.user.id }, { onConflict: "user_id" });
+    }
   }
   return NextResponse.json({ ok: true, userId: data.user?.id });
 }

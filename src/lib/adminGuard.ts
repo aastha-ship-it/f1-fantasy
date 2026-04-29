@@ -25,7 +25,12 @@ export async function isAdmin(
 }
 
 export type AdminGuardResult =
-  | { ok: true; userId: string }
+  | {
+      ok: true;
+      userId: string;
+      email: string | null;
+      displayName: string | null;
+    }
   | { ok: false; reason: "unauthenticated" | "forbidden" };
 
 /**
@@ -40,5 +45,16 @@ export async function currentAdmin(): Promise<AdminGuardResult> {
   if (!(await isAdmin(svc, data.user.id))) {
     return { ok: false, reason: "forbidden" };
   }
-  return { ok: true, userId: data.user.id };
+  // Pull display name from public.users so the admin strip can render it.
+  const { data: row } = await supabase
+    .from("users")
+    .select("display_name")
+    .eq("id", data.user.id)
+    .maybeSingle<{ display_name: string | null }>();
+  return {
+    ok: true,
+    userId: data.user.id,
+    email: data.user.email ?? null,
+    displayName: row?.display_name?.trim() ?? null,
+  };
 }

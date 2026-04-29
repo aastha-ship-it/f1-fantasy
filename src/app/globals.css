@@ -26,17 +26,32 @@
   --warning: oklch(74% 0.18 70);
   --error: oklch(60% 0.22 15);
 
-  /* Team chips */
+  /* Team chips (OKLCH for borders / dots) */
   --team-mclaren: oklch(72% 0.17 55);
   --team-ferrari: oklch(58% 0.22 27);
   --team-mercedes: oklch(78% 0.08 180);
-  --team-redbull: oklch(38% 0.16 265);
+  --team-redbull: oklch(58% 0.16 265);
   --team-aston: oklch(50% 0.15 165);
-  --team-williams: oklch(58% 0.14 245);
+  --team-williams: oklch(64% 0.16 245);
   --team-haas: oklch(88% 0.01 27);
   --team-kick: oklch(60% 0.20 145);
   --team-alpine: oklch(58% 0.18 260);
   --team-vcarb: oklch(45% 0.12 260);
+
+  /* Team hex (for inline drop-shadows, livery gradient stops, accent bars
+   * — places where OKLCH is awkward, e.g. text-shadow / box-shadow that mix
+   * with rgba(). Keep both in sync; design canvas data.jsx is source of truth.
+   */
+  --team-mclaren-hex: #FF8000;
+  --team-ferrari-hex: #E8002D;
+  --team-mercedes-hex: #27F4D2;
+  --team-redbull-hex: #3671C6;
+  --team-aston-hex: #229971;
+  --team-williams-hex: #1E5BCF;
+  --team-haas-hex: #B6BABD;
+  --team-kick-hex: #52E252;
+  --team-alpine-hex: #0093CC;
+  --team-vcarb-hex: #6692FF;
 
   /* Spacing scale (4pt base) */
   --space-xs: 4px;
@@ -50,6 +65,30 @@
 
   /* Motion */
   --ease-out-quart: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-cubic: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/*
+ * Boldonse has dramatically tall ascenders + descenders that overflow its
+ * line-box at any line-height < ~1.1. Without this fix, hero titles clip
+ * into siblings above (eyebrow labels, position numbers). Design canvas
+ * F1 Fantasy.html applies the same workaround.
+ *
+ * The selector is intentionally broad — it targets every element that uses
+ * Boldonse via inline style attribute (our convention for display type).
+ * `data-tight` opts out for full-bleed cinematic display (reveal hero).
+ */
+.font-display,
+[style*="Boldonse"] {
+  line-height: 1.05;
+  padding-top: 0.12em;
+  padding-bottom: 0.04em;
+}
+.font-display[data-tight],
+[style*="Boldonse"][data-tight] {
+  line-height: 0.95;
+  padding-top: 0.04em;
+  padding-bottom: 0;
 }
 
 @theme inline {

@@ -66,6 +66,18 @@ export async function writeResultsWith(
     };
   }
 
+  return writeResultsService(svc, input);
+}
+
+/**
+ * Same pipeline, no auth/admin gate. Trust boundary is the caller — used by
+ * the OpenF1 cron fetcher, which is itself protected by `Bearer CRON_SECRET`.
+ * Do NOT call this from a request handler that lacks an equivalent gate.
+ */
+export async function writeResultsService(
+  svc: SupabaseClient,
+  input: WriteResultsInput,
+): Promise<WriteResultsResult> {
   // 3. Event exists.
   const { data: event, error: evErr } = await svc
     .from("events")

@@ -17,14 +17,21 @@ import postgres from "postgres";
  * downstream routing (welcome redirect if display_name is null).
  */
 
-const INVITE_CODE = process.env.INVITE_CODE ?? "LECLERC-FTW-2026";
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54421";
-const SERVICE_ROLE =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? "<redacted-supabase-local-dev-key>";
-const DATABASE_URL =
-  process.env.DATABASE_URL ??
-  "postgresql://postgres:postgres@127.0.0.1:54422/postgres";
+// Test config — every value MUST come from the environment. We deliberately
+// do NOT hardcode fallbacks (Supabase local-dev keys etc.), so:
+//   1. CI / contributors see a loud failure if .env.local isn't loaded;
+//   2. nothing in the repo trips secret scanners on GitHub.
+// Run with `bun --env-file=.env.local run test:e2e` (or set the vars in CI).
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`${name} is required for e2e tests — load .env.local`);
+  return v;
+}
+
+const INVITE_CODE = requireEnv("INVITE_CODE");
+const SUPABASE_URL = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
+const SERVICE_ROLE = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+const DATABASE_URL = requireEnv("DATABASE_URL");
 
 function e2eEmail(tag: string): string {
   return `test+e2e-${tag}-${Date.now()}@f1fantasy.test`;
@@ -86,7 +93,7 @@ test.describe("E2E auth", () => {
       await page.goto("/dashboard");
       await page.waitForURL(/\/profile\?welcome=1/, { timeout: 15_000 });
       await expect(
-        page.getByRole("heading", { name: "WELCOME" }),
+        page.getByRole("heading", { name: /pick your.+side of the grid/i }),
       ).toBeVisible();
 
       // Fill the required name; other fields stay empty.
@@ -95,12 +102,15 @@ test.describe("E2E auth", () => {
         page.waitForURL((url) => url.pathname === "/dashboard", {
           timeout: 15_000,
         }),
-        page.getByRole("button", { name: /continue/i }).click(),
+        page.getByRole("button", { name: /save.+paddock/i }).click(),
       ]);
-      // Dashboard toolbar shows display name + email inline, with a
-      // Sign out button. Asserting on the email is the most precise check.
-      await expect(page.getByText(email)).toBeVisible();
+      // Dashboard TopBar shows the user's initial avatar + Sign out button;
+      // the redesign deliberately doesn't render the email inline. Asserting
+      // on the Sign out button + a hero heading is the precise check.
       await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: /grand prix/i }),
+      ).toBeVisible();
     } finally {
       await cleanupUser(email);
     }

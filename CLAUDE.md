@@ -4,9 +4,80 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0–5 shipped (2026-04-20) + UX pass.** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **37/37 tests green:** 35 Vitest + 2 Playwright (E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
+**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign — 2026-04-30).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **99/99 tests green:** 97 Vitest + 2 Playwright (E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
 
-Routes currently serving: `/`, `/join`, `/login` (Google button), `/auth/callback`, `/dashboard`, `/dashboard/predict`, `/dashboard/predict/[eventId]`, `/dashboard/league`, `/dashboard/standings` (stub), `/profile` (supports `?welcome=1`), `/admin`, `/admin/results/[eventId]`, `/reveal/[eventId]`, `/api/cron/sync-f1-data` (Bearer-gated), `/api/share/[eventId]/card.png` (public OG), `/api/test/sign-in-password` (non-prod only).
+### Design system (Pass 1–4 shipped 2026-04-28)
+
+All four design-port passes have shipped. Every authenticated screen — Login, Profile, Dashboard, Predict-list, Predict-detail, World standings, League, and Reveal — now matches the Claude design canvas at `design/`.
+
+The reveal cinematic (`src/app/reveal/[eventId]/reveal-stage.tsx`) ports the canvas's 9.5-second timeline entirely to Framer Motion (no RAF loop): stripe wash bg → title slam (skew-in 0–1.4s) → livery sweep car (winner's team carSrc translating across the band 0.6–2.2s with blur+opacity envelope) → SVG track-draw via `motion.path pathLength` (2.0–2.9s) → P3 → P2 → P1 podium reveal (3.3s onward) → friend-pick cards cascading at 150ms stagger. A Replay button bumps a `playKey` that re-keys every motion node so the full sequence replays. `useReducedMotion()` swaps in a `StaticHero` and collapses all delays to 0 — the cinematic is structurally absent for that audience, not throttled.
+
+Foundation modules in `src/lib/design/`:
+- `teams.ts` — single source of truth for team metadata (slug, name, hex, livery, logoSrc, carSrc). Resolves free-form `drivers.team` strings via an alias table ("Red Bull Racing"/"Audi" → canonical slug). Exposes `teamMeta(team)`, `teamHex(team)`, `ALL_TEAMS`.
+- `drivers.ts` — `driverPortraitSrc(code)` / `driverHeadshotSrc(code)` (return null for codes outside the design canvas asset set), `driverCountry(code)`, `countryFlag(iso)`.
+- `tracks.ts` — 12 stylized SVG track paths lifted from the design canvas, alias-resolved between OpenF1 short names and Jolpica `circuit_id`.
+
+Reusable components in `src/components/`:
+- `TopBar.tsx` — used on every authenticated screen. 4 tabs (Calendar/Predict/F1 Standings/The Group) + user initial + sign-out.
+- `TrackDiagram.tsx` — 200×120 SVG, alias-resolved, configurable size + stroke.
+- `DriverPortrait.tsx` — image when asset exists, initial-letter avatar tinted with team hex when not.
+
+Asset directory at `public/assets/{drivers,drivers-portrait,cars,logos}/` (~36MB). `src/middleware.ts` matcher excludes `/assets/` so they're served unauthenticated.
+
+Boldonse line-height fix: a global `[style*="Boldonse"]` selector in `globals.css` adds 0.12em top padding + 1.05 line-height to absorb the font's deep ascenders. Use `data-tight` attribute to opt out (cinematic display titles).
+
+Routes currently serving: `/`, `/join`, `/login` (split-layout cinematic Google button), `/auth/callback`, `/dashboard`, `/dashboard/predict`, `/dashboard/predict/round/[round]` (per-round session list), `/dashboard/predict/[eventId]`, `/dashboard/league`, `/dashboard/standings`, `/profile` (supports `?welcome=1`), `/admin`, `/admin/results/round/[round]` (per-round admin overview), `/admin/results/[eventId]`, `/reveal/[eventId]`, `/api/cron/sync-f1-data` (Bearer-gated), `/api/cron/fetch-results` (Bearer-gated), `/api/cron/refresh-jolpica-current` (Bearer-gated), `/api/cron/refresh-nudges` (Bearer-gated), `/api/share/[eventId]/card.png` (public OG), `/api/test/sign-in-password` (non-prod only).
+
+### Two-source data identity (Jolpica + OpenF1)
+
+OpenF1 keys results by `driver_number` which F1 reassigns between seasons (#1 follows the WDC). **Never** join historical OpenF1 data on `driver_number` directly — the same number maps to different humans across years. Two stable identifiers in our schema:
+
+- **`drivers.full_name`** + `src/lib/text/canonicalize.ts:canonicalizeName` — strips diacritics, lowercases, collapses whitespace. Used by `refreshNudges` to remap each OpenF1 session's `driver_number → our_id`.
+- **`drivers.ergast_id`** (text, unique, nullable) — Jolpica/Ergast canonical id (`max_verstappen`, `norris`). Populated by `resolveDrivers(svc, season)` in the nightly sync. Used by all `historical_results` joins.
+
+Same pattern for circuits: OpenF1's `events.circuit` short name (e.g. "Sakhir") and Jolpica's `events.ergast_circuit_id` (e.g. "bahrain") coexist; a small alias map in `resolveCircuits.ts` covers the few cases where neither circuitName nor locality matches.
+
+### Jolpica historical layer (shipped 2026-04-28)
+
+Built per `plans/2026-04-28-jolpica-historical.md`. Lives entirely under `src/lib/jolpica/`:
+
+- `client.ts` — fetch wrapper with 6-attempt 429 backoff (Retry-After-aware), pagination iterator
+- `resolveDrivers.ts` + `resolveCircuits.ts` — populate `ergast_id` columns
+- `backfillResults.ts` — UPSERTs `historical_races` + `historical_results` (race + sprint, idempotent)
+- `atTrackPodiumsFor.ts` — pure SQL aggregate, single Postgres round-trip per driver
+
+Schema additions in `supabase/migrations/20260429000000_jolpica_foundation.sql` + `20260429000100_driver_nudges_nullable_podiums.sql`.
+
+**Cron sequence (UTC)**: `04:00 sync-f1-data` (calendar/drivers + ergast_id mapper) → `04:15 fetch-results` (OpenF1 hot path) → `04:20 refresh-jolpica-current` (Jolpica delta into `historical_results`) → `04:30 refresh-nudges` (reads `historical_results` for at-track signal).
+
+**Initial backfill** (last 10 seasons, ~120 Jolpica requests, ~3 min):
+
+```bash
+bun --env-file=.env.local run scripts/backfill-jolpica.ts
+# or scoped:
+bun --env-file=.env.local run scripts/backfill-jolpica.ts --season 2024
+bun --env-file=.env.local run scripts/backfill-jolpica.ts --from 2017 --to 2026
+```
+
+**Standings page** is now Jolpica-canonical for the current season's race + sprint points; falls back to recomputing from `session_classifications` for races finished but not yet ingested by the next Jolpica delta. UI shows "Latest ingested race · YYYY-MM-DD" + a backstop-row count when applicable.
+
+**Nudges** at-track-podium signal now sources from `historical_results` over a 10-year window (was OpenF1 4-year window). Predict UI labels include the timeframe inline: `Podiums @ Miami (last 10 yrs)`, `Race-day gain (this season)`. Constant: `JOLPICA_HISTORY_WINDOW_YEARS` in `src/lib/jolpica/config.ts`.
+
+### Auto-fetch results (Track B, shipped 2026-04-28)
+
+`src/lib/results/fetchResults.ts` walks past events with an `openf1_session_key` and no `results` row, pulls `/session_result` from OpenF1, and runs the scoring pipeline via the new `writeResultsService` (admin-check-bypass; trust boundary is the `Bearer CRON_SECRET` on `/api/cron/fetch-results`). Manual admin entry stays the primary path — auto-fetch is a convenience. Also UPSERTs full classification rows into `session_classifications` for the standings page.
+
+### Standings (Track B, shipped 2026-04-28)
+
+`/dashboard/standings` reads from `session_classifications` (migration `20260428110000`) and computes driver + constructor totals via `src/lib/standings/computeStandings.ts` using official 2026 F1 points (race 25/18/15/12/10/8/6/4/2/1, sprint 8/7/6/5/4/3/2/1). Empty state until the first race weekend fills the cache.
+
+### Resend admin alerts (Track B, shipped 2026-04-28)
+
+`src/lib/email/notifyAdmin.ts` is a thin Resend wrapper. Configured via `RESEND_API_KEY` + `ADMIN_EMAIL` (+ optional `RESEND_FROM`). Safe to call without configuration — returns `{sent: false, reason}` instead of throwing. Wired into the catch path of all three cron routes.
+
+### Telemetry nudges (Phase 4 carry-over, shipped 2026-04-28)
+
+Predict screen surfaces three signals under each chosen driver: last-5 form (`P1 · P4 · DNF · P2 · P3`), at-circuit podium count, and average grid→race delta for the season. Pure aggregation lives in `src/lib/nudges/computeNudges.ts` (12 unit tests). Cache table: `driver_nudges (event_id, driver_id, recent_form, at_track_podiums, quali_race_delta)` — see `supabase/migrations/20260428100000_driver_nudges.sql`. Filled by `src/lib/nudges/refreshNudges.ts` which walks OpenF1 `/sessions` + `/session_result` for the current and prior season. Cron at `/api/cron/refresh-nudges` rebuilds nudges for any event within the next 10 days; idempotent. Vercel schedule wired in `vercel.json` (04:30 UTC daily, 30min after `sync-f1-data`).
 
 See `plans/program-tracker.md` for the live phase-by-phase status. See `plans/flickering-giggling-valley.md` for the authoritative plan.
 
@@ -98,6 +169,13 @@ bun --env-file=.env.local run vitest run tests/integration
 bun run latency                     # measure OpenF1 publish latency
 bun --env-file=.env.local run scripts/seed-calendar.ts  # 2026 schedule
 bun --env-file=.env.local run scripts/seed-drivers.ts   # current drivers
+
+# Historical at-track data — required for predict-detail telemetry to show
+# real "1 win · 2 podiums" numbers. Run once after `supabase db reset` or
+# a fresh clone; idempotent. Without it, at-track values render as "—".
+bun --env-file=.env.local run scripts/backfill-jolpica.ts
+curl -H "Authorization: Bearer $CRON_SECRET" \
+  http://localhost:3001/api/cron/refresh-nudges
 ```
 
 ### Google OAuth setup (one-time per environment)
@@ -214,8 +292,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=  # Supabase 'publishable' key (sb_publishable_...
 SUPABASE_SERVICE_ROLE_KEY=      # Supabase 'secret' key (sb_secret_...), server-only
 DATABASE_URL=                   # direct pg connection for seeds + integration tests
 INVITE_CODE=                    # shared secret for /join gate; HMAC'd into the invite cookie
-CRON_SECRET=                    # verifies Vercel cron calls (unused until Phase 3)
-# RESEND_API_KEY — deferred; Phase 3 currently logs to console instead
+CRON_SECRET=                    # verifies Vercel cron calls
+# Optional — admin email alerts on cron failure (no-op if either is missing)
+RESEND_API_KEY=                 # re_... from resend.com
+ADMIN_EMAIL=                    # destination for cron failure alerts; also self-heals admins on signin
+RESEND_FROM=                    # optional; defaults to "F1 Fantasy <noreply@f1-fantasy.app>"
 ```
 
 ### Vitest + local Supabase

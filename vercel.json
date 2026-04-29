@@ -1,0 +1,20 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-f1-data",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/fetch-results",
+      "schedule": "15 4 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-jolpica-current",
+      "schedule": "20 4 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-nudges",
+      "schedule": "30 4 * * *"
+    }
+  ]
+}

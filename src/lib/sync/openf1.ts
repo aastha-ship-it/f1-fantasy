@@ -11,8 +11,13 @@ export const OPENF1 = "https://api.openf1.org/v1";
 
 export async function fetchJson<T>(url: string, attempt = 1): Promise<T> {
   const res = await fetch(url);
-  if (res.status === 429 && attempt <= 4) {
-    const backoffMs = 1000 * 2 ** (attempt - 1);
+  if (res.status === 429 && attempt <= 6) {
+    // Honor Retry-After if OpenF1 sets it; otherwise exponential backoff
+    // starting at 2s (1, 2, 4, 8, 16, 32 → ~63s worst case).
+    const retryAfter = Number(res.headers.get("retry-after"));
+    const backoffMs = Number.isFinite(retryAfter) && retryAfter > 0
+      ? retryAfter * 1000
+      : 2000 * 2 ** (attempt - 1);
     await new Promise((r) => setTimeout(r, backoffMs));
     return fetchJson<T>(url, attempt + 1);
   }

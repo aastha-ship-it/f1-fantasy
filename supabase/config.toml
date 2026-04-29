@@ -147,9 +147,15 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://127.0.0.1:3000"
+site_url = "http://127.0.0.1:3001"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
+# Both :3000 and :3001 are kept — :3001 is the dev port (Phase 8 onward; :3000 is held by an
+# unrelated Docker container locally), but :3000 is left so cron / curl flows that hardcode
+# port 3000 still succeed against the same Supabase instance.
 additional_redirect_urls = [
+  "http://127.0.0.1:3001/**",
+  "http://localhost:3001/**",
+  "https://127.0.0.1:3001/**",
   "http://127.0.0.1:3000/**",
   "http://localhost:3000/**",
   "https://127.0.0.1:3000/**",

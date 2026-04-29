@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Claude design canvas — kept as reference, not production code:
+    "design/**",
   ]),
 ]);
 
