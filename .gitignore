@@ -49,6 +49,18 @@ dist/
 **/_capture.spec.ts
 plans/designs/**/implementation.png
 
+# Personal planning artifacts (private — not pushed to public repos)
+/plans/
+
+# Design canvas extras kept local. The src/lib/design/ helpers + the
+# public/assets/ images are everything the app actually uses; the design
+# canvas exports + screenshot diffs are reference material that bloats the
+# repo without being required to build or run.
+/design/design-screenshots/
+/design/implementation-screenshots/
+/design/ui-issues.md
+/design/uploads/
+
 # Coverage
 coverage/
 *.lcov

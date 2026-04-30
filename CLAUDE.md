@@ -39,7 +39,7 @@ Same pattern for circuits: OpenF1's `events.circuit` short name (e.g. "Sakhir") 
 
 ### Jolpica historical layer (shipped 2026-04-28)
 
-Built per `plans/2026-04-28-jolpica-historical.md`. Lives entirely under `src/lib/jolpica/`:
+Lives entirely under `src/lib/jolpica/`:
 
 - `client.ts` — fetch wrapper with 6-attempt 429 backoff (Retry-After-aware), pagination iterator
 - `resolveDrivers.ts` + `resolveCircuits.ts` — populate `ergast_id` columns
@@ -79,34 +79,9 @@ bun --env-file=.env.local run scripts/backfill-jolpica.ts --from 2017 --to 2026
 
 Predict screen surfaces three signals under each chosen driver: last-5 form (`P1 · P4 · DNF · P2 · P3`), at-circuit podium count, and average grid→race delta for the season. Pure aggregation lives in `src/lib/nudges/computeNudges.ts` (12 unit tests). Cache table: `driver_nudges (event_id, driver_id, recent_form, at_track_podiums, quali_race_delta)` — see `supabase/migrations/20260428100000_driver_nudges.sql`. Filled by `src/lib/nudges/refreshNudges.ts` which walks OpenF1 `/sessions` + `/session_result` for the current and prior season. Cron at `/api/cron/refresh-nudges` rebuilds nudges for any event within the next 10 days; idempotent. Vercel schedule wired in `vercel.json` (04:30 UTC daily, 30min after `sync-f1-data`).
 
-See `plans/program-tracker.md` for the live phase-by-phase status. See `plans/flickering-giggling-valley.md` for the authoritative plan.
+Design context (fonts, palette, principles, anti-patterns) lives in `.impeccable.md` at the project root.
 
-### Planning artifacts (read before writing any code)
-
-All planning artifacts are in `plans/`:
-
-| File | What it contains |
-|---|---|
-| `plans/program-tracker.md` | **Live status board.** Which phases are done, exit-criteria checkboxes, what's in flight. Check this first. |
-| `plans/flickering-giggling-valley.md` | **The master plan.** Data model, RLS policies, scoring pseudocode, 29-path test plan, screen-level design decisions, wireframe refinements. |
-| `plans/2026-04-18-f1-fantasy.md` | CEO plan — scope decisions, 10x vision, what was accepted vs deferred vs skipped. Context on WHY the scope looks the way it does. |
-| `plans/aasthakataria-unknown-eng-review-test-plan-20260418-170000.md` | Test plan artifact consumed by `/qa` and `/qa-only`. Critical paths, interactions to verify, edge cases per page. |
-| `plans/designs/reveal-20260419/wireframe.html` | Reveal screen reference composition |
-| `plans/designs/leaderboard-20260419/wireframe.html` | Leaderboard reference composition |
-| `plans/designs/predict-20260419/wireframe.html` | Predict screen reference composition (includes lock-countdown hero) |
-
-Design Context (fonts, palette, principles, anti-patterns) is in `.impeccable.md` at the project root.
-
-### Viewing wireframes during dev
-
-The wireframes are self-contained HTML (Google Fonts via CDN, inline CSS, no build step):
-
-```bash
-# Open any wireframe directly in your browser
-open "plans/designs/reveal-20260419/wireframe.html"
-open "plans/designs/leaderboard-20260419/wireframe.html"
-open "plans/designs/predict-20260419/wireframe.html"
-```
+`plans/` is gitignored — it holds the project owner's local planning artifacts (program tracker, master plan, dated session logs). If you need historical scope context that isn't reflected in the current code or commit history, ask the project owner.
 
 ### Scaffold done — what's actually installed
 
