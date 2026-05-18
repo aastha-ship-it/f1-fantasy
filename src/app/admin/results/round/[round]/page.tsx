@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { currentAdmin } from "@/lib/adminGuard";
 import { AdminStrip } from "../../../admin-strip";
+import { PracticeOverridesForm } from "./practice-overrides-form";
 import { TrackDiagram } from "@/components/TrackDiagram";
 import { shortEventName, eventCountry } from "@/lib/design/eventName";
 import { countryFlag } from "@/lib/design/drivers";
@@ -126,6 +128,43 @@ export default async function AdminResultsRoundPage({
     if (!haveResults.has(s.id)) return "awaiting";
     if (!s.revealed_at) return "entered";
     return "revealed";
+  }
+
+  // FP override editor data (changes.md §6). practice_overrides has no RLS
+  // policy (deny-all) so it's read via the service client, same as the
+  // admin gate itself.
+  const svc = createSupabaseServiceClient();
+  const [{ data: fpDrivers }, { data: fpOverrides }] = await Promise.all([
+    svc
+      .from("drivers")
+      .select("id, code")
+      .eq("active", true)
+      .order("code", { ascending: true })
+      .returns<{ id: number; code: string }[]>(),
+    svc
+      .from("practice_overrides")
+      .select("fp_index, p1_driver_id, p2_driver_id, p3_driver_id")
+      .eq("season", currentSeason)
+      .eq("round", round)
+      .returns<
+        {
+          fp_index: number;
+          p1_driver_id: number;
+          p2_driver_id: number;
+          p3_driver_id: number;
+        }[]
+      >(),
+  ]);
+  const fpExisting: Record<
+    number,
+    { p1: number; p2: number; p3: number } | undefined
+  > = {};
+  for (const o of fpOverrides ?? []) {
+    fpExisting[o.fp_index] = {
+      p1: o.p1_driver_id,
+      p2: o.p2_driver_id,
+      p3: o.p3_driver_id,
+    };
   }
 
   const first = sessions[0]!;
@@ -290,6 +329,13 @@ export default async function AdminResultsRoundPage({
             );
           })}
         </section>
+
+        <PracticeOverridesForm
+          season={currentSeason}
+          round={round}
+          drivers={fpDrivers ?? []}
+          existing={fpExisting}
+        />
       </main>
     </>
   );

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 118 unit + 21 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
+**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 129 unit + 21 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
 
 ### Design system (Pass 1–4 shipped 2026-04-28)
 
@@ -91,6 +91,37 @@ Six changes from `changes.md`, resolved interactively (decisions captured in the
 6. **Next-round nudge coverage** — see Telemetry nudges section above.
 
 Shared fixed-duration constants live in `src/lib/sessionDuration.ts` (Quali 60m, Race 90m; sprint values used only as ICS DTEND fallback).
+
+### Phase 11 — Free Practice banner (changes.md §6, shipped 2026-05-18)
+
+A "FREE PRACTICE — FORM GUIDE" banner on `/dashboard/predict/round/[round]`
+(between the weekend hero and the session list) showing FP1/FP2/FP3 top-3 to
+help users lock picks. **Practice is deliberately NOT in the schema** (the
+`session_type` enum and `syncCalendar` filter stay scoring-only — practice
+rows in `events` would pollute predict/lobby/standings/RLS/lock).
+
+- **On-demand, no cron.** `src/lib/practice/loadPractice.ts` fetches OpenF1
+  `/sessions?meeting_key` then `/session_result` + `/drivers` per completed
+  FP, cached ~15 min via Next's Data Cache (`fetchJson` gained an optional,
+  backward-compatible `init` arg carrying `{ next: { revalidate: 900 } }`).
+  Each FP appears automatically ≤15 min after it ends; **best-effort** —
+  every fetch is wrapped so an OpenF1 outage yields no banner, never a broken
+  predict round page (the critical path).
+- **Why not the results pipeline?** FP is read-only decoration; Quali/Race
+  results are authoritative (drive `computeScores`, gate the reveal) and stay
+  on the deliberate admin/cron path. Asymmetry is intentional.
+- **Admin override wins.** `practice_overrides (season, round, fp_index,
+  p1/p2/p3_driver_id)` (migration `20260518100000`, service-role only, no
+  RLS). When a slot has a row it beats the live fetch (OpenF1 late/wrong/
+  cancelled). Editor on `/admin/results/round/[round]`
+  (`practice-overrides-form.tsx` + `practice-actions.ts`, gated by
+  `currentAdmin()`). Drivers only — lap time shows only for OpenF1-sourced
+  rows, `—` on an override.
+- **Pure + tested:** `formatLapTime` (M:SS.mmm) and `parsePractice`
+  (top-3 by position, cross-year-safe `driver_number → drivers.id` via
+  `canonicalizeName`) — TDD'd, 11 unit tests. Driver mapping reuses the
+  `refreshNudges.loadDriverMap` pattern; chip styling matches the existing
+  P1/P2/P3 idiom (`teamMeta` hex, Geist Mono `data-tabular`).
 
 Design context (fonts, palette, principles, anti-patterns) lives in `.impeccable.md` at the project root.
 

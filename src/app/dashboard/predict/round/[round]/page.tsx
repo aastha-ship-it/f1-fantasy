@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { TopBar } from "@/components/TopBar";
 import { TrackDiagram } from "@/components/TrackDiagram";
+import { PracticeBanner } from "@/components/PracticeBanner";
 import { teamMeta } from "@/lib/design/teams";
 import { shortEventName } from "@/lib/design/eventName";
 import { circuitMeta } from "@/lib/design/circuits";
@@ -12,8 +14,12 @@ import {
   groupByRound,
   type GroupableEvent,
 } from "@/lib/predict/groupByRound";
+import {
+  loadPracticeForRound,
+  type FpSession,
+} from "@/lib/practice/loadPractice";
 
-type EventRow = GroupableEvent;
+type EventRow = GroupableEvent & { openf1_meeting_key: number | null };
 
 type DriverRow = { id: number; code: string; team: string };
 type PredictionRow = {
@@ -61,7 +67,7 @@ export default async function PredictRoundPage({
   const { data: roundSessions } = await supabase
     .from("events")
     .select(
-      "id, name, circuit, round, session_type, session_start_at, lock_at, revealed_at, ergast_circuit_id",
+      "id, name, circuit, round, session_type, session_start_at, lock_at, revealed_at, ergast_circuit_id, openf1_meeting_key",
     )
     .eq("season", currentSeason)
     .eq("round", round)
@@ -72,6 +78,21 @@ export default async function PredictRoundPage({
 
   const [grouped] = groupByRound(roundSessions, "asc");
   if (!grouped) notFound();
+
+  // Free Practice form guide (changes.md §6). On-demand, cached ~15 min,
+  // best-effort: an OpenF1 hiccup must never break this page (the critical
+  // path for locking predictions), so the banner just renders nothing.
+  let practice: FpSession[] = [];
+  try {
+    const meetingKey = roundSessions[0]?.openf1_meeting_key ?? null;
+    practice = await loadPracticeForRound(createSupabaseServiceClient(), {
+      season: currentSeason,
+      round,
+      meetingKey,
+    });
+  } catch {
+    practice = [];
+  }
 
   const sessionIds = grouped.sessions.map((s) => s.id);
 
@@ -197,6 +218,8 @@ export default async function PredictRoundPage({
             />
           </div>
         </section>
+
+        <PracticeBanner sessions={practice} />
 
         <section className="mt-10 grid gap-px bg-[color:var(--border)] border border-[color:var(--border)]">
           {grouped.sessions.map((s) => {

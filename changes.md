@@ -33,3 +33,9 @@ New Point system :
     - Miss (prediction is not on podium) -> 0 points
 
 5. Let's also show point system in a very systematic way on the UI for the user. This will help them in better understanding.
+
+6. Show Free Practice podium results (FP1/FP2/FP3) as a banner on the predict round page (/dashboard/predict/round/[id]) to help participants while locking their predictions.
+   - Standard weekends have FP1, FP2, FP3; Sprint weekends have only FP1.
+   - Sourced on-demand from OpenF1 (cached ~15 min, no cron) — appears automatically within ~15 min of each FP session ending.
+   - Admin can override an FP slot's top-3 (wins over the live OpenF1 fetch) for when OpenF1 is late/wrong/cancelled.
+   - Display: position + driver code + fastest-lap time (lap time shown only when sourced from OpenF1; "—" on an admin override).
