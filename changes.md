@@ -39,3 +39,8 @@ New Point system :
    - Sourced on-demand from OpenF1 (cached ~15 min, no cron) — appears automatically within ~15 min of each FP session ending.
    - Admin can override an FP slot's top-3 (wins over the live OpenF1 fetch) for when OpenF1 is late/wrong/cancelled.
    - Display: position + driver code + fastest-lap time (lap time shown only when sourced from OpenF1; "—" on an admin override).
+
+7. Fetch OpenF1 results for every scoring session (Sprint Qualifying, Sprint, Qualifying, Race) after it ends, with admin override.
+   - Trigger: an admin "Fetch from OpenF1" button on /admin/results/[eventId] (one click → fetch + score). The nightly fetch-results cron stays as a backstop.
+   - Override/freeze: once results are admin-entered OR the event is revealed, the automatic/OpenF1 path never changes them. Before reveal an OpenF1 row may still be refreshed (provisional → official).
+   - Reveal stays admin-triggered; the predictions reveal fallback is lengthened 10 min → 1 hour so a prompt fetch can't auto-spoil the cinematic.

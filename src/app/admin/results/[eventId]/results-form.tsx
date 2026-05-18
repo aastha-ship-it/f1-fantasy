@@ -6,7 +6,10 @@ import { computeScore } from "@/lib/computeScores";
 import { DriverPortrait } from "@/components/DriverPortrait";
 import { teamMeta } from "@/lib/design/teams";
 import type { WriteResultsResult } from "@/lib/writeResults";
-import type { FileAndRevealResult } from "./actions";
+import type {
+  FileAndRevealResult,
+  FetchFromOpenF1Result,
+} from "./actions";
 
 type Driver = {
   id: number;
@@ -83,6 +86,7 @@ export function ResultsForm({
   existing,
   submit,
   submitAndReveal,
+  fetchFromOpenF1,
 }: {
   eventId: string;
   isSprint: boolean;
@@ -103,6 +107,7 @@ export function ResultsForm({
     p2: number | null;
     p3: number | null;
   }) => Promise<FileAndRevealResult>;
+  fetchFromOpenF1: (eventId: string) => Promise<FetchFromOpenF1Result>;
 }) {
   const router = useRouter();
   const [picks, setPicks] = useState<Picks>(existing);
@@ -189,6 +194,19 @@ export function ResultsForm({
                   ? result.message
                   : result.message,
         });
+      }
+    });
+  }
+
+  function onFetchFromOpenF1() {
+    setFeedback(null);
+    startTransition(async () => {
+      const r = await fetchFromOpenF1(eventId);
+      if (r.ok) {
+        setFeedback({ kind: "ok", message: r.message });
+        if (r.written) router.refresh();
+      } else {
+        setFeedback({ kind: "err", message: r.message });
       }
     });
   }
@@ -536,6 +554,22 @@ export function ResultsForm({
               </>
             )}
           </p>
+          <button
+            type="button"
+            onClick={onFetchFromOpenF1}
+            disabled={pending}
+            className="mt-3 w-full px-5 py-3 text-xs uppercase transition-colors disabled:opacity-40"
+            style={{
+              background: "var(--surface-2)",
+              color: "var(--fg)",
+              border: "1px solid var(--border)",
+              fontFamily: "var(--font-mono), ui-monospace, monospace",
+              letterSpacing: "0.08em",
+            }}
+            title="Pull the classification from OpenF1 and score it. Won't overwrite admin-entered or revealed results."
+          >
+            {pending ? "Working…" : "↻ Fetch from OpenF1"}
+          </button>
           <div className="mt-3 flex gap-3">
             <button
               type="button"

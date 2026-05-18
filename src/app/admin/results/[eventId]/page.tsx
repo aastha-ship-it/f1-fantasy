@@ -2,7 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { currentAdmin } from "@/lib/adminGuard";
-import { fileResultsAction, fileResultsAndRevealAction } from "./actions";
+import {
+  fileResultsAction,
+  fileResultsAndRevealAction,
+  fetchFromOpenF1Action,
+} from "./actions";
 import { ResultsForm } from "./results-form";
 import { AdminStrip } from "../../admin-strip";
 import { TrackDiagram } from "@/components/TrackDiagram";
@@ -220,6 +224,7 @@ export default async function AdminResultsPage({
           }}
           submit={fileResultsAction}
           submitAndReveal={fileResultsAndRevealAction}
+          fetchFromOpenF1={fetchFromOpenF1Action}
         />
       </main>
     </>

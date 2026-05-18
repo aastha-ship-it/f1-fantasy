@@ -78,7 +78,7 @@ describe("revealEvent", () => {
 });
 
 describe("RLS · 10-minute results fallback", () => {
-  it("R3 · results older than 10m open predictions to others even without admin trigger", async () => {
+  it("R3 · results fallback is now 1 hour, not 10 minutes (changes.md §7)", async () => {
     const svc = serviceClient();
     const alice = await createTestUser("alice");
     const bob = await createTestUser("bob");
@@ -95,20 +95,33 @@ describe("RLS · 10-minute results fallback", () => {
       });
     }
 
-    // Insert a results row with fetched_at backdated 11 minutes.
-    // The RLS policy compares against results.fetched_at < now() - interval '10 minutes'.
-    // We go through raw SQL because the supabase-js upsert stamps fetched_at server-side.
+    // RLS policy now compares against results.fetched_at < now() - interval
+    // '1 hour'. Raw SQL because supabase-js stamps fetched_at server-side.
     const sql = postgres(process.env.DATABASE_URL!, { max: 1 });
     try {
+      // 11 minutes old: under the OLD 10-min rule this would open; under the
+      // new 1-hour rule it must NOT — Alice sees only her own pick.
       await sql`
         insert into public.results (event_id, p1_driver_id, p2_driver_id, p3_driver_id, fetched_at)
         values (${event.id}, 901, 902, 903, now() - interval '11 minutes')
+      `;
+      const { data: tooFresh } = await alice.client
+        .from("predictions")
+        .select("user_id")
+        .eq("event_id", event.id);
+      expect(tooFresh).toHaveLength(1);
+
+      // Backdate past 1 hour: the fallback now fires.
+      await sql`
+        update public.results set fetched_at = now() - interval '61 minutes'
+        where event_id = ${event.id}
       `;
     } finally {
       await sql.end();
     }
 
-    // revealed_at is still null. With the 10-min fallback, Alice should see Bob's pick.
+    // revealed_at is still null. With the 1-hour fallback elapsed, Alice
+    // should now see Bob's pick too.
     const { data: eventRow } = await svc
       .from("events")
       .select("revealed_at")

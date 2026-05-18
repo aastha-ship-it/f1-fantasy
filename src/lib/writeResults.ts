@@ -5,6 +5,7 @@ import {
   type Actual,
 } from "./computeScores";
 import { isAdmin } from "./adminGuard";
+import { isResultsFrozenForAuto } from "./results/freezeResults";
 
 /**
  * Results + scoring pipeline (Phase 3).
@@ -38,8 +39,10 @@ export type WriteResultsError =
   | "VALIDATION"
   | "DB";
 
+export type ResultsSource = "openf1" | "admin";
+
 export type WriteResultsResult =
-  | { ok: true; scoresUpdated: number }
+  | { ok: true; scoresUpdated: number; frozen?: boolean }
   | { ok: false; error: WriteResultsError; message: string };
 
 function isSprintType(t: string): boolean {
@@ -66,7 +69,8 @@ export async function writeResultsWith(
     };
   }
 
-  return writeResultsService(svc, input);
+  // Manual entry is the override — always wins, stamps source='admin'.
+  return writeResultsService(svc, input, "admin");
 }
 
 /**
@@ -77,15 +81,40 @@ export async function writeResultsWith(
 export async function writeResultsService(
   svc: SupabaseClient,
   input: WriteResultsInput,
+  source: ResultsSource = "openf1",
 ): Promise<WriteResultsResult> {
   // 3. Event exists.
   const { data: event, error: evErr } = await svc
     .from("events")
-    .select("id, session_type")
+    .select("id, session_type, revealed_at")
     .eq("id", input.eventId)
-    .maybeSingle<{ id: string; session_type: string }>();
+    .maybeSingle<{
+      id: string;
+      session_type: string;
+      revealed_at: string | null;
+    }>();
   if (evErr) return { ok: false, error: "DB", message: evErr.message };
   if (!event) return { ok: false, error: "NOT_FOUND", message: "Event not found" };
+
+  // Freeze rule (changes.md §7): the automatic/OpenF1 path must not modify a
+  // row once it's admin-entered or the event is revealed. Admin entry
+  // (source='admin') is the override and skips this check.
+  if (source === "openf1") {
+    const { data: existing, error: exErr } = await svc
+      .from("results")
+      .select("source")
+      .eq("event_id", input.eventId)
+      .maybeSingle<{ source: ResultsSource }>();
+    if (exErr) return { ok: false, error: "DB", message: exErr.message };
+    if (
+      isResultsFrozenForAuto({
+        existingSource: existing?.source ?? null,
+        revealedAt: event.revealed_at,
+      })
+    ) {
+      return { ok: true, scoresUpdated: 0, frozen: true };
+    }
+  }
 
   const sprint = isSprintType(event.session_type);
 
@@ -123,6 +152,7 @@ export async function writeResultsService(
       p1_driver_id: input.p1,
       p2_driver_id: input.p2,
       p3_driver_id: input.p3,
+      source,
       fetched_at: new Date().toISOString(),
     },
     { onConflict: "event_id" },

@@ -29,6 +29,88 @@ type EventRow = {
   session_start_at: string;
 };
 
+export type FetchOneResult =
+  | { ok: true; written: boolean; frozen?: boolean }
+  | { ok: false; fetched: boolean; reason: string };
+
+/**
+ * Fetch + score one event's results from OpenF1 (source='openf1').
+ * Shared by the nightly cron loop and the admin "Fetch from OpenF1" button.
+ * The freeze rule (admin-entered / revealed) is enforced downstream in
+ * writeResultsService, which returns `frozen` instead of overwriting.
+ */
+export async function fetchResultForEvent(
+  svc: SupabaseClient,
+  event: {
+    id: string;
+    session_type: string;
+    openf1_session_key: number | null;
+  },
+): Promise<FetchOneResult> {
+  if (event.openf1_session_key == null) {
+    return { ok: false, fetched: false, reason: "no_session_key" };
+  }
+
+  let rows: OpenF1ResultRow[];
+  try {
+    await sleep(350);
+    rows = await fetchJson<OpenF1ResultRow[]>(
+      `${OPENF1}/session_result?session_key=${event.openf1_session_key}`,
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[fetch-results] ${event.id}: ${message}`);
+    return { ok: false, fetched: false, reason: `fetch:${message}` };
+  }
+
+  if (!rows || rows.length === 0) {
+    return { ok: false, fetched: true, reason: "no_rows" };
+  }
+
+  let podium;
+  try {
+    podium = parsePodium(rows, SPRINT_TYPES.has(event.session_type));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, fetched: true, reason: `parse:${message}` };
+  }
+
+  const result = await writeResultsService(
+    svc,
+    { eventId: event.id, p1: podium.p1, p2: podium.p2, p3: podium.p3 },
+    "openf1",
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      fetched: true,
+      reason: `write:${result.error}:${result.message}`,
+    };
+  }
+  if (result.frozen) {
+    // Admin-entered or revealed — intentionally not overwritten.
+    return { ok: true, written: false, frozen: true };
+  }
+
+  // Cache full classification for the standings page. Best-effort —
+  // failure here doesn't undo the podium write.
+  const classificationRows = rows.map((r) => ({
+    event_id: event.id,
+    driver_id: r.driver_number,
+    position: r.position,
+    fetched_at: new Date().toISOString(),
+  }));
+  const { error: classErr } = await svc
+    .from("session_classifications")
+    .upsert(classificationRows, { onConflict: "event_id,driver_id" });
+  if (classErr) {
+    console.warn(
+      `[fetch-results] classification cache failed for ${event.id}: ${classErr.message}`,
+    );
+  }
+  return { ok: true, written: true };
+}
+
 export async function fetchPendingResults(
   svc: SupabaseClient,
 ): Promise<FetchResultsSummary> {
@@ -70,70 +152,15 @@ export async function fetchPendingResults(
   summary.scanned = pending.length;
 
   for (const event of pending) {
-    if (event.openf1_session_key == null) {
-      summary.skipped.push({ event_id: event.id, reason: "no_session_key" });
-      continue;
-    }
-
-    let rows: OpenF1ResultRow[];
-    try {
-      await sleep(350);
-      rows = await fetchJson<OpenF1ResultRow[]>(
-        `${OPENF1}/session_result?session_key=${event.openf1_session_key}`,
-      );
+    const r = await fetchResultForEvent(svc, event);
+    if (r.ok) {
       summary.fetched += 1;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.warn(`[fetch-results] ${event.id}: ${message}`);
-      summary.skipped.push({ event_id: event.id, reason: `fetch:${message}` });
-      continue;
+      if (r.written) summary.written += 1;
+      else summary.skipped.push({ event_id: event.id, reason: "frozen" });
+    } else {
+      if (r.fetched) summary.fetched += 1;
+      summary.skipped.push({ event_id: event.id, reason: r.reason });
     }
-
-    if (!rows || rows.length === 0) {
-      summary.skipped.push({ event_id: event.id, reason: "no_rows" });
-      continue;
-    }
-
-    let podium;
-    try {
-      podium = parsePodium(rows, SPRINT_TYPES.has(event.session_type));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      summary.skipped.push({ event_id: event.id, reason: `parse:${message}` });
-      continue;
-    }
-
-    const result = await writeResultsService(svc, {
-      eventId: event.id,
-      p1: podium.p1,
-      p2: podium.p2,
-      p3: podium.p3,
-    });
-    if (!result.ok) {
-      summary.skipped.push({
-        event_id: event.id,
-        reason: `write:${result.error}:${result.message}`,
-      });
-      continue;
-    }
-
-    // Cache full classification for the standings page. Best-effort —
-    // failure here doesn't undo the podium write.
-    const classificationRows = rows.map((r) => ({
-      event_id: event.id,
-      driver_id: r.driver_number,
-      position: r.position,
-      fetched_at: new Date().toISOString(),
-    }));
-    const { error: classErr } = await svc
-      .from("session_classifications")
-      .upsert(classificationRows, { onConflict: "event_id,driver_id" });
-    if (classErr) {
-      console.warn(
-        `[fetch-results] classification cache failed for ${event.id}: ${classErr.message}`,
-      );
-    }
-    summary.written += 1;
   }
 
   return summary;

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 129 unit + 21 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
+**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 135 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
 
 ### Design system (Pass 1–4 shipped 2026-04-28)
 
@@ -65,7 +65,7 @@ bun --env-file=.env.local run scripts/backfill-jolpica.ts --from 2017 --to 2026
 
 ### Auto-fetch results (Track B, shipped 2026-04-28)
 
-`src/lib/results/fetchResults.ts` walks past events with an `openf1_session_key` and no `results` row, pulls `/session_result` from OpenF1, and runs the scoring pipeline via the new `writeResultsService` (admin-check-bypass; trust boundary is the `Bearer CRON_SECRET` on `/api/cron/fetch-results`). Manual admin entry stays the primary path — auto-fetch is a convenience. Also UPSERTs full classification rows into `session_classifications` for the standings page.
+`src/lib/results/fetchResults.ts` walks past events with an `openf1_session_key` and no `results` row, pulls `/session_result` from OpenF1, and runs the scoring pipeline via the new `writeResultsService` (admin-check-bypass; trust boundary is the `Bearer CRON_SECRET` on `/api/cron/fetch-results`). Manual admin entry stays the primary path — auto-fetch is a convenience. Also UPSERTs full classification rows into `session_classifications` for the standings page. **Phase 12:** the per-event core is extracted as `fetchResultForEvent` and is also reachable via the admin "Fetch from OpenF1" button; both honour the `results.source`/revealed freeze (see Phase 12 section).
 
 ### Standings (Track B, shipped 2026-04-28)
 
@@ -122,6 +122,34 @@ rows in `events` would pollute predict/lobby/standings/RLS/lock).
   `canonicalizeName`) — TDD'd, 11 unit tests. Driver mapping reuses the
   `refreshNudges.loadDriverMap` pattern; chip styling matches the existing
   P1/P2/P3 idiom (`teamMeta` hex, Geist Mono `data-tabular`).
+
+### Phase 12 — admin OpenF1 result fetch + freeze (changes.md §7, shipped 2026-05-18)
+
+Results for the 4 scoring session types can now be pulled from OpenF1
+**on demand by the admin** (one click), not just the nightly cron.
+
+- **Trigger = admin "Fetch from OpenF1" button** on `/admin/results/[eventId]`
+  (`fetchFromOpenF1Action`, `currentAdmin()`-gated → `fetchResultForEvent`).
+  No new cron (Vercel Hobby is daily-only); the 04:15 UTC `fetch-results`
+  cron stays as a backstop. `fetchResultForEvent` is the extracted per-event
+  OpenF1→`parsePodium`→`writeResultsService` helper, shared by the cron loop
+  and the button.
+- **`results.source` ('openf1'|'admin')** (migration `20260518110000`).
+  Freeze rule (pure, unit-tested `src/lib/results/freezeResults.ts`
+  `isResultsFrozenForAuto`): the OpenF1 path (`source='openf1'`) must NOT
+  modify a row once it is `source='admin'` **or** the event is revealed —
+  `writeResultsService` returns `{ok:true,scoresUpdated:0,frozen:true}`
+  instead of overwriting. Admin manual entry passes `source='admin'` and
+  always wins (the override). Before reveal an `openf1` row may still be
+  refreshed (provisional → official).
+- **Reveal stays admin-triggered.** The `preds_select` results fallback was
+  lengthened **10 min → 1 hour** (same migration) so prompt fetching can't
+  auto-spoil the curated cinematic; 1h is the forgot-to-reveal backstop.
+  Composes with the admin-button trigger (the admin controls when
+  `fetched_at` is stamped). The admin must run the reveal within 1h of
+  fetching, else picks auto-unlock.
+- Regression-tracked: `freezeResults.test.ts` (6 unit) + `results-source`
+  integration (S1–S5) + the updated `reveal.test.ts` R3 (1h boundary).
 
 Design context (fonts, palette, principles, anti-patterns) lives in `.impeccable.md` at the project root.
 
@@ -243,7 +271,7 @@ DB trigger `predictions_lock_guard` on `predictions` BEFORE INSERT/UPDATE reject
 
 `events.revealed_at` gates the RLS policy that makes other friends' predictions queryable. Workflow: results land → admin sees "Results in" → clicks "Reveal to group" → `UPDATE events SET revealed_at = now()`. Only then do other users' predictions become visible.
 
-Fallback: if admin forgets, RLS auto-unlocks 10 minutes after `results.fetched_at`. See the RLS block in the plan for the exact policy.
+Fallback: if admin forgets, RLS auto-unlocks **1 hour** after `results.fetched_at` (was 10 min — lengthened in Phase 12 so the admin "Fetch from OpenF1" button can't auto-spoil the cinematic). See the RLS block in the plan for the exact policy.
 
 This solves the "solo reveal" problem — without a trigger, each friend hits `/reveal` at a different time and experiences the animation alone.
 
@@ -353,7 +381,7 @@ CLI seed scripts and the cron endpoint share the same lib functions in `src/lib/
 
 - Don't add an `is_admin` column on `users`. Use the `admins` table.
 - Don't compute `locked` anywhere except from `events.lock_at`. No derived fields across the app.
-- Don't let RLS leak predictions before `revealed_at` (or the 10-min fallback). The reveal IS the product.
+- Don't let RLS leak predictions before `revealed_at` (or the 1-hour results fallback). The reveal IS the product.
 - Don't auto-refresh a running race's results into the UI mid-session. Results only land post-session.
 - Don't add left-border stripes to cards for visual accent. Use tinted surface-lift or subtle borders.
 - Don't import F1 team logos from formula1.com without a second thought — trademarks. OK for the private friend league, risky if it ever opens up. Default to color-dot + 3-letter code pattern (see `.impeccable.md`).
