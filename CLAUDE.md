@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **99/99 tests green:** 97 Vitest + 2 Playwright (E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
+**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 118 unit + 21 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
 
 ### Design system (Pass 1–4 shipped 2026-04-28)
 
@@ -18,7 +18,7 @@ Foundation modules in `src/lib/design/`:
 - `tracks.ts` — 12 stylized SVG track paths lifted from the design canvas, alias-resolved between OpenF1 short names and Jolpica `circuit_id`.
 
 Reusable components in `src/components/`:
-- `TopBar.tsx` — used on every authenticated screen. 6 tabs (Calendar / Predict / Reveal / Standings / League / Profile) + user initial + sign-out.
+- `TopBar.tsx` — used on every authenticated screen. 7 tabs (Calendar / Predict / Lobby / Reveal / Standings / League / Profile) + user initial + sign-out.
 - `TrackDiagram.tsx` — 200×120 SVG, alias-resolved, configurable size + stroke.
 - `DriverPortrait.tsx` — image when asset exists, initial-letter avatar tinted with team hex when not.
 
@@ -26,7 +26,7 @@ Asset directory at `public/assets/{drivers,drivers-portrait,cars,logos}/` (~36MB
 
 Boldonse line-height fix: a global `[style*="Boldonse"]` selector in `globals.css` adds 0.12em top padding + 1.05 line-height to absorb the font's deep ascenders. Use `data-tight` attribute to opt out (cinematic display titles).
 
-Routes currently serving: `/`, `/join`, `/login` (split-layout cinematic Google button), `/auth/callback`, `/dashboard`, `/dashboard/predict`, `/dashboard/predict/round/[round]` (per-round session list), `/dashboard/predict/[eventId]`, `/dashboard/league`, `/dashboard/standings`, `/profile` (supports `?welcome=1`), `/admin`, `/admin/results/round/[round]` (per-round admin overview), `/admin/results/[eventId]`, `/reveal` (show-reel index, grouped by round), `/reveal/[eventId]`, `/api/cron/sync-f1-data` (Bearer-gated), `/api/cron/fetch-results` (Bearer-gated), `/api/cron/refresh-jolpica-current` (Bearer-gated), `/api/cron/refresh-nudges` (Bearer-gated), `/api/share/[eventId]/card.png` (public OG), `/api/test/sign-in-password` (non-prod only).
+Routes currently serving: `/`, `/join`, `/login` (split-layout cinematic Google button), `/auth/callback`, `/dashboard`, `/dashboard/predict`, `/dashboard/predict/round/[round]` (per-round session list), `/dashboard/predict/[eventId]`, `/dashboard/lobby` (weekend lock roster + progressive pick reveal), `/dashboard/lobby/round/[round]`, `/dashboard/league`, `/dashboard/standings`, `/profile` (supports `?welcome=1`; has Google-Calendar ICS sync panel), `/admin`, `/admin/results/round/[round]` (per-round admin overview), `/admin/results/[eventId]`, `/reveal` (show-reel index, grouped by round), `/reveal/[eventId]`, `/api/cron/sync-f1-data` (Bearer-gated), `/api/cron/fetch-results` (Bearer-gated), `/api/cron/refresh-jolpica-current` (Bearer-gated), `/api/cron/refresh-nudges` (Bearer-gated), `/api/calendar/[token]` (public, per-user opaque token — ICS feed), `/api/share/[eventId]/card.png` (public OG), `/api/test/sign-in-password` (non-prod only).
 
 ### Two-source data identity (Jolpica + OpenF1)
 
@@ -77,7 +77,20 @@ bun --env-file=.env.local run scripts/backfill-jolpica.ts --from 2017 --to 2026
 
 ### Telemetry nudges (Phase 4 carry-over, shipped 2026-04-28)
 
-Predict screen surfaces three signals under each chosen driver: last-5 form (`P1 · P4 · DNF · P2 · P3`), at-circuit podium count, and average grid→race delta for the season. Pure aggregation lives in `src/lib/nudges/computeNudges.ts` (12 unit tests). Cache table: `driver_nudges (event_id, driver_id, recent_form, at_track_podiums, quali_race_delta)` — see `supabase/migrations/20260428100000_driver_nudges.sql`. Filled by `src/lib/nudges/refreshNudges.ts` which walks OpenF1 `/sessions` + `/session_result` for the current and prior season. Cron at `/api/cron/refresh-nudges` rebuilds nudges for any event within the next 10 days; idempotent. Vercel schedule wired in `vercel.json` (04:30 UTC daily, 30min after `sync-f1-data`).
+Predict screen surfaces three signals under each chosen driver: last-5 form (`P1 · P4 · DNF · P2 · P3`), at-circuit podium count, and average grid→race delta for the season. Pure aggregation lives in `src/lib/nudges/computeNudges.ts` (12 unit tests). Cache table: `driver_nudges (event_id, driver_id, recent_form, at_track_podiums, quali_race_delta)` — see `supabase/migrations/20260428100000_driver_nudges.sql`. Filled by `src/lib/nudges/refreshNudges.ts` which walks OpenF1 `/sessions` + `/session_result` for the current and prior season. Cron at `/api/cron/refresh-nudges` rebuilds nudges for any event within the next 10 days **plus every session of the next upcoming round, however far away** (so a user picking for the next race weekend always has telemetry even when it's >10 days out). The window∪next-round union/dedupe/order is the pure, unit-tested `selectNudgeEventIds` helper (tests N14–N16). Idempotent. Vercel schedule wired in `vercel.json` (04:30 UTC daily, 30min after `sync-f1-data`). Last-5 form renders oldest→newest (latest rightmost) — the flip is render-side in `driver-picker.tsx`, the stored string stays most-recent-first.
+
+### Phase 10 — changes.md (shipped 2026-05-18)
+
+Six changes from `changes.md`, resolved interactively (decisions captured in the plan at `~/.claude/plans/`):
+
+1. **New bucket scoring** (`src/lib/computeScores.ts`, 12 unit tests). Race/Quali: `5×exact + wrongSlotBucket(onPodiumWrongSlot) + (allThreeExact ? +3 : 0)`, where `wrongSlotBucket` is non-linear `{1→1, 2→2, 3→4}`; a driver off the podium scores 0. Sprint Quali/Race unchanged (P1 exact = 5 else 0). `ScoreBreakdown` columns reused (`slot_mismatches` now = on-podium-wrong-slot count). Apply retroactively with `bun --env-file=.env.local run scripts/recompute-all-scores.ts` (idempotent; re-runs `writeResultsService` over every `results` row). **Regression rule still applies** — `computeScores.test.ts` + the `admin-results` integration test track this.
+2. **Lobby tab** (`/dashboard/lobby` + `/round/[round]`, `src/app/dashboard/lobby/**`, `src/lib/lobby/**`). Weekend-scoped: per session, a full participant lock-status roster (boolean only — never picks pre-reveal). Quali & Race additionally run a **progressive pick reveal** off the *scheduled* clock with fixed durations (Quali 60m, Race 90m): P3 picks at +1/3, P2 at +2/3, **P1 never shown here** (it belongs to the Reveal cinematic — once the session window ends a "P1 & results in the Reveal" CTA appears). Sprint sessions show roster only. **Security boundary:** the all-or-nothing `preds_select` RLS is *not* changed; Lobby data is served by `src/lib/lobby/loadLobby.ts` via the **service client**, which enforces slot gating in app code (`src/lib/lobby/revealGate.ts`, pure + unit-tested) and never reads P1 into the response. Cross-linked with Predict.
+3. **Telemetry order flip** — see Telemetry nudges section above.
+4. **ScoringLegend** (`src/components/ScoringLegend.tsx`) — systematic explainer of the new ruleset; expanded on Lobby, collapsible (`<details>`) on the Predict detail screen.
+5. **ICS calendar feed** — per-user opaque `users.calendar_token` (migration `20260518000000`, minted lazily by `enableCalendarSyncAction` in `profile/actions.ts`). Public route `/api/calendar/[token]` (added to `PUBLIC_PREFIXES`) emits a VCALENDAR (`src/lib/calendar/buildIcs.ts`, pure + 6 tests) of all current+next-season sessions, each with a 30-min `VALARM`. Stable `UID = {event.id}@f1-fantasy`. Profile page has the subscribe panel (`calendar-sync.tsx`). No new Google OAuth scopes.
+6. **Next-round nudge coverage** — see Telemetry nudges section above.
+
+Shared fixed-duration constants live in `src/lib/sessionDuration.ts` (Quali 60m, Race 90m; sprint values used only as ICS DTEND fallback).
 
 Design context (fonts, palette, principles, anti-patterns) lives in `.impeccable.md` at the project root.
 
@@ -215,7 +228,7 @@ Admin bootstrap: `INSERT INTO admins (user_id) VALUES ('<your uuid>');` in the S
 
 Idempotent via `INSERT ... ON CONFLICT (user_id, event_id) DO UPDATE`. Safe to re-run.
 
-**DNF rule:** if a predicted driver is not in the classified P1/P2/P3, that slot scores 0. Not "right driver wrong slot" — just zero. Otherwise exact=5, slot_match=2, perfect_podium=+3. Max per race event: 18 pts. Sprint events only score P1 (max 5 pts).
+**Scoring (Phase 10 / changes.md §4):** Race/Quali = `5×exact + wrongSlotBucket(onPodiumWrongSlot) + (allThreeExact ? +3 : 0)`, `wrongSlotBucket = {1→1, 2→2, 3→4}`. A predicted driver not in the classified P1/P2/P3 scores 0 for that slot (DNF rule — never "right driver wrong slot" unless the driver is on the podium). Max per race/quali event: 18 pts. Sprint events only score P1 (exact = 5, else 0; max 5 pts). See the Phase 10 section above for the recompute script.
 
 ### 5. Invite-code gate + Google OAuth
 
@@ -313,3 +326,13 @@ CLI seed scripts and the cron endpoint share the same lib functions in `src/lib/
 - Don't auto-refresh a running race's results into the UI mid-session. Results only land post-session.
 - Don't add left-border stripes to cards for visual accent. Use tinted surface-lift or subtle borders.
 - Don't import F1 team logos from formula1.com without a second thought — trademarks. OK for the private friend league, risky if it ever opens up. Default to color-dot + 3-letter code pattern (see `.impeccable.md`).
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- ALWAYS read graphify-out/GRAPH_REPORT.md before reading any source files, running grep/glob searches, or answering codebase questions. The graph is your primary map of the codebase.
+- IF graphify-out/wiki/index.md EXISTS, navigate it instead of reading raw files
+- For cross-module "how does X relate to Y" questions, prefer `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` over grep — these traverse the graph's EXTRACTED + INFERRED edges instead of scanning files
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

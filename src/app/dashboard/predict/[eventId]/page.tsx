@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/TopBar";
 import { TrackDiagram } from "@/components/TrackDiagram";
 import { DriverPicker } from "../driver-picker";
+import { ScoringLegend } from "@/components/ScoringLegend";
 import { submitPrediction } from "../actions";
 import { shortEventName } from "@/lib/design/eventName";
 import { circuitMeta } from "@/lib/design/circuits";
@@ -272,6 +273,9 @@ export default async function PredictEventPage({
           hotPicks={hotPicks}
           submit={submitPrediction}
         />
+        <div className="mt-6">
+          <ScoringLegend collapsible />
+        </div>
       </main>
     </>
   );

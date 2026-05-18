@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/TopBar";
 import { updateProfileAction } from "./actions";
 import { ProfileForm } from "./profile-form";
+import { CalendarSync } from "./calendar-sync";
 
 export default async function ProfilePage({
   searchParams,
@@ -27,7 +28,7 @@ export default async function ProfilePage({
     supabase
       .from("users")
       .select(
-        "display_name, favorite_team, favorite_driver, favorite_past_driver",
+        "display_name, favorite_team, favorite_driver, favorite_past_driver, calendar_token",
       )
       .eq("id", userData.user.id)
       .maybeSingle<{
@@ -35,6 +36,7 @@ export default async function ProfilePage({
         favorite_team: string | null;
         favorite_driver: number | null;
         favorite_past_driver: string | null;
+        calendar_token: string | null;
       }>(),
     supabase
       .from("drivers")
@@ -115,6 +117,9 @@ export default async function ProfilePage({
           }}
           submit={updateProfileAction}
         />
+        {!welcome && (
+          <CalendarSync hasToken={Boolean(profile?.calendar_token)} />
+        )}
       </main>
     </>
   );

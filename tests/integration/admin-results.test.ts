@@ -135,9 +135,11 @@ describe("writeResults", () => {
       dnf_zeros: 0,
       perfect_bonus: true,
     });
+    // New point system (changes.md §4): all three drivers on the podium but
+    // in the wrong slot → wrong-slot bucket(3) = 4 pts (was 2+2+2 = 6).
     expect(byUser.get(bob.id)).toEqual({
       user_id: bob.id,
-      points: 6,
+      points: 4,
       exact_matches: 0,
       slot_mismatches: 3,
       dnf_zeros: 0,

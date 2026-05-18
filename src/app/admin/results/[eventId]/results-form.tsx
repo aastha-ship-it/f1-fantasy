@@ -62,7 +62,7 @@ function breakdown(
       `${score.exact_matches} exact${score.exact_matches === 1 ? "" : "es"}`,
     );
   if (score.slot_mismatches > 0)
-    parts.push(`${score.slot_mismatches} slot`);
+    parts.push(`${score.slot_mismatches} on podium`);
   if (score.dnf_zeros > 0) parts.push(`${score.dnf_zeros} miss`);
   if (score.perfect_bonus) parts.push("perfect podium · +3");
   if (parts.length === 0) parts.push("0 hits");

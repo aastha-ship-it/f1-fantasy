@@ -322,25 +322,86 @@ export async function refreshNudgesForEvent(
   };
 }
 
+type NudgeEventRef = { id: string; session_start_at: string };
+
+/**
+ * Union the near-term window events with the next upcoming round's events,
+ * dedupe by id, and order by session_start_at ascending so the most
+ * imminent (and most likely to be picked) events compute first — a partial
+ * timeout then degrades gracefully. Pure; unit-tested (N14–N16).
+ */
+export function selectNudgeEventIds(
+  windowEvents: NudgeEventRef[],
+  nextRoundEvents: NudgeEventRef[],
+): string[] {
+  const ordered = [...windowEvents, ...nextRoundEvents].sort(
+    (a, b) =>
+      new Date(a.session_start_at).getTime() -
+      new Date(b.session_start_at).getTime(),
+  );
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const e of ordered) {
+    if (seen.has(e.id)) continue;
+    seen.add(e.id);
+    ids.push(e.id);
+  }
+  return ids;
+}
+
 export async function refreshNudgesForUpcoming(
   svc: SupabaseClient,
   opts: { withinDays?: number } = {},
 ): Promise<RefreshNudgesSummary[]> {
   const horizonMs = (opts.withinDays ?? 10) * 24 * 60 * 60 * 1000;
   const now = new Date();
+  const nowIso = now.toISOString();
   const horizon = new Date(now.getTime() + horizonMs).toISOString();
 
-  const { data: events, error } = await svc
+  // Near-term safety window (existing behaviour).
+  const { data: windowEvents, error } = await svc
     .from("events")
-    .select("id")
-    .gte("session_start_at", now.toISOString())
+    .select("id, session_start_at")
+    .gte("session_start_at", nowIso)
     .lte("session_start_at", horizon)
     .order("session_start_at", { ascending: true });
   if (error) throw error;
 
+  // Always cover the next upcoming round in full, however far away it is, so
+  // a user picking for the next race weekend always has telemetry. Resolve
+  // the round of the earliest future session, then take all its sessions.
+  const { data: nextEvent, error: nextErr } = await svc
+    .from("events")
+    .select("season, round")
+    .gte("session_start_at", nowIso)
+    .order("session_start_at", { ascending: true })
+    .limit(1)
+    .maybeSingle<{ season: number; round: number }>();
+  if (nextErr) throw nextErr;
+
+  let nextRoundEvents: { id: string; session_start_at: string }[] = [];
+  if (nextEvent) {
+    const { data: roundEvents, error: roundErr } = await svc
+      .from("events")
+      .select("id, session_start_at")
+      .eq("season", nextEvent.season)
+      .eq("round", nextEvent.round)
+      .order("session_start_at", { ascending: true });
+    if (roundErr) throw roundErr;
+    nextRoundEvents = (roundEvents ?? []) as {
+      id: string;
+      session_start_at: string;
+    }[];
+  }
+
+  const ids = selectNudgeEventIds(
+    (windowEvents ?? []) as { id: string; session_start_at: string }[],
+    nextRoundEvents,
+  );
+
   const out: RefreshNudgesSummary[] = [];
-  for (const e of events ?? []) {
-    out.push(await refreshNudgesForEvent(svc, e.id as string));
+  for (const id of ids) {
+    out.push(await refreshNudgesForEvent(svc, id));
   }
   return out;
 }

@@ -12,6 +12,7 @@ import { signOutAction } from "@/app/signout/actions";
 type Tab =
   | "calendar"
   | "predict"
+  | "lobby"
   | "reveal"
   | "standings"
   | "league"
@@ -20,6 +21,7 @@ type Tab =
 const TABS: { id: Tab; label: string; href: string }[] = [
   { id: "calendar", label: "Calendar", href: "/dashboard" },
   { id: "predict", label: "Predict", href: "/dashboard/predict" },
+  { id: "lobby", label: "Lobby", href: "/dashboard/lobby" },
   { id: "reveal", label: "Reveal", href: "/reveal" },
   { id: "standings", label: "Standings", href: "/dashboard/standings" },
   { id: "league", label: "League", href: "/dashboard/league" },

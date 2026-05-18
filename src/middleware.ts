@@ -7,6 +7,8 @@ const PUBLIC_PATHS = new Set(["/join", "/login"]);
 // middleware would block Vercel's cron requests (they have no user cookies).
 // /api/share/* is public (OG images for link-preview crawlers) — individual
 // routes under there gate themselves on event state + reveal status.
+// /api/calendar/* is the ICS subscription feed — calendar clients fetch it
+// with no user cookie; the route gates itself on a per-user opaque token.
 const PUBLIC_PREFIXES = [
   "/auth/",
   "/_next/",
@@ -14,6 +16,7 @@ const PUBLIC_PREFIXES = [
   "/api/cron/",
   "/api/share/",
   "/api/test/",
+  "/api/calendar/",
 ];
 
 function isPublicPath(pathname: string): boolean {

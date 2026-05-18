@@ -4,9 +4,34 @@
  * Called from the server path that writes `results` (cron or admin manual entry).
  * Kept out of DB triggers so it's trivially unit-testable.
  *
- * DNF rule: predicted driver not among classified finishers => 0 for that slot.
- * Never awarded "right driver wrong slot" unless the driver is in the classified set.
+ * Race / Quali (3 slots):
+ *   - Each driver predicted in its exact finishing slot: +5.
+ *   - Drivers that are on the podium but in the wrong slot are scored as a
+ *     non-linear bucket on the COUNT of such drivers: 1→1, 2→2, 3→4.
+ *   - Perfect podium (all three exact): +3 bonus.
+ *   - A predicted driver not on the podium scores 0 (DNF rule — never awarded
+ *     "right driver wrong slot" unless the driver is on the classified podium).
+ *   Max = 3·5 + 3 = 18.
+ * Sprint (P1 only): exact P1 = 5, else 0.
  */
+
+/**
+ * Points for the count of predicted drivers that are on the podium but in the
+ * wrong slot. Deliberately non-linear (see changes.md): rewarding "I got the
+ * whole podium, just jumbled" more than scattered single hits.
+ */
+function wrongSlotBucket(n: number): number {
+  switch (n) {
+    case 1:
+      return 1;
+    case 2:
+      return 2;
+    case 3:
+      return 4;
+    default:
+      return 0;
+  }
+}
 
 export type DriverId = number;
 
@@ -60,7 +85,7 @@ export function computeScore(
   ];
 
   let exact = 0;
-  let slotMismatch = 0;
+  let onPodiumWrongSlot = 0;
   let dnfZeros = 0;
 
   for (const [pos, pick] of slots) {
@@ -73,17 +98,18 @@ export function computeScore(
     } else if (pick === actual[pos]) {
       exact++;
     } else {
-      slotMismatch++;
+      onPodiumWrongSlot++;
     }
   }
 
   const perfect_bonus = exact === 3;
-  const points = exact * 5 + slotMismatch * 2 + (perfect_bonus ? 3 : 0);
+  const points =
+    exact * 5 + wrongSlotBucket(onPodiumWrongSlot) + (perfect_bonus ? 3 : 0);
 
   return {
     points,
     exact_matches: exact,
-    slot_mismatches: slotMismatch,
+    slot_mismatches: onPodiumWrongSlot,
     dnf_zeros: dnfZeros,
     perfect_bonus,
   };

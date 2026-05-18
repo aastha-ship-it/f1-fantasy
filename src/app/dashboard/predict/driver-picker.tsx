@@ -364,10 +364,14 @@ export function DriverPicker({
                     <div className="flex items-center justify-between gap-4">
                       <dt className="text-xs">Form L5</dt>
                       <dd className="flex flex-wrap justify-end gap-1">
+                        {/* recent_form is stored most-recent-first; reverse
+                            so the latest result sits rightmost (sports
+                            convention — see changes.md §2). */}
                         {(n.recent_form || "")
                           .split("·")
                           .map((s) => s.trim())
                           .filter((s) => s.length > 0)
+                          .reverse()
                           .map((tok, i) => {
                             const c = formPillColors(tok);
                             return (

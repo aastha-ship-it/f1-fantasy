@@ -132,6 +132,13 @@ export default async function PredictRoundPage({
             /dashboard/predict
           </Link>
           {" · "}/round/{String(grouped.round).padStart(2, "0")}
+          {"  ·  "}
+          <Link
+            href={`/dashboard/lobby/round/${grouped.round}`}
+            className="text-[color:var(--fg)] hover:text-[color:var(--accent)]"
+          >
+            View the Lobby →
+          </Link>
         </p>
 
         <section className="grid items-end gap-12 border-b border-[color:var(--border)] pb-8 lg:grid-cols-[1.4fr_1fr]">
