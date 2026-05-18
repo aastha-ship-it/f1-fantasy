@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 135 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
+**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18) + Phase 13 (changes.md §8: scoring legend relocated to a global TopBar "How Scoring Works" modal — 2026-05-18).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 135 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
 
 ### Design system (Pass 1–4 shipped 2026-04-28)
 
@@ -18,7 +18,7 @@ Foundation modules in `src/lib/design/`:
 - `tracks.ts` — 12 stylized SVG track paths lifted from the design canvas, alias-resolved between OpenF1 short names and Jolpica `circuit_id`.
 
 Reusable components in `src/components/`:
-- `TopBar.tsx` — used on every authenticated screen. 7 tabs (Calendar / Predict / Lobby / Reveal / Standings / League / Profile) + user initial + sign-out.
+- `TopBar.tsx` — used on every authenticated screen. 7 tabs (Calendar / Predict / Lobby / Reveal / Standings / League / Profile) + a global **"How Scoring Works"** modal trigger (`ScoringHelp` client island, native `<dialog>`, mobile-visible — replaced the old "The Group · {season}" label) + user initial + sign-out. `ScoringLegend.tsx` now exports only `ScoringLegendBody` (the point-system content), rendered inside that modal.
 - `TrackDiagram.tsx` — 200×120 SVG, alias-resolved, configurable size + stroke.
 - `DriverPortrait.tsx` — image when asset exists, initial-letter avatar tinted with team hex when not.
 
@@ -86,7 +86,7 @@ Six changes from `changes.md`, resolved interactively (decisions captured in the
 1. **New bucket scoring** (`src/lib/computeScores.ts`, 12 unit tests). Race/Quali: `5×exact + wrongSlotBucket(onPodiumWrongSlot) + (allThreeExact ? +3 : 0)`, where `wrongSlotBucket` is non-linear `{1→1, 2→2, 3→4}`; a driver off the podium scores 0. Sprint Quali/Race unchanged (P1 exact = 5 else 0). `ScoreBreakdown` columns reused (`slot_mismatches` now = on-podium-wrong-slot count). Apply retroactively with `bun --env-file=.env.local run scripts/recompute-all-scores.ts` (idempotent; re-runs `writeResultsService` over every `results` row). **Regression rule still applies** — `computeScores.test.ts` + the `admin-results` integration test track this.
 2. **Lobby tab** (`/dashboard/lobby` + `/round/[round]`, `src/app/dashboard/lobby/**`, `src/lib/lobby/**`). Weekend-scoped: per session, a full participant lock-status roster (boolean only — never picks pre-reveal). Quali & Race additionally run a **progressive pick reveal** off the *scheduled* clock with fixed durations (Quali 60m, Race 90m): P3 picks at +1/3, P2 at +2/3, **P1 never shown here** (it belongs to the Reveal cinematic — once the session window ends a "P1 & results in the Reveal" CTA appears). Sprint sessions show roster only. **Security boundary:** the all-or-nothing `preds_select` RLS is *not* changed; Lobby data is served by `src/lib/lobby/loadLobby.ts` via the **service client**, which enforces slot gating in app code (`src/lib/lobby/revealGate.ts`, pure + unit-tested) and never reads P1 into the response. Cross-linked with Predict.
 3. **Telemetry order flip** — see Telemetry nudges section above.
-4. **ScoringLegend** (`src/components/ScoringLegend.tsx`) — systematic explainer of the new ruleset; expanded on Lobby, collapsible (`<details>`) on the Predict detail screen.
+4. **ScoringLegend** (`src/components/ScoringLegend.tsx`) — systematic explainer of the new ruleset. *(Phase 13 / changes.md §8: relocated — `ScoringLegendBody` now renders inside the global TopBar "How Scoring Works" modal; the old Lobby + Predict-detail render sites and the `collapsible <details>` wrapper were removed.)*
 5. **ICS calendar feed** — per-user opaque `users.calendar_token` (migration `20260518000000`, minted lazily by `enableCalendarSyncAction` in `profile/actions.ts`). Public route `/api/calendar/[token]` (added to `PUBLIC_PREFIXES`) emits a VCALENDAR (`src/lib/calendar/buildIcs.ts`, pure + 6 tests) of all current+next-season sessions, each with a 30-min `VALARM`. Stable `UID = {event.id}@f1-fantasy`. Profile page has the subscribe panel (`calendar-sync.tsx`). No new Google OAuth scopes.
 6. **Next-round nudge coverage** — see Telemetry nudges section above.
 
@@ -150,6 +150,20 @@ Results for the 4 scoring session types can now be pulled from OpenF1
   fetching, else picks auto-unlock.
 - Regression-tracked: `freezeResults.test.ts` (6 unit) + `results-source`
   integration (S1–S5) + the updated `reveal.test.ts` R3 (1h boundary).
+
+### Phase 13 — "How Scoring Works" modal (changes.md §8, shipped 2026-05-18)
+
+The scoring explainer is now a single global entry point. The shared
+`TopBar` "The Group · {season}" label is replaced by a **"How Scoring
+Works"** trigger (`src/components/ScoringHelp.tsx`, `"use client"` island,
+mobile-visible) that opens a native `<dialog>` (`showModal`; backdrop +
+focus-trap + Esc free; backdrop-click + ✕ close) rendering
+`ScoringLegendBody`. Removed from the Lobby tab and Predict detail screen;
+the `ScoringLegend({collapsible})` wrapper is deleted (no callers). TopBar
+stays a server component (the trigger is the only client bit); the season
+indicator is dropped (still shown on League/Standings). Dialog scrim + a
+light reduced-motion-safe fade live in `globals.css`. Pure UI relocation —
+no logic/test changes.
 
 Design context (fonts, palette, principles, anti-patterns) lives in `.impeccable.md` at the project root.
 

@@ -1,9 +1,10 @@
 /**
- * Systematic explainer for the point system (changes.md §4 + §5).
+ * Systematic explainer for the point system (changes.md §4 + §5 + §8).
  *
- * Server-renderable (no client JS). `collapsible` wraps it in a native
- * <details> so it can sit unobtrusively on the Predict screen; the Lobby
- * tab renders it expanded.
+ * `ScoringLegendBody` is pure presentational JSX (no hooks / no server-only
+ * imports) so it renders fine inside the client `ScoringHelp` modal. It is
+ * the single source of the scoring content, surfaced via the global
+ * "How Scoring Works" TopBar modal.
  *
  * Design rules honoured: Geist Mono for every numeric, design tokens only,
  * no left-border accent stripes, no gradient text.
@@ -99,7 +100,7 @@ function Section({
   );
 }
 
-function Body() {
+export function ScoringLegendBody() {
   return (
     <div
       style={{
@@ -139,32 +140,3 @@ function Body() {
   );
 }
 
-export function ScoringLegend({
-  collapsible = false,
-}: {
-  collapsible?: boolean;
-}) {
-  if (!collapsible) return <Body />;
-  return (
-    <details
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 4,
-      }}
-    >
-      <summary
-        className="cursor-pointer select-none px-4 py-3 text-sm"
-        style={{
-          fontFamily: "var(--font-display), ui-sans-serif",
-          letterSpacing: "0.02em",
-        }}
-      >
-        HOW SCORING WORKS
-      </summary>
-      <div style={{ padding: "0 var(--space-xs) var(--space-xs)" }}>
-        <Body />
-      </div>
-    </details>
-  );
-}

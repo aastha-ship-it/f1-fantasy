@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { TrackDiagram } from "@/components/TrackDiagram";
-import { ScoringLegend } from "@/components/ScoringLegend";
 import { shortEventName } from "@/lib/design/eventName";
 import { circuitMeta } from "@/lib/design/circuits";
 import { formatDateRange } from "@/lib/design/dateRange";
@@ -262,10 +261,6 @@ export function LobbyView({
         {weekend.sessions.map((s) => (
           <SessionBlock key={s.eventId} s={s} />
         ))}
-      </div>
-
-      <div className="mt-12">
-        <ScoringLegend />
       </div>
     </main>
   );

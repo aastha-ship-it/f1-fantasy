@@ -152,6 +152,26 @@ body {
   font-family: var(--font-mono), ui-monospace, monospace;
 }
 
+/* Native <dialog> (How Scoring Works modal). The scrim is instant
+   (reduced-motion-safe); the panel gets a light fade-in that the
+   reduced-motion block below neutralises by zeroing animation-duration. */
+dialog::backdrop {
+  background: rgb(0 0 0 / 0.6);
+}
+dialog[open] {
+  animation: dialog-fade-in 0.18s ease-out;
+}
+@keyframes dialog-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Respect reduced motion: no pulses, no flips */
 @media (prefers-reduced-motion: reduce) {
   *,

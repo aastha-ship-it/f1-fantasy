@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { F1Mark } from "@/components/F1Mark";
+import { ScoringHelp } from "@/components/ScoringHelp";
 import { signOutAction } from "@/app/signout/actions";
 
 /**
@@ -27,8 +28,6 @@ const TABS: { id: Tab; label: string; href: string }[] = [
   { id: "league", label: "League", href: "/dashboard/league" },
   { id: "profile", label: "Profile", href: "/profile" },
 ];
-
-const CURRENT_SEASON = new Date().getUTCFullYear();
 
 export function TopBar({
   active,
@@ -73,12 +72,7 @@ export function TopBar({
         </ul>
 
         <div className="flex items-center gap-4">
-          <span
-            className="hidden text-xs uppercase tracking-[0.1em] text-[color:var(--fg-subtle)] sm:inline"
-            data-tabular
-          >
-            The Group · {CURRENT_SEASON}
-          </span>
+          <ScoringHelp />
           <Link
             href="/profile"
             aria-label="Profile"

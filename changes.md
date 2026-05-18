@@ -44,3 +44,8 @@ New Point system :
    - Trigger: an admin "Fetch from OpenF1" button on /admin/results/[eventId] (one click → fetch + score). The nightly fetch-results cron stays as a backstop.
    - Override/freeze: once results are admin-entered OR the event is revealed, the automatic/OpenF1 path never changes them. Before reveal an OpenF1 row may still be refreshed (provisional → official).
    - Reveal stays admin-triggered; the predictions reveal fallback is lengthened 10 min → 1 hour so a prompt fetch can't auto-spoil the cinematic.
+
+8. Move the scoring explainer into a "How Scoring Works" modal.
+   - Remove the inline scoring legend from the Lobby tab and the Predict detail screen.
+   - Replace the shared TopBar "The Group · {season}" label with a "How Scoring Works" trigger (drops the season indicator there).
+   - Clicking it opens a modal showing the point system. The trigger is global (every authenticated screen) and visible on mobile too.
