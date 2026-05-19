@@ -43,3 +43,108 @@ export function trackPath(key: string | null | undefined): string | null {
   const resolved = resolveKey(key);
   return resolved ? TRACK_PATHS[resolved]! : null;
 }
+
+/**
+ * PNG silhouette set (design_handoff_phase11/ADDENDUM §B). Replaces the SVG
+ * paths as the primary render; `trackPath` above stays the fallback.
+ *
+ * `TRACK_IMG` maps every Jolpica `ergast_circuit_id` AND every OpenF1
+ * `circuit_short_name` (lowercased) the UI passes (`ergast_circuit_id ??
+ * circuit`) onto one of the 23 country-named PNG base names. Circuits with
+ * no shipped PNG (Imola, Jeddah → SVG; Madring → rect) are intentionally
+ * absent so resolution falls through.
+ */
+const TRACK_IMG: Record<string, string> = {
+  // ergast circuit_id → png base
+  albert_park: "australia",
+  americas: "usa",
+  baku: "azerbaijan",
+  catalunya: "spain",
+  hungaroring: "hungary",
+  interlagos: "brazil",
+  losail: "qatar",
+  marina_bay: "singapore",
+  miami: "miami",
+  monaco: "monaco",
+  monza: "italy",
+  red_bull_ring: "austria",
+  rodriguez: "mexico",
+  shanghai: "china",
+  silverstone: "britain",
+  spa: "belgium",
+  suzuka: "japan",
+  vegas: "las_vegas",
+  villeneuve: "canada",
+  yas_marina: "abu_dhabi",
+  zandvoort: "netherlands",
+  bahrain: "bahrain",
+  // OpenF1 circuit_short_name (lowercased) → png base, for rows where the
+  // events table only has the OpenF1 short name (ergast id null).
+  melbourne: "australia",
+  austin: "usa",
+  "mexico city": "mexico",
+  "monte carlo": "monaco",
+  spielberg: "austria",
+  "sao paulo": "brazil",
+  "são paulo": "brazil",
+  "spa-francorchamps": "belgium",
+  "las vegas": "las_vegas",
+  lusail: "qatar",
+  sakhir: "bahrain",
+  singapore: "singapore",
+  "marina bay": "singapore",
+  "yas marina": "abu_dhabi",
+  "yas marina circuit": "abu_dhabi",
+  montreal: "canada",
+  barcelona: "spain",
+};
+
+/** Per-image width/height (ADDENDUM §B, verbatim). */
+export const TRACK_RATIO: Record<string, number> = {
+  abu_dhabi: 1.6867,
+  australia: 1.6667,
+  austria: 1.6667,
+  azerbaijan: 1.6055,
+  bahrain: 1.7073,
+  barcelona: 1.6867,
+  belgium: 1.5909,
+  brazil: 1.3972,
+  britain: 1.3133,
+  canada: 1.7115,
+  china: 1.3333,
+  hungary: 1.3333,
+  italy: 1.7766,
+  japan: 1.7766,
+  las_vegas: 1.3333,
+  mexico: 1.3333,
+  miami: 1.3333,
+  monaco: 1.3333,
+  netherlands: 1.3333,
+  qatar: 1.7766,
+  singapore: 1.7766,
+  spain: 1.7766,
+  usa: 1.3333,
+};
+
+function resolveImgBase(key: string | null | undefined): string | null {
+  if (!key) return null;
+  return TRACK_IMG[key.trim().toLowerCase()] ?? null;
+}
+
+/**
+ * Public URL of the silhouette PNG for a circuit, or null when no PNG is
+ * shipped (caller then falls back to `trackPath`, then a rounded rect).
+ */
+export function trackImg(key: string | null | undefined): string | null {
+  const base = resolveImgBase(key);
+  return base ? `/assets/tracks/${base}.png` : null;
+}
+
+/**
+ * width / height of the resolved silhouette so the container reserves the
+ * right aspect-correct height. Sane default for unknown circuits.
+ */
+export function trackRatio(key: string | null | undefined): number {
+  const base = resolveImgBase(key);
+  return (base && TRACK_RATIO[base]) || 1.6667;
+}

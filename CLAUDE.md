@@ -214,10 +214,13 @@ rules future Claude must respect:
 Foundation: `src/lib/design/teams.ts` (single source of team
 slug/name/hex/livery/logo/car; alias-resolves free-form `drivers.team`),
 `drivers.ts` (portrait/headshot/country/flag — null outside the asset set →
-initial-letter avatar), `tracks.ts` (stylized SVG paths, alias-resolved).
-Bespoke components: `TopBar`, `TrackDiagram`, `DriverPortrait`,
-`ScoringHelp`/`ScoringLegend`. Assets in
-`public/assets/{drivers,drivers-portrait,cars,logos}/`; `src/middleware.ts`
+initial-letter avatar), `tracks.ts` (`trackImg`/`trackRatio` → country
+silhouette PNG drawn via CSS `mask-image` so it recolours by
+`backgroundColor`; legacy `trackPath` SVG kept as fallback; alias-resolved
+on both ergast id + OpenF1 short-name). Bespoke components: `TopBar`,
+`TrackDiagram`, `DriverPortrait`, `ScoringHelp`/`ScoringLegend`. Assets in
+`public/assets/{drivers,drivers-portrait,cars,logos,tracks}/`;
+`src/middleware.ts`
 excludes `/assets/` so they serve unauthenticated.
 
 ## Routes serving
