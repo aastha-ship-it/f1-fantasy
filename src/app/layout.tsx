@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { Boldonse } from "next/font/google";
+import { Titillium_Web } from "next/font/google";
 import "./globals.css";
 
-const boldonse = Boldonse({
-  weight: "400",
+// Display face. Semantically still "--font-boldonse" so the ~104 inline
+// `fontFamily: var(--font-boldonse)` call sites + the `[style*="Boldonse"]`
+// globals.css selector keep working untouched — only the loaded typeface
+// changes (design_handoff_phase11/ADDENDUM §A: broadcast Titillium Web Black).
+const display = Titillium_Web({
+  weight: ["400", "600", "700", "900"],
   subsets: ["latin"],
   variable: "--font-boldonse",
   display: "swap",
@@ -25,7 +29,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable} ${boldonse.variable} h-full antialiased`}
+      className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable} h-full antialiased`}
     >
       <body className="min-h-dvh">{children}</body>
     </html>

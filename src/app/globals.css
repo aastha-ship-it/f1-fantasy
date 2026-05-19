@@ -71,26 +71,26 @@
 }
 
 /*
- * Boldonse has dramatically tall ascenders + descenders that overflow its
- * line-box at any line-height < ~1.1. Without this fix, hero titles clip
- * into siblings above (eyebrow labels, position numbers). Design canvas
- * F1 Fantasy.html applies the same workaround.
- *
- * The selector is intentionally broad — it targets every element that uses
- * Boldonse via inline style attribute (our convention for display type).
- * `data-tight` opts out for full-bleed cinematic display (reveal hero).
+ * Display type = Titillium Web Black 900 (the pre-2018 F1 broadcast face;
+ * design_handoff_phase11/ADDENDUM §A). Titillium has clean ascenders, so the
+ * old Boldonse 0.12em padding fix is gone. The selector stays broad — it
+ * targets every element using the display face via inline style attribute
+ * (`fontFamily: var(--font-boldonse)`) or the `.font-display` class, our
+ * convention. `data-tight` is the tighter cinematic variant (reveal/Show
+ * Reel hero). Inline `font-size`/`line-height`/`letter-spacing` at call
+ * sites still win over these defaults.
  */
 .font-display,
 [style*="Boldonse"] {
-  line-height: 1.05;
-  padding-top: 0.12em;
-  padding-bottom: 0.04em;
+  font-weight: 900;
+  line-height: 0.98;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
 }
 .font-display[data-tight],
 [style*="Boldonse"][data-tight] {
-  line-height: 0.95;
-  padding-top: 0.04em;
-  padding-bottom: 0;
+  line-height: 0.9;
+  letter-spacing: -0.025em;
 }
 
 @theme inline {
