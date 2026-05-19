@@ -21,6 +21,44 @@ import { computeScore, wrongSlotBucket, slotOutcome } from "./computeScores";
 const ACTUAL_RACE = { p1: 1, p2: 4, p3: 16 };
 const ACTUAL_SPRINT = { p1: 1, p2: null, p3: null };
 
+describe("computeScore — breakdown text (locked to design/data.jsx MIAMI_PREDICTIONS)", () => {
+  const bd = (p: { p1: number; p2: number | null; p3: number | null }) =>
+    computeScore(p, ACTUAL_RACE, false).breakdown;
+
+  it("BD1: perfect podium → '3 exact + perfect bonus'", () => {
+    expect(bd({ p1: 1, p2: 4, p3: 16 })).toBe("3 exact + perfect bonus");
+  });
+  it("BD2: exact only → '1 exact (5)'", () => {
+    expect(bd({ p1: 1, p2: 99, p3: 55 })).toBe("1 exact (5)");
+  });
+  it("BD3: exact + bucket → '1 exact (5) + 2 on podium bucket (2)'", () => {
+    // P1=1 exact; P2=16 (actual P3, wrong slot); P3=4 (actual P2, wrong slot)
+    expect(bd({ p1: 1, p2: 16, p3: 4 })).toBe(
+      "1 exact (5) + 2 on podium bucket (2)",
+    );
+  });
+  it("BD4: bucket only (0 exact) → '0 exact + 2 on podium bucket (2)'", () => {
+    // P1=4 (actual P2), P2=16 (actual P3) — both wrong slot; P3=99 miss
+    expect(bd({ p1: 4, p2: 16, p3: 99 })).toBe(
+      "0 exact + 2 on podium bucket (2)",
+    );
+  });
+  it("BD5: zero → '0 exact · 0 on podium — rough week'", () => {
+    expect(bd({ p1: 77, p2: 99, p3: 55 })).toBe(
+      "0 exact · 0 on podium — rough week",
+    );
+  });
+  it("BD6: sprint exact → '1 exact (5)', sprint miss → rough week", () => {
+    expect(
+      computeScore({ p1: 1, p2: null, p3: null }, ACTUAL_SPRINT, true).breakdown,
+    ).toBe("1 exact (5)");
+    expect(
+      computeScore({ p1: 99, p2: null, p3: null }, ACTUAL_SPRINT, true)
+        .breakdown,
+    ).toBe("0 exact · 0 on podium — rough week");
+  });
+});
+
 describe("computeScore — race/quali (new point system)", () => {
   it("perfect podium → 18 pts with perfect_bonus", () => {
     const s = computeScore({ p1: 1, p2: 4, p3: 16 }, ACTUAL_RACE, false);

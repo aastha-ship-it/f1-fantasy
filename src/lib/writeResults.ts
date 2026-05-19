@@ -188,6 +188,7 @@ export async function writeResultsService(
         slot_mismatches: score.slot_mismatches,
         dnf_zeros: score.dnf_zeros,
         perfect_bonus: score.perfect_bonus,
+        breakdown: score.breakdown,
         computed_at: new Date().toISOString(),
       },
       { onConflict: "user_id,event_id" },

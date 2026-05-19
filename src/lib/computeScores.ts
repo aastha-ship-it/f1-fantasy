@@ -55,7 +55,33 @@ export type ScoreBreakdown = {
   slot_mismatches: number;
   dnf_zeros: number;
   perfect_bonus: boolean;
+  /**
+   * Human one-liner, wording locked to design/data.jsx MIAMI_PREDICTIONS
+   * (design_handoff_phase11/ADDENDUM §C). Persisted to `scores.breakdown`.
+   */
+  breakdown: string;
 };
+
+/**
+ * Plain-language summary of a scored prediction. Same shape for sprint
+ * (P1 only → exact=0|1, wrongSlot=0, perfect=false). Locked by BD1..BD6.
+ */
+export function breakdownText(
+  exact: number,
+  wrongSlot: number,
+  perfect: boolean,
+): string {
+  if (perfect) return "3 exact + perfect bonus";
+  if (exact === 0 && wrongSlot === 0) {
+    return "0 exact · 0 on podium — rough week";
+  }
+  const exactPart = exact > 0 ? `${exact} exact (${exact * 5})` : "0 exact";
+  const bucketPart =
+    wrongSlot > 0
+      ? `${wrongSlot} on podium bucket (${wrongSlotBucket(wrongSlot)})`
+      : null;
+  return [exactPart, bucketPart].filter(Boolean).join(" + ");
+}
 
 /**
  * Classify one predicted slot against the actual podium. The single source
@@ -77,6 +103,27 @@ export function slotOutcome(
   return classified.has(pick) ? "onPodium" : "miss";
 }
 
+/**
+ * Reveal FriendCard pick-row badge for a slot outcome. The wrong-slot
+ * ("on podium") and miss rows deliberately carry NO number — the
+ * non-linear bucket is shown once, in the bucket-tally row. Only the
+ * fixed per-driver +5 appears on an exact row (by spec). Single source
+ * for the FriendCard so the badge text can't drift (ADDENDUM §C, RS*).
+ */
+export function slotBadge(o: SlotOutcome): {
+  text: string;
+  color: string;
+  weight: number;
+} {
+  if (o === "exact") {
+    return { text: "✓ Exact +5", color: "var(--success)", weight: 600 };
+  }
+  if (o === "onPodium") {
+    return { text: "⊙ On podium", color: "var(--warning)", weight: 600 };
+  }
+  return { text: "× Miss", color: "var(--fg-subtle)", weight: 400 };
+}
+
 export function computeScore(
   prediction: Prediction,
   actual: Actual,
@@ -91,6 +138,7 @@ export function computeScore(
       slot_mismatches: 0,
       dnf_zeros: inClassified ? 0 : 1,
       perfect_bonus: false,
+      breakdown: breakdownText(inClassified ? 1 : 0, 0, false),
     };
   }
 
@@ -123,5 +171,6 @@ export function computeScore(
     slot_mismatches: onPodiumWrongSlot,
     dnf_zeros: dnfZeros,
     perfect_bonus,
+    breakdown: breakdownText(exact, onPodiumWrongSlot, perfect_bonus),
   };
 }

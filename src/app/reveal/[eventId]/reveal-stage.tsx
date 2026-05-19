@@ -10,7 +10,7 @@ import {
   isPortraitRightFacing,
 } from "@/lib/design/drivers";
 import { teamMeta, type TeamMeta } from "@/lib/design/teams";
-import { slotOutcome, wrongSlotBucket } from "@/lib/computeScores";
+import { slotOutcome, slotBadge, wrongSlotBucket } from "@/lib/computeScores";
 
 type Driver = { id: number; code: string; full_name: string; team: string };
 type User = { id: string; email: string; display_name: string | null };
@@ -800,12 +800,15 @@ function FriendCard({
       className="relative flex h-full flex-col gap-3 p-5"
       style={{
         background: "var(--surface)",
-        outline: perfect
-          ? "1px solid var(--accent)"
-          : isMe
-            ? "1px solid var(--accent-muted)"
+        // design_handoff_phase11/ADDENDUM §C: the outline is the "you"
+        // indicator (2px accent, offset -2). The perfect-podium accent
+        // outline is retained too (owner decision) at the original 1px/-1.
+        outline: isMe
+          ? "2px solid var(--accent)"
+          : perfect
+            ? "1px solid var(--accent)"
             : "none",
-        outlineOffset: "-1px",
+        outlineOffset: isMe ? "-2px" : "-1px",
       }}
     >
       <div className="flex items-baseline justify-between gap-3">
@@ -858,12 +861,7 @@ function FriendCard({
           const d = p.id !== null ? driverById.get(p.id) : null;
           const t = d ? teamMeta(d.team) : null;
           const o = slotOutcome(p.id, actual, p.pos);
-          const badge =
-            o === "exact"
-              ? { text: "✓ Exact +5", color: "var(--success)", weight: 600 }
-              : o === "onPodium"
-                ? { text: "⊙ On podium", color: "var(--warning)", weight: 600 }
-                : { text: "× Miss", color: "var(--fg-subtle)", weight: 400 };
+          const badge = slotBadge(o);
           return (
             <li
               key={p.label}

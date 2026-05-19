@@ -9,6 +9,7 @@ import { DriverPortrait } from "@/components/DriverPortrait";
 import { teamMeta } from "@/lib/design/teams";
 import { formatAtTrack } from "@/lib/nudges/format";
 import { formPillColor } from "@/lib/nudges/formColor";
+import { orderRecentForm } from "@/lib/nudges/recentForm";
 
 const EASE_OUT_QUART = [0.22, 1, 0.36, 1] as const;
 
@@ -346,14 +347,10 @@ export function DriverPicker({
                       <dt className="text-xs">Form L5</dt>
                       <dd className="flex items-center justify-end gap-1">
                         {(() => {
-                          // Stored most-recent-first; reverse so the latest
-                          // result sits rightmost (sports convention —
+                          // Oldest-left → latest-right (sports convention —
                           // changes.md §2 / design_handoff_phase11 §11).
-                          const toks = (n.recent_form || "")
-                            .split("·")
-                            .map((s) => s.trim())
-                            .filter((s) => s.length > 0);
-                          toks.reverse();
+                          // Ordering is the unit-locked `orderRecentForm`.
+                          const toks = orderRecentForm(n.recent_form);
                           if (toks.length === 0) {
                             return (
                               <span
