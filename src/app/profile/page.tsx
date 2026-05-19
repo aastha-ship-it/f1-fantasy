@@ -24,27 +24,43 @@ export default async function ProfilePage({
     );
   }
 
-  const [{ data: profile }, { data: drivers }] = await Promise.all([
-    supabase
-      .from("users")
-      .select(
-        "display_name, favorite_team, favorite_driver, favorite_past_driver, calendar_token",
-      )
-      .eq("id", userData.user.id)
-      .maybeSingle<{
-        display_name: string | null;
-        favorite_team: string | null;
-        favorite_driver: number | null;
-        favorite_past_driver: string | null;
-        calendar_token: string | null;
-      }>(),
-    supabase
-      .from("drivers")
-      .select("id, code, full_name, team")
-      .eq("active", true)
-      .order("team", { ascending: true })
-      .order("full_name", { ascending: true }),
-  ]);
+  // Same season window the ICS feed covers (see /api/calendar/[token])
+  // so the panel's "{n} events · {n} sessions" reflects the real subscription.
+  const calYear = new Date().getUTCFullYear();
+
+  const [{ data: profile }, { data: drivers }, { data: calRows }] =
+    await Promise.all([
+      supabase
+        .from("users")
+        .select(
+          "display_name, favorite_team, favorite_driver, favorite_past_driver, calendar_token",
+        )
+        .eq("id", userData.user.id)
+        .maybeSingle<{
+          display_name: string | null;
+          favorite_team: string | null;
+          favorite_driver: number | null;
+          favorite_past_driver: string | null;
+          calendar_token: string | null;
+        }>(),
+      supabase
+        .from("drivers")
+        .select("id, code, full_name, team")
+        .eq("active", true)
+        .order("team", { ascending: true })
+        .order("full_name", { ascending: true }),
+      supabase
+        .from("events")
+        .select("round, season")
+        .in("season", [calYear, calYear + 1])
+        .returns<{ round: number; season: number }[]>(),
+    ]);
+
+  const calSessions = calRows ?? [];
+  const sessionCount = calSessions.length;
+  const eventCount = new Set(
+    calSessions.map((r) => `${r.season}-${r.round}`),
+  ).size;
 
   const teams = Array.from(
     new Set((drivers ?? []).map((d) => d.team as string)),
@@ -118,7 +134,7 @@ export default async function ProfilePage({
           submit={updateProfileAction}
         />
         {!welcome && (
-          <CalendarSync hasToken={Boolean(profile?.calendar_token)} />
+          <CalendarSync eventCount={eventCount} sessionCount={sessionCount} />
         )}
       </main>
     </>

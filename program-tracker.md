@@ -8,6 +8,22 @@
 
 ## Session log
 
+**2026-05-19 — Phase 14 PR 6 shipped: Profile calendar-sync 2-col panel (design_handoff_phase11 §5).** Committed on `main` after PR 5 (`e448762`); not pushed. executing-plans. **First PR with no TDD slice** — §5 is pure layout + copy + a client clipboard interaction with no deterministic pure logic (unlike PRs 1–5's phaseLine/formColor/wrongSlotBucket/pillFill). Surfaced this in Step-1 review; owner chose **visual-only, no unit test** — verified via Playwright + the suite staying green.
+
+Delivered:
+- **`src/app/profile/calendar-sync.tsx`** rebuilt to the canvas `screens-auth.jsx`: 2-col `grid 1fr auto` (`gap`/`padding` `--space-2xl`, **no border-radius**). Left: `Sync to Google Calendar` Boldonse 16/0.04em + `Beta · uses your Google account` pill (Geist Mono 9/0.14em, surface-2/border/fg-subtle); body copy with bold `30 minutes before`; on reveal → ICS URL field (surface-2, Geist Mono 11, truncate, accent `Copy`→`Copied` 2s) + 3-step decimal `<ol>` verbatim (accent Google-Calendar link kept as a **real `<a>`** — functional improvement over the static canvas mock; `Add calendar` in `--fg`). Right: 240px-min surface-2 card with the 44px calendar+clock SVG (rect + accent clock circle, exact canvas paths), stats line, `Show my calendar link` CTA (Geist Mono 11/600, accent/#000) → `enableCalendarSyncAction` (mint-if-absent then reveal — flow intact).
+- **`src/app/profile/page.tsx`** — added a lightweight count query over the **exact** set the ICS feed covers (`events` where `season in [year, year+1]`, matching `/api/calendar/[token]`): distinct `(season,round)` = events, total rows = sessions; passed as `eventCount`/`sessionCount` props so the stats line ("22 events · 56 sessions / 30-min lock alarms") is honest. No schema change.
+- Dropped the now-dead `hasToken` prop (per §5 the CTA copy never branches on token presence; it always reads "Show my calendar link") — removed from the component + the page call (cleared the only lint warning).
+
+Verification: full suite **182/182** (35 files; unchanged count — visual-only, no new tests; zero regressions). lint+typecheck exit 0 (the transient `.next/dev/types` typecheck error was the known stale-generated artifact — `rm -rf .next/dev/types && bunx next typegen` cleared it, PR 1 precedent). Playwright (`plans/designs/calsync-20260519/`, gitignored) captured **initial** + **revealed** states, both visually verified vs canvas §5; the capture-minted `calendar_token` on the test user was **purged immediately** (the PR 5 discipline) and the final clean-DB suite gate re-confirmed 182/182. No hydration/browser errors (counts are server-computed props; panel is a thin client island).
+
+Gotchas:
+- §5 is the first BUILD-ORDER item with genuinely **no pure-logic TDD slice**. Don't manufacture a token unit test to satisfy a pattern — surface it at Step 1 and let the owner pick visual-only. (PRs 7–9: §6 FP banner and §7/§8 admin have real logic again — TDD resumes there.)
+- The stats line must reflect the **same** event set the ICS route emits, or the panel lies. Tied it to the `season in [year, year+1]` query `/api/calendar/[token]` uses — if that route's window ever changes, update this count too (or extract a shared selector).
+- Canvas `<ol>` step 1 wraps the Google-Calendar text in a non-interactive accent `<span>` (it's a static mock). We keep a real `<a href>` — a deliberate functional upgrade over the canvas, not a fidelity miss.
+
+---
+
 **2026-05-19 — Phase 14 PR 5 shipped: Show Reel /reveal index redesign (design_handoff_phase11 §3).** Committed on `main` after PR 4 (`a97aab4`); not pushed. executing-plans + org-core:tdd. Mostly visual-fidelity tightening of `src/app/reveal/page.tsx` (server component) against the canvas `screens-lobby.jsx` ShowReelScreen; TDD slice = the pure pill-fill map.
 
 Delivered:
@@ -817,7 +833,7 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 
 ---
 
-### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–5 shipped; PRs 6–9 pending)
+### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–6 shipped; PRs 7–9 pending)
 
 **Goal:** Apply the `design_handoff_phase11/` visual design pass over the Phases 10–13 functionality (changes.md §1–§8). 9 PRs, one per phase, executed in BUILD ORDER. Plan of record: `plans/design-handoff.md`. UI-only — no schema/data changes. §11 already shipped in code → verify/polish only; §9+§4 combined into PR 1. Do not start PR N+1 until PR N's exit criteria are green.
 
@@ -856,10 +872,11 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 - [x] Empty `NO REVEALS YET` block unchanged (captured + verified)
 - **Exit:** ✓ matches canvas §3 (empty + populated Playwright captures verified); full suite **182/182**; no hydration errors.
 
-**PR 6 — §5 Profile calendar-sync panel · ☐**
-- [ ] 1-col → 2-col (left copy/URL/3-step; right 240px stats card + SVG glyph)
-- [ ] Beta pill; `Copy`→`Copied` 2s; strip `borderRadius`
-- **Exit:** matches README §5; token mint/reveal flow intact; suite green.
+**PR 6 — §5 Profile calendar-sync panel · ☑ (shipped 2026-05-19)** *(visual-only — no TDD slice; owner-confirmed)*
+- [x] 1-col → 2-col `grid 1fr auto` (left title/Beta-pill/copy/URL/3-step `<ol>`; right 240px-min `--surface-2` card + 44px calendar+clock SVG + stats + CTA); all `borderRadius` stripped
+- [x] Beta pill (mono 9/0.14em); `Copy`→`Copied` 2s; canvas copy verbatim; functional accent `<a>` kept for the Google-Calendar link
+- [x] **Real stats counts** — `profile/page.tsx` counts the ICS feed's exact set (`season in [year,year+1]`) → events (distinct rounds) + sessions; passed as props (no schema change); dead `hasToken` prop dropped
+- **Exit:** ✓ matches canvas §5 (Playwright initial + revealed verified); mint/reveal flow intact; full suite **182/182**; lint+typecheck clean; no hydration errors; capture-minted token purged.
 
 **PR 7 — §6 Predict-list FP banner · ☐** *(blocked: Red Bull hex decision)*
 - [ ] Framed banner: header strip (`Source: OpenF1` pill) + N-col session grid + 1px dividers
