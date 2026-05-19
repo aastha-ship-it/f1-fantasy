@@ -156,7 +156,8 @@ body {
    (reduced-motion-safe); the panel gets a light fade-in that the
    reduced-motion block below neutralises by zeroing animation-duration. */
 dialog::backdrop {
-  background: rgb(0 0 0 / 0.6);
+  background: rgb(8 4 6 / 0.78);
+  backdrop-filter: blur(8px);
 }
 dialog[open] {
   animation: dialog-fade-in 0.18s ease-out;

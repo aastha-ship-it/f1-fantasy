@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Claude design canvas — kept as reference, not production code:
     "design/**",
+    // Phase 11 design-handoff bundle (canvas JSX reference, not source):
+    "design_handoff_phase11/**",
   ]),
 ]);
 

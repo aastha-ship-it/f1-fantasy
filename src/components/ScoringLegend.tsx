@@ -15,16 +15,16 @@ type Row = { outcome: string; points: string; accent?: boolean };
 const PODIUM_ROWS: Row[] = [
   { outcome: "Driver predicted in its exact slot", points: "+5 each" },
   { outcome: "Perfect podium — all three exact", points: "+3 bonus", accent: true },
-  { outcome: "1 of your drivers on the podium, wrong slot", points: "1" },
-  { outcome: "2 of your drivers on the podium, wrong slot", points: "2" },
-  { outcome: "3 of your drivers on the podium, wrong slot", points: "4" },
+  { outcome: "1 of your drivers on the podium (wrong slot)", points: "1" },
+  { outcome: "2 of your drivers on the podium (wrong slot)", points: "2" },
+  { outcome: "3 of your drivers on the podium (wrong slot)", points: "4" },
   { outcome: "Driver finishes off the podium", points: "0" },
 ];
 
 const WORKED: Row[] = [
   { outcome: "1 exact + 1 other on podium (wrong slot)", points: "5 + 1 = 6" },
   { outcome: "1 exact + 2 others on podium (wrong slot)", points: "5 + 2 = 7" },
-  { outcome: "Perfect podium (3 exact + bonus)", points: "5×3 + 3 = 18", accent: true },
+  { outcome: "Perfect podium — all three exact (+ bonus)", points: "5×3 + 3 = 18", accent: true },
 ];
 
 function Num({ children, accent }: { children: string; accent?: boolean }) {
@@ -45,23 +45,20 @@ function Num({ children, accent }: { children: string; accent?: boolean }) {
 
 function RowList({ rows }: { rows: Row[] }) {
   return (
-    <dl style={{ display: "grid", gap: "var(--space-sm)" }}>
+    <dl style={{ display: "grid", gap: "var(--space-sm)", margin: 0 }}>
       {rows.map((r) => (
         <div
           key={r.outcome}
-          className="flex items-baseline justify-between gap-4"
+          className="flex items-baseline justify-between gap-[var(--space-lg)]"
           style={{
             paddingBottom: "var(--space-sm)",
             borderBottom: "1px solid var(--border)",
           }}
         >
-          <dt
-            className="text-sm"
-            style={{ color: "var(--fg-muted)" }}
-          >
+          <dt style={{ fontSize: 13, color: "var(--fg-muted)", margin: 0 }}>
             {r.outcome}
           </dt>
-          <dd>
+          <dd style={{ margin: 0 }}>
             <Num accent={r.accent}>{r.points}</Num>
           </dd>
         </div>
@@ -80,21 +77,28 @@ function Section({
   rows: Row[];
 }) {
   return (
-    <section style={{ display: "grid", gap: "var(--space-md)" }}>
-      <div>
-        <h3
-          style={{
-            fontFamily: "var(--font-display), ui-sans-serif",
-            fontSize: 14,
-            letterSpacing: "0.02em",
-          }}
-        >
-          {title.toUpperCase()}
-        </h3>
-        <p className="text-xs" style={{ color: "var(--fg-subtle)" }}>
-          {subtitle}
-        </p>
-      </div>
+    <section>
+      <h3
+        style={{
+          fontFamily: "var(--font-display), ui-sans-serif",
+          fontSize: 13,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          margin: 0,
+        }}
+      >
+        {title}
+      </h3>
+      <p
+        style={{
+          fontSize: 12,
+          color: "var(--fg-subtle)",
+          margin: "var(--space-xs) 0 var(--space-lg)",
+          lineHeight: 1.5,
+        }}
+      >
+        {subtitle}
+      </p>
       <RowList rows={rows} />
     </section>
   );
@@ -102,24 +106,15 @@ function Section({
 
 export function ScoringLegendBody() {
   return (
-    <div
-      style={{
-        display: "grid",
-        gap: "var(--space-xl)",
-        padding: "var(--space-lg)",
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 4,
-      }}
-    >
+    <div style={{ display: "grid", gap: "var(--space-2xl)" }}>
       <Section
         title="Race & Qualifying"
-        subtitle="Predict the top three. Every driver scores independently."
+        subtitle="Predict the top three. Every driver scores independently — then a non-linear bucket rewards getting the whole podium even when jumbled."
         rows={PODIUM_ROWS}
       />
       <Section
         title="Worked examples"
-        subtitle="How the pieces add up across a single podium prediction."
+        subtitle="How the pieces add up across one podium prediction."
         rows={WORKED}
       />
       <Section
@@ -130,10 +125,16 @@ export function ScoringLegendBody() {
           { outcome: "Wrong winner", points: "0" },
         ]}
       />
-      <p className="text-xs" style={{ color: "var(--fg-subtle)" }}>
+      <p
+        style={{
+          fontSize: 12,
+          color: "var(--fg-subtle)",
+          lineHeight: 1.5,
+        }}
+      >
         “On the podium” means the driver finished top three — just not in the
         slot you predicted. A driver who finishes off the podium scores nothing
-        for that slot. Maximum for a race or qualifying session is{" "}
+        for that slot. Max for a race/quali session is{" "}
         <Num accent>18</Num>.
       </p>
     </div>

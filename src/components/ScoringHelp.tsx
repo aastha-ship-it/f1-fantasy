@@ -12,8 +12,12 @@ import { ScoringLegendBody } from "./ScoringLegend";
  * of the point-system content. Visible on mobile too — it's now the only
  * scoring-rules surface.
  *
- * Shell kept deliberately minimal/swappable: an upcoming Claude Design pass
- * will restyle the dialog without touching the TopBar wiring.
+ * Design pass (Phase 14 PR 1 — design_handoff_phase11 §9): bordered trigger
+ * with a circular "?" glyph; modal shell is a 720px card (no border-radius),
+ * header = "Reference" caption + Boldonse "How scoring works" title + an
+ * "ESC ✕" close button; scrim + blur live in globals.css. Built to README
+ * §9 prose (no canvas artboard exists for the modal). Native <dialog> kept
+ * deliberately over a useState overlay — free top-layer/focus-trap/Esc.
  */
 export function ScoringHelp() {
   const ref = useRef<HTMLDialogElement>(null);
@@ -24,9 +28,33 @@ export function ScoringHelp() {
         type="button"
         onClick={() => ref.current?.showModal()}
         aria-haspopup="dialog"
-        className="cursor-pointer text-xs uppercase tracking-[0.1em] text-[color:var(--fg-subtle)] hover:text-[color:var(--fg)] transition-colors"
+        className="inline-flex cursor-pointer items-center gap-[var(--space-sm)] uppercase text-[color:var(--fg-subtle)] hover:text-[color:var(--fg)] transition-colors"
         data-tabular
+        style={{
+          border: "1px solid var(--border)",
+          background: "transparent",
+          padding: "var(--space-xs) var(--space-md)",
+          fontSize: 11,
+          letterSpacing: "0.1em",
+        }}
       >
+        <span
+          aria-hidden="true"
+          data-tabular
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 16,
+            height: 16,
+            borderRadius: "50%",
+            border: "1px solid var(--fg-muted)",
+            fontSize: 10,
+            lineHeight: 1,
+          }}
+        >
+          ?
+        </span>
         How Scoring Works
       </button>
 
@@ -42,7 +70,7 @@ export function ScoringHelp() {
           padding: 0,
           border: "none",
           background: "transparent",
-          width: "min(92vw, 560px)",
+          width: "min(92vw, 720px)",
           maxHeight: "85vh",
           overflow: "auto",
           color: "var(--fg)",
@@ -52,32 +80,54 @@ export function ScoringHelp() {
           style={{
             background: "var(--bg)",
             border: "1px solid var(--border)",
-            borderRadius: 4,
           }}
         >
           <div
-            className="flex items-center justify-between px-5 py-4"
-            style={{ borderBottom: "1px solid var(--border)" }}
+            className="flex items-start justify-between"
+            style={{
+              padding: "var(--space-xl) var(--space-2xl)",
+              borderBottom: "1px solid var(--border)",
+            }}
           >
-            <h2
-              style={{
-                fontFamily: "var(--font-display), ui-sans-serif",
-                fontSize: 16,
-                letterSpacing: "0.02em",
-              }}
-            >
-              HOW SCORING WORKS
-            </h2>
+            <div>
+              <p
+                className="uppercase text-[color:var(--fg-subtle)]"
+                data-tabular
+                style={{
+                  fontSize: 10,
+                  letterSpacing: "0.18em",
+                  marginBottom: "var(--space-sm)",
+                }}
+              >
+                Reference
+              </p>
+              <h2
+                style={{
+                  fontFamily: "var(--font-display), ui-sans-serif",
+                  fontSize: 32,
+                  lineHeight: 0.9,
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                How scoring works
+              </h2>
+            </div>
             <button
               type="button"
               onClick={() => ref.current?.close()}
               aria-label="Close"
-              className="cursor-pointer text-lg leading-none text-[color:var(--fg-subtle)] hover:text-[color:var(--fg)]"
+              data-tabular
+              className="cursor-pointer text-[color:var(--fg-subtle)] hover:text-[color:var(--fg)]"
+              style={{
+                fontSize: 11,
+                border: "1px solid var(--border)",
+                padding: "var(--space-sm) var(--space-lg)",
+              }}
             >
-              ✕
+              ESC ✕
             </button>
           </div>
-          <div style={{ padding: "var(--space-md)" }}>
+          <div style={{ padding: "var(--space-2xl)" }}>
             <ScoringLegendBody />
           </div>
         </div>

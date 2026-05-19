@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18) + Phase 13 (changes.md §8: scoring legend relocated to a global TopBar "How Scoring Works" modal — 2026-05-18).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 135 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
+**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18) + Phase 13 (changes.md §8: scoring legend relocated to a global TopBar "How Scoring Works" modal — 2026-05-18) + Phase 14 PR 1 (design_handoff_phase11 §9+§4 visual-fidelity pass: ScoringHelp modal shell + ScoringLegendBody chrome/copy — 2026-05-18).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 139 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
 
 ### Design system (Pass 1–4 shipped 2026-04-28)
 
@@ -18,7 +18,7 @@ Foundation modules in `src/lib/design/`:
 - `tracks.ts` — 12 stylized SVG track paths lifted from the design canvas, alias-resolved between OpenF1 short names and Jolpica `circuit_id`.
 
 Reusable components in `src/components/`:
-- `TopBar.tsx` — used on every authenticated screen. 7 tabs (Calendar / Predict / Lobby / Reveal / Standings / League / Profile) + a global **"How Scoring Works"** modal trigger (`ScoringHelp` client island, native `<dialog>`, mobile-visible — replaced the old "The Group · {season}" label) + user initial + sign-out. `ScoringLegend.tsx` now exports only `ScoringLegendBody` (the point-system content), rendered inside that modal.
+- `TopBar.tsx` — used on every authenticated screen. 7 tabs (Calendar / Predict / Lobby / Reveal / Standings / League / Profile) + a global **"How Scoring Works"** modal trigger (`ScoringHelp` client island, native `<dialog>`, mobile-visible — replaced the old "The Group · {season}" label) + user initial + sign-out. `ScoringLegend.tsx` now exports only `ScoringLegendBody` (the point-system content), rendered inside that modal. *(Phase 14 PR 1 restyled the shell to design_handoff_phase11 §9: bordered `?`-glyph trigger, 720px no-radius card, "Reference" caption + Boldonse "How scoring works" title + "ESC ✕" close, scrim `rgb(8 4 6 / .78)` + `blur(8px)` in `globals.css`; `ScoringLegendBody` dropped its own card chrome and its copy/sizing now match the §4 `screens-lobby.jsx` canvas verbatim.)*
 - `TrackDiagram.tsx` — 200×120 SVG, alias-resolved, configurable size + stroke.
 - `DriverPortrait.tsx` — image when asset exists, initial-letter avatar tinted with team hex when not.
 
@@ -164,6 +164,31 @@ stays a server component (the trigger is the only client bit); the season
 indicator is dropped (still shown on League/Standings). Dialog scrim + a
 light reduced-motion-safe fade live in `globals.css`. Pure UI relocation —
 no logic/test changes.
+
+### Phase 14 — design-fidelity port (`design_handoff_phase11`, in progress)
+
+Visual pass over the Phases 10–13 features. 9 PRs, one per phase, in BUILD
+ORDER. Plan of record: `plans/design-handoff.md`; trackable phase breakdown +
+session log in `plans/program-tracker.md` "Phase 14". UI-only.
+
+**PR 1 — §9 + §4 (shipped 2026-05-18).** `ScoringHelp.tsx` modal shell rebuilt
+to README §9 prose (no canvas artboard exists for it): bordered transparent
+trigger with a 16px circular `?` glyph, native `<dialog>` kept (top-layer /
+focus-trap / Esc beat a `useState` overlay), 720px card with **no
+border-radius**, header = "Reference" caption + sentence-case Boldonse 32px
+`line-height:0.9` "How scoring works" + "ESC ✕" bordered close, body padding
+`--space-2xl`. `globals.css` `dialog::backdrop` → `rgb(8 4 6 / 0.78)` +
+`backdrop-filter: blur(8px)`. `ScoringLegend.tsx` `ScoringLegendBody` dropped
+its own surface/border/radius chrome (the modal supplies it) and `Section`/
+`RowList` now match `design_handoff_phase11/design/screens-lobby.jsx`
+`LegendSection` (Boldonse 13/0.04em headings, 12px subtitles, tokenized
+margins). §4 copy is now verbatim-locked to that canvas — TDD'd via
+`src/components/ScoringLegend.test.tsx` (**SL1–SL4**, jsdom + RTL; the
+project's first `src/components/*.test.tsx`). Token-only spacing throughout
+(28→`--space-2xl`, 7→`--space-xs`, 14→`--space-lg`, ≤4px tolerance).
+Gotcha: the owner-dropped `design_handoff_phase11/` JSX bundle is now eslint-
+ignored (mirrors the existing `design/**` ignore — canvas reference, not
+source).
 
 Design context (fonts, palette, principles, anti-patterns) lives in `.impeccable.md` at the project root.
 
