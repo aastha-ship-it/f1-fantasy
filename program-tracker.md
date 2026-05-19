@@ -8,6 +8,23 @@
 
 ## Session log
 
+**2026-05-19 — Phase 14 PR 8 shipped: Admin OpenF1-fetch 4-state banner + Accept-as-official (design_handoff_phase11 §7).** Committed on `main` after PR 7 (`91d17f8`); not pushed. executing-plans + org-core:tdd. The flagged open Q3 was raised at Step 1; owner chose **a new one-click `Accept as official` action**.
+
+Delivered:
+- **`src/lib/results/bannerState.ts`** (new, pure) + **`bannerState.test.ts`** (BS1–BS4) — `openF1BannerState({revealed,hasResults,source})` → idle/provisional/official/revealed (revealed precedence; no results = idle; `source==='admin'` = official; else provisional). The 4-state machine derived from data the admin page already loads.
+- **`acceptAsOfficialAction`** (new, in `admin/results/[eventId]/actions.ts`) — `currentAdmin()`-gated; flips a provisional row `results.source` `openf1`→`admin` (podium untouched) → frozen from auto-fetch via the existing Phase-12 rule (same end-state as a manual re-save, one click). Defensive no-ops: revealed event / already-official / no results row. Freeze consequence already covered by `results-source` S1–S5 + `freezeResults` (no new integration test — would be redundant).
+- **`src/app/admin/results/[eventId]/openf1-banner.tsx`** (new client island) — canvas `OpenF1FetchBanner`: `--surface` framed (1px border, **no radius**, `overflow:hidden`), absolute tone radial-gradient `.05`, 3-col `auto 1fr auto`; status dot+tag, Boldonse 18 title, sub (verbatim), Geist-Mono meta, per-state CTAs (Geist Mono 11/600, primary accent/#000 else transparent+border). Wires existing `fetchFromOpenF1Action`/`revealEventAction` + the new `acceptAsOfficialAction`; "Edit manually" anchors `#manual-entry`; `router.refresh()` after a successful action so the server re-derives state.
+- **`page.tsx`** — results query extended with `source, fetched_at` (existing Phase-12 columns, **no schema change**); derives `bannerState` + a server-side `bannerMeta`; mounts the banner above a now-`id="manual-entry"`-anchored `ResultsForm`; `AdminStrip` untouched.
+
+Verification: BS1–BS4 red-green. Full suite **190/190** (37 files; was 186 → +4 BS, zero regressions — `results-source`/`freezeResults`/`computeScore` all green, proving the new action doesn't weaken the freeze). lint+typecheck exit 0. Playwright (`plans/designs/openf1banner-20260519/`, gitignored): the Miami-quali event was driven by psql through **all four states** (idle → seed openf1 results → flip source admin → set revealed_at) with a screenshot each — every variant visually matched the canvas (tone, tag bg/fg, title, verbatim sub, CTA set). All fixtures purged; final clean-DB gate re-confirmed 190/190, no hydration/browser errors.
+
+Gotchas:
+- **Canvas `meta`/idle-`sub` strings are fabricated demo data** ("Session ended 6h ago", "session_key 9621 · 18 classifications", "auto-fetch cron next run in 4h 12m", "Locked by Aastha · 14m ago"). Rendering them verbatim would ship lies. Rule (consistent with PR 5/6/7): render the **real copy** verbatim, but **derive any data-bearing line from actual columns** (`fetched_at`/`revealed_at` → relative time) and drop fabricated metrics we don't track. README's "strings verbatim" means the *copy*, not the fixture's invented numbers.
+- `acceptAsOfficial` deliberately changes **only** `results.source` — not the podium, not scores. It's the Phase-12 "promote provisional → official" the design implies; the freeze then falls out of the existing `isResultsFrozenForAuto` (source='admin' ⇒ auto path skipped). No new freeze logic, so no new regression test — S1–S5 already assert "source='admin' ⇒ frozen".
+- The banner is a **client island** (not a server component) purely so the CTAs can `useTransition` + `router.refresh()` with canvas-faithful button styling; all state/meta is server-computed and passed as plain props (no Date/locale in the client → no hydration risk, same discipline as PR 2/7).
+
+---
+
 **2026-05-19 — Phase 14 PR 7 shipped: Predict-list FP banner reframe (design_handoff_phase11 §6).** Committed on `main` after PR 6 (`5419d60`); not pushed. executing-plans + org-core:tdd. "blocked: Red Bull hex" was already cleared by PR 2 → no real blocker.
 
 Delivered:
@@ -850,7 +867,7 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 
 ---
 
-### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–7 shipped; PRs 8–9 pending)
+### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–8 shipped; PR 9 pending)
 
 **Goal:** Apply the `design_handoff_phase11/` visual design pass over the Phases 10–13 functionality (changes.md §1–§8). 9 PRs, one per phase, executed in BUILD ORDER. Plan of record: `plans/design-handoff.md`. UI-only — no schema/data changes. §11 already shipped in code → verify/polish only; §9+§4 combined into PR 1. Do not start PR N+1 until PR N's exit criteria are green.
 
@@ -901,10 +918,12 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 - [x] `FpSession.startLabel` added (server-formatted from OpenF1 `date_start`, TZ-safe); banner remounted **above** the weekend hero
 - **Exit:** ✓ matches canvas §6 (Playwright: live FP1/FP2 OpenF1 + seeded FP3 OVR, all variants verified); full suite **186/186**; lint+typecheck clean; no hydration; override fixture purged.
 
-**PR 8 — §7 Admin OpenF1 fetch banner · ☐** *(open: §7 `Accept as official` action?)*
-- [ ] New 4-state banner (idle/provisional/official/revealed) above podium form — strings verbatim from `screens-aux.jsx:OpenF1FetchBanner`
-- [ ] State from existing event/results status (no schema change); admin top-strip preserved
-- **Exit:** matches README §7 4-state artboard; suite green.
+**PR 8 — §7 Admin OpenF1 fetch banner · ☑ (shipped 2026-05-19)** *(open Q3 resolved: owner chose a new one-click `Accept as official` action)*
+- [x] New `openf1-banner.tsx` client island (4 states idle/provisional/official/revealed) mounted **above** the manual form — tone gradient wash, status dot+tag, Boldonse 18 title, CTAs; tag/title/sub copy verbatim from `screens-aux.jsx:OpenF1FetchBanner`
+- [x] State = pure `openF1BannerState` (BS1–BS4), derived server-side; results query extended (`source, fetched_at` — existing cols, no schema change); `AdminStrip` preserved
+- [x] CTAs: Fetch/Refetch → `fetchFromOpenF1Action`; **new `acceptAsOfficialAction`** (admin-gated, `source` openf1→admin, podium untouched → Phase-12 frozen); Reveal → `revealEventAction`; Edit manually → `#manual-entry` anchor
+- [x] Meta line server-derived from real `fetched_at`/`revealed_at` (canvas's fabricated "6h ago / session_key / cron" demo data **not** rendered — honesty over fixture)
+- **Exit:** ✓ all 4 states Playwright-verified vs canvas §7; full suite **190/190** (results-source/freezeResults/computeScore green = freeze intact); lint+typecheck clean; fixtures purged; no hydration.
 
 **PR 9 — §8 Admin FP overrides section · ☐** *(blocked: Red Bull hex; open: badge persistence)*
 - [ ] Section frame + `Session · P1 · P2 · P3 · Status · Actions` column-header strip

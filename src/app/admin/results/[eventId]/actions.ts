@@ -160,3 +160,70 @@ export async function fetchFromOpenF1Action(
               : reason;
   return { ok: false, message };
 }
+
+/**
+ * Admin "Accept as official" (design_handoff_phase11 §7). Promotes a
+ * provisional OpenF1 row (`source='openf1'`) to `source='admin'` without
+ * touching the podium — which freezes it from the auto-fetch path via the
+ * Phase-12 rule (same end-state as a manual re-save, one click). Defensive:
+ * a revealed event or an already-official / missing row is a no-op.
+ */
+export type AcceptAsOfficialResult =
+  | { ok: true; message: string }
+  | { ok: false; message: string };
+
+export async function acceptAsOfficialAction(
+  eventId: string,
+): Promise<AcceptAsOfficialResult> {
+  const guard = await currentAdmin();
+  if (!guard.ok) {
+    return {
+      ok: false,
+      message:
+        guard.reason === "unauthenticated"
+          ? "Sign in again."
+          : "Admin privilege required.",
+    };
+  }
+
+  const svc = createSupabaseServiceClient();
+  const { data: ev } = await svc
+    .from("events")
+    .select("revealed_at")
+    .eq("id", eventId)
+    .maybeSingle<{ revealed_at: string | null }>();
+  if (ev?.revealed_at) {
+    return {
+      ok: false,
+      message: "Event is already revealed — results are frozen.",
+    };
+  }
+
+  const { data: existing } = await svc
+    .from("results")
+    .select("source")
+    .eq("event_id", eventId)
+    .maybeSingle<{ source: string | null }>();
+  if (!existing) {
+    return {
+      ok: false,
+      message: "No results to accept yet — fetch from OpenF1 first.",
+    };
+  }
+  if (existing.source === "admin") {
+    return { ok: false, message: "Results are already official." };
+  }
+
+  const { error } = await svc
+    .from("results")
+    .update({ source: "admin" })
+    .eq("event_id", eventId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/results/${eventId}`);
+  return {
+    ok: true,
+    message: "Accepted as official. Auto-fetch will no longer touch this row.",
+  };
+}

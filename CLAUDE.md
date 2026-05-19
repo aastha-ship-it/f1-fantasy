@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18) + Phase 13 (changes.md §8: scoring legend relocated to a global TopBar "How Scoring Works" modal — 2026-05-18) + Phase 14 PR 1 (design_handoff_phase11 §9+§4 visual-fidelity pass: ScoringHelp modal shell + ScoringLegendBody chrome/copy — 2026-05-18) + Phase 14 PR 2 (design_handoff_phase11 §1: Lobby preview/expand redesign + Red Bull hex → #4A77DB — 2026-05-19) + Phase 14 PR 3 (design_handoff_phase11 §11: Predict last-5 form-strip polish — 2026-05-19) + Phase 14 PR 4 (design_handoff_phase11 §10: Reveal FriendCard bucket math — per-row badges + bucket-tally + perfect pill — 2026-05-19) + Phase 14 PR 5 (design_handoff_phase11 §3: Show Reel /reveal index redesign — 2026-05-19) + Phase 14 PR 6 (design_handoff_phase11 §5: Profile calendar-sync 2-col panel — 2026-05-19) + Phase 14 PR 7 (design_handoff_phase11 §6: Predict-list FP banner reframe — 2026-05-19).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 160 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
+**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18) + Phase 13 (changes.md §8: scoring legend relocated to a global TopBar "How Scoring Works" modal — 2026-05-18) + Phase 14 PR 1 (design_handoff_phase11 §9+§4 visual-fidelity pass: ScoringHelp modal shell + ScoringLegendBody chrome/copy — 2026-05-18) + Phase 14 PR 2 (design_handoff_phase11 §1: Lobby preview/expand redesign + Red Bull hex → #4A77DB — 2026-05-19) + Phase 14 PR 3 (design_handoff_phase11 §11: Predict last-5 form-strip polish — 2026-05-19) + Phase 14 PR 4 (design_handoff_phase11 §10: Reveal FriendCard bucket math — per-row badges + bucket-tally + perfect pill — 2026-05-19) + Phase 14 PR 5 (design_handoff_phase11 §3: Show Reel /reveal index redesign — 2026-05-19) + Phase 14 PR 6 (design_handoff_phase11 §5: Profile calendar-sync 2-col panel — 2026-05-19) + Phase 14 PR 7 (design_handoff_phase11 §6: Predict-list FP banner reframe — 2026-05-19) + Phase 14 PR 8 (design_handoff_phase11 §7: admin OpenF1-fetch 4-state banner + Accept-as-official — 2026-05-19).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 164 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
 
 ### Design system (Pass 1–4 shipped 2026-04-28)
 
@@ -308,6 +308,31 @@ from the OpenF1 `date_start`, never recomputed client-side; null only if
 no OpenF1 session). The banner now mounts **above** the weekend hero on
 `/dashboard/predict/round/[round]` (was below). Verified live: FP1/FP2
 OpenF1 cells + a seeded FP3 override → OVR.
+
+**PR 8 — §7 Admin OpenF1-fetch banner (shipped 2026-05-19).** New
+`src/app/admin/results/[eventId]/openf1-banner.tsx` (client island)
+mounted **above** the manual-entry form, per canvas `screens-aux.jsx`
+`OpenF1FetchBanner`: a 4-state banner (idle / provisional / official /
+revealed) — tone radial-gradient wash `.05`, 3-col `auto 1fr auto`,
+status dot + tag, Boldonse 18 title, sub copy **verbatim** from the
+canvas, Geist Mono CTAs. State is the pure
+`src/lib/results/bannerState.ts` `openF1BannerState({revealed,
+hasResults, source})` (unit-locked **BS1–BS4**: revealed wins → no
+results = idle → `source='admin'` = official → else provisional),
+derived server-side in `page.tsx` (results query extended with `source,
+fetched_at` — columns already exist, no schema change). CTAs reuse
+existing actions (`fetchFromOpenF1Action` for Fetch/Refetch,
+`revealEventAction` for Reveal, "Edit manually" anchors `#manual-entry`)
+plus a **new** `acceptAsOfficialAction` (currentAdmin()-gated; flips a
+provisional row `source` `openf1`→`admin` without touching the podium →
+frozen via the Phase-12 rule; revealed/already-official/no-row are
+no-ops). **Honesty note:** the canvas's `meta`/`sub` strings embed
+fabricated demo data ("6h ago", "session_key 9621", "cron in 4h 12m") —
+tag/title/instructional sub are rendered verbatim, but the meta line is
+**server-derived from real `fetched_at`/`revealed_at`** and the
+fabricated time clauses are dropped (truth over fixture, per the PR 5/6/7
+precedent). Freeze consequence of `acceptAsOfficial` is already covered
+by `results-source` S1–S5 + `freezeResults`.
 
 Design context (fonts, palette, principles, anti-patterns) lives in `.impeccable.md` at the project root.
 

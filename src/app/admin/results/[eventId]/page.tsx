@@ -6,13 +6,29 @@ import {
   fileResultsAction,
   fileResultsAndRevealAction,
   fetchFromOpenF1Action,
+  acceptAsOfficialAction,
 } from "./actions";
+import { revealEventAction } from "../../actions";
 import { ResultsForm } from "./results-form";
+import { OpenF1FetchBanner } from "./openf1-banner";
+import { openF1BannerState } from "@/lib/results/bannerState";
 import { AdminStrip } from "../../admin-strip";
 import { TrackDiagram } from "@/components/TrackDiagram";
 import { shortEventName, eventCountry } from "@/lib/design/eventName";
 import { sessionLabel } from "@/lib/sessionLabel";
 import { countryFlag } from "@/lib/design/drivers";
+
+/** Short relative-time for the banner meta (server-rendered, TZ-safe). */
+function ago(iso: string | null): string {
+  if (!iso) return "";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0) return "moments ago";
+  const m = Math.floor(ms / 60_000);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
 type EventRow = {
   id: string;
@@ -111,12 +127,14 @@ export default async function AdminResultsPage({
       .order("id", { ascending: true }),
     supabase
       .from("results")
-      .select("p1_driver_id, p2_driver_id, p3_driver_id")
+      .select("p1_driver_id, p2_driver_id, p3_driver_id, source, fetched_at")
       .eq("event_id", event.id)
       .maybeSingle<{
         p1_driver_id: number | null;
         p2_driver_id: number | null;
         p3_driver_id: number | null;
+        source: "openf1" | "admin" | null;
+        fetched_at: string | null;
       }>(),
     supabase
       .from("predictions")
@@ -131,6 +149,20 @@ export default async function AdminResultsPage({
 
   const short = shortEventName(event.name);
   const flagEmoji = countryFlag(eventCountry(event.name));
+
+  const bannerState = openF1BannerState({
+    revealed: Boolean(event.revealed_at),
+    hasResults: existingResult != null,
+    source: existingResult?.source ?? null,
+  });
+  const bannerMeta =
+    bannerState === "idle"
+      ? "Last attempt — none"
+      : bannerState === "provisional"
+        ? `Fetched ${ago(existingResult?.fetched_at ?? null)} · provisional`
+        : bannerState === "official"
+          ? "Frozen as official · auto-fetch off"
+          : `Revealed ${ago(event.revealed_at)}`;
 
   return (
     <>
@@ -210,6 +242,19 @@ export default async function AdminResultsPage({
           </div>
         </section>
 
+        <div className="mt-8">
+          <OpenF1FetchBanner
+            state={bannerState}
+            eventId={event.id}
+            metaText={bannerMeta}
+            formAnchor="#manual-entry"
+            fetchFromOpenF1={fetchFromOpenF1Action}
+            acceptAsOfficial={acceptAsOfficialAction}
+            revealEvent={revealEventAction}
+          />
+        </div>
+
+        <div id="manual-entry" className="mt-8">
         <ResultsForm
           eventId={event.id}
           isSprint={isSprint}
@@ -226,6 +271,7 @@ export default async function AdminResultsPage({
           submitAndReveal={fileResultsAndRevealAction}
           fetchFromOpenF1={fetchFromOpenF1Action}
         />
+        </div>
       </main>
     </>
   );
