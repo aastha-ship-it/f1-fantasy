@@ -20,7 +20,7 @@
  * wrong slot. Deliberately non-linear (see changes.md): rewarding "I got the
  * whole podium, just jumbled" more than scattered single hits.
  */
-function wrongSlotBucket(n: number): number {
+export function wrongSlotBucket(n: number): number {
   switch (n) {
     case 1:
       return 1;
@@ -34,6 +34,8 @@ function wrongSlotBucket(n: number): number {
 }
 
 export type DriverId = number;
+
+export type SlotOutcome = "exact" | "onPodium" | "miss";
 
 export type Prediction = {
   p1: DriverId;
@@ -55,6 +57,26 @@ export type ScoreBreakdown = {
   perfect_bonus: boolean;
 };
 
+/**
+ * Classify one predicted slot against the actual podium. The single source
+ * of the §4 "exact / on-podium-wrong-slot / miss" rule — `computeScore`
+ * scores from it and the reveal FriendCard badges read from it, so display
+ * and points can never disagree.
+ */
+export function slotOutcome(
+  pick: DriverId | null,
+  actual: Actual,
+  pos: "p1" | "p2" | "p3",
+): SlotOutcome {
+  if (pick === null) return "miss";
+  if (pick === actual[pos]) return "exact";
+  const classified = new Set<DriverId>();
+  if (actual.p1 !== null) classified.add(actual.p1);
+  if (actual.p2 !== null) classified.add(actual.p2);
+  if (actual.p3 !== null) classified.add(actual.p3);
+  return classified.has(pick) ? "onPodium" : "miss";
+}
+
 export function computeScore(
   prediction: Prediction,
   actual: Actual,
@@ -72,12 +94,8 @@ export function computeScore(
     };
   }
 
-  // Race scoring — all three slots required.
-  const classified = new Set<DriverId>();
-  if (actual.p1 !== null) classified.add(actual.p1);
-  if (actual.p2 !== null) classified.add(actual.p2);
-  if (actual.p3 !== null) classified.add(actual.p3);
-
+  // Race scoring — all three slots required. Classify each slot through the
+  // shared `slotOutcome` so points and the reveal FriendCard badges agree.
   const slots: Array<["p1" | "p2" | "p3", DriverId | null]> = [
     ["p1", prediction.p1],
     ["p2", prediction.p2],
@@ -89,17 +107,10 @@ export function computeScore(
   let dnfZeros = 0;
 
   for (const [pos, pick] of slots) {
-    if (pick === null) {
-      dnfZeros++;
-      continue;
-    }
-    if (!classified.has(pick)) {
-      dnfZeros++;
-    } else if (pick === actual[pos]) {
-      exact++;
-    } else {
-      onPodiumWrongSlot++;
-    }
+    const outcome = slotOutcome(pick, actual, pos);
+    if (outcome === "exact") exact++;
+    else if (outcome === "onPodium") onPodiumWrongSlot++;
+    else dnfZeros++;
   }
 
   const perfect_bonus = exact === 3;

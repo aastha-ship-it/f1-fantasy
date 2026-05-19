@@ -10,6 +10,7 @@ import {
   isPortraitRightFacing,
 } from "@/lib/design/drivers";
 import { teamMeta, type TeamMeta } from "@/lib/design/teams";
+import { slotOutcome, wrongSlotBucket } from "@/lib/computeScores";
 
 type Driver = { id: number; code: string; full_name: string; team: string };
 type User = { id: string; email: string; display_name: string | null };
@@ -257,6 +258,7 @@ export function RevealStage({
                       isMe={isMe}
                       prediction={row.prediction}
                       score={row.score}
+                      result={result}
                       driverById={driverById}
                       isSprint={isSprint}
                     />
@@ -752,6 +754,7 @@ function FriendCard({
   isMe,
   prediction,
   score,
+  result,
   driverById,
   isSprint,
 }: {
@@ -759,19 +762,38 @@ function FriendCard({
   isMe: boolean;
   prediction: Prediction;
   score: Score | undefined;
+  result: Result;
   driverById: Map<number, Driver>;
   isSprint: boolean;
 }) {
   const name = displayName(user, isMe);
-  const picks = isSprint
-    ? [{ label: "P1", id: prediction.p1_driver_id }]
+  const picks: Array<{
+    label: string;
+    pos: "p1" | "p2" | "p3";
+    id: number | null;
+  }> = isSprint
+    ? [{ label: "P1", pos: "p1", id: prediction.p1_driver_id }]
     : [
-        { label: "P1", id: prediction.p1_driver_id },
-        { label: "P2", id: prediction.p2_driver_id },
-        { label: "P3", id: prediction.p3_driver_id },
+        { label: "P1", pos: "p1", id: prediction.p1_driver_id },
+        { label: "P2", pos: "p2", id: prediction.p2_driver_id },
+        { label: "P3", pos: "p3", id: prediction.p3_driver_id },
       ];
+  const actual = {
+    p1: result.p1_driver_id,
+    p2: result.p2_driver_id,
+    p3: result.p3_driver_id,
+  };
   const points = score?.points ?? 0;
   const perfect = score?.perfect_bonus ?? false;
+  const exact = score?.exact_matches ?? 0;
+  const wrongSlot = score?.slot_mismatches ?? 0;
+  // §10 card-score colour tiers.
+  const scoreColor =
+    points >= 10
+      ? "var(--success)"
+      : points > 0
+        ? "var(--fg)"
+        : "var(--fg-subtle)";
 
   return (
     <article
@@ -799,12 +821,10 @@ function FriendCard({
         </p>
         <div className="flex items-baseline gap-1">
           <span
-            data-tabular
             style={{
-              fontFamily: "var(--font-mono), ui-monospace, monospace",
-              fontSize: 28,
-              fontWeight: 500,
-              color: perfect ? "var(--accent)" : "var(--fg)",
+              fontFamily: "var(--font-boldonse), ui-sans-serif",
+              fontSize: 32,
+              color: scoreColor,
             }}
           >
             {points}
@@ -820,11 +840,16 @@ function FriendCard({
 
       {perfect && (
         <p
-          className="inline-block self-start border border-[color:var(--accent)] px-2 py-0.5 text-[10px] uppercase text-[color:var(--accent)]"
-          style={{ letterSpacing: "0.12em" }}
+          className="inline-block self-start border border-[color:var(--accent)] text-[10px] uppercase text-[color:var(--accent)]"
+          style={{
+            fontFamily: "var(--font-mono), ui-monospace, monospace",
+            letterSpacing: "0.18em",
+            background: "transparent",
+            padding: "var(--space-xs) var(--space-sm)",
+          }}
           data-tabular
         >
-          Perfect podium
+          ★ Perfect Podium · +3 bonus
         </p>
       )}
 
@@ -832,6 +857,13 @@ function FriendCard({
         {picks.map((p) => {
           const d = p.id !== null ? driverById.get(p.id) : null;
           const t = d ? teamMeta(d.team) : null;
+          const o = slotOutcome(p.id, actual, p.pos);
+          const badge =
+            o === "exact"
+              ? { text: "✓ Exact +5", color: "var(--success)", weight: 600 }
+              : o === "onPodium"
+                ? { text: "⊙ On podium", color: "var(--warning)", weight: 600 }
+                : { text: "× Miss", color: "var(--fg-subtle)", weight: 400 };
           return (
             <li
               key={p.label}
@@ -854,7 +886,7 @@ function FriendCard({
                 <>
                   <DriverPortrait code={d.code} team={d.team} size={28} />
                   <span
-                    className="truncate text-sm"
+                    className="shrink-0 text-sm"
                     style={{
                       color: "var(--fg)",
                       fontFamily: "var(--font-boldonse), ui-sans-serif",
@@ -863,17 +895,63 @@ function FriendCard({
                   >
                     {d.code}
                   </span>
-                  <span className="ml-auto truncate text-xs text-[color:var(--fg-muted)]">
+                  <span className="min-w-0 flex-1 truncate text-xs text-[color:var(--fg-muted)]">
                     {d.full_name}
                   </span>
                 </>
               ) : (
-                <span className="text-sm text-[color:var(--fg-subtle)]">—</span>
+                <span className="flex-1 text-sm text-[color:var(--fg-subtle)]">
+                  —
+                </span>
               )}
+              <span
+                data-tabular
+                className="ml-auto shrink-0 text-[10px]"
+                style={{
+                  fontFamily: "var(--font-mono), ui-monospace, monospace",
+                  letterSpacing: "0.08em",
+                  color: badge.color,
+                  fontWeight: badge.weight,
+                }}
+              >
+                {badge.text}
+              </span>
             </li>
           );
         })}
       </ul>
+
+      {wrongSlot > 0 && exact < 3 && (
+        <div
+          className="flex items-center justify-between"
+          style={{
+            border: "1px dashed var(--border)",
+            background: "var(--surface-2)",
+            padding: "var(--space-sm) var(--space-md)",
+          }}
+        >
+          <span
+            data-tabular
+            className="text-[11px] text-[color:var(--fg-muted)]"
+            style={{
+              fontFamily: "var(--font-mono), ui-monospace, monospace",
+            }}
+          >
+            {wrongSlot} on podium (wrong slot) bucket
+          </span>
+          <span
+            data-tabular
+            className="text-[11px]"
+            style={{
+              fontFamily: "var(--font-mono), ui-monospace, monospace",
+              fontWeight: 600,
+              color: "var(--warning)",
+            }}
+          >
+            +{wrongSlotBucket(wrongSlot)}
+          </span>
+        </div>
+      )}
     </article>
   );
 }

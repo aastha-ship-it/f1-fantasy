@@ -8,6 +8,23 @@
 
 ## Session log
 
+**2026-05-19 — Phase 14 PR 4 shipped: Reveal FriendCard bucket math (design_handoff_phase11 §10).** Committed on `main` after PR 3 (`3ffa7ea`); not pushed. The "blocked: Red Bull hex" tag was already cleared by PR 2 (#4A77DB applied project-wide) → no new blocker. executing-plans + org-core:tdd; TDD slice = the §4 scoring helpers; FriendCard render = Playwright visual on a seeded reveal.
+
+Delivered:
+- **`src/lib/computeScores.ts`** — `wrongSlotBucket(n)` is now **exported** (was private); new pure exported `slotOutcome(pick, actual, pos) → "exact"|"onPodium"|"miss"` (+ `SlotOutcome` type). `computeScore`'s race loop **refactored to consume `slotOutcome`** (dropped its duplicate inline classify + the now-unused `classified` Set) — behaviour-preserving: the 12 original `computeScore` contract tests are the green gate (all still pass). This makes the §4 rule single-source so reveal badges and points can't diverge (directly closes the design-handoff "re-implemented inline" failure mode).
+- **`src/lib/computeScores.test.ts`** +4: `wrongSlotBucket` map lock; `slotOutcome` exact / onPodium / miss (descriptive names — matches that file's non-numbered convention).
+- **`src/app/reveal/[eventId]/reveal-stage.tsx`** — `FriendCard` now receives the actual `result` (threaded from the parent, which already had it; the `FlipCard` motion wrapper + choreography untouched). Per README §10: per-row badge via `slotOutcome` (`✓ Exact +5` `--success` 600 / `⊙ On podium` `--warning` 600 / `× Miss` `--fg-subtle`); dashed `--surface-2` bucket-tally row using the shared `wrongSlotBucket`, gated `slot_mismatches>0 && exact<3`; `★ Perfect Podium · +3 bonus` pill (Geist Mono 10px 0.18em accent, transparent) replacing the plain "Perfect podium"; card score → Boldonse 32px coloured by tier (≥10 `--success` / >0 `--fg` / 0 `--fg-subtle`).
+
+Verification: 4 TDD cycles red-green; **full suite 179/179** (was 175 → +4, zero regressions — critically the 12 untouched `computeScore` tests stayed green = the refactor changed no scoring output). lint+typecheck exit 0. Playwright capture (`plans/designs/friendcard-20260519/`, gitignored) on a purpose-seeded Japan-GP reveal: Vineet 18/perfect, Priya 1/on-podium-wrong-slot, Rohan & Tara 0/miss — screenshot visually confirmed every §10 element (badges, ★ pill, dashed bucket-tally `+1`, the three score-colour tiers) with the full cinematic settled. No hydration/browser errors.
+
+Gotchas:
+- **`scripts/seed-reveal-fixture.ts` has a stale hardcoded `JAPAN_RACE_ID`** (`3e56e331…`) that no longer matches the reseeded calendar (real id `bbc5faa1…`). Its `session_replication_role=replica` bypass let 4 predictions insert against the dead id with the FK silently skipped — they were orphaned. Had to re-point them via psql (same replica bypass). The script "succeeds" misleadingly. Fix the constant (or resolve the race id by name) before relying on it again — out of PR 4 scope (dev fixture, not shipped code), logged here.
+- **Phase 12 freeze bit the fixture flow:** `recompute-all-scores.ts` runs `writeResultsService` on the default `"openf1"` path, which `isResultsFrozenForAuto` blocks when `results.source='admin'` OR the event is revealed (→ "0 score(s) rewritten"). To compute fixture scores: set `source='openf1'` + clear `revealed_at`, recompute, *then* set `revealed_at`. Order matters for any future seeded-reveal capture.
+- Playwright `reducedMotion:'reduce'` did NOT give a usable screenshot here — the reveal's Framer Motion nodes sat at their `initial` (opacity:0) state (and Playwright's `toBeVisible` ignores opacity, so asserts passed on blank cards). The reliable path is full motion + an explicit ~12s settle before the shot. Reuse this for any reveal-cinematic capture in later PRs.
+- README §10 says the card score is **Boldonse 32px** — this intentionally overrides the usual "Geist Mono for all numerics" rule for this one hero number (it's static post-reveal, not a jittering live value); matches the reveal podium's display-number idiom. Don't "correct" it back to mono.
+
+---
+
 **2026-05-19 — Phase 14 PR 3 shipped: Predict last-5 form-strip polish (design_handoff_phase11 §11).** Smallest PR of the port ("verify/polish — core shipped"). Committed on `main` after PR 2 (`9a19843`); not pushed. executing-plans + org-core:tdd; TDD slice = the form-pip colour map (L5-1..L5-4), strip render = Playwright visual.
 
 Delivered:
@@ -785,7 +802,7 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 
 ---
 
-### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–3 shipped; PRs 4–9 pending)
+### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–4 shipped; PRs 5–9 pending)
 
 **Goal:** Apply the `design_handoff_phase11/` visual design pass over the Phases 10–13 functionality (changes.md §1–§8). 9 PRs, one per phase, executed in BUILD ORDER. Plan of record: `plans/design-handoff.md`. UI-only — no schema/data changes. §11 already shipped in code → verify/polish only; §9+§4 combined into PR 1. Do not start PR N+1 until PR N's exit criteria are green.
 
@@ -811,11 +828,12 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 - [x] §11 render polish in `driver-picker.tsx`: colour-of-text pips (dropped per-pip bg tint), Geist Mono 11px 600 `min-width:24` centred `padding:2px 5px`, latest pip `--surface-2`+`1px --border` box, `↑ LATEST` tag (8px 0.1em `--fg-subtle`)
 - **Exit:** ✓ matches README §11 (Playwright capture — all 4 colour buckets + latest box + LATEST tag verified); full suite 175/175; no hydration/browser errors.
 
-**PR 4 — §10 Reveal FriendCard bucket math · ☐** *(blocked: Red Bull hex decision)*
-- [ ] Per-row badges (`✓ Exact +5` / `⊙ On podium` / `× Miss`)
-- [ ] Bucket-tally row (dashed, `bucket={1→1,2→2,3→4}`, only when `wrongSlot>0 && exact<3`)
-- [ ] `★ Perfect Podium · +3 bonus` pill; card-score color tiers (≥10/`>0`/`0`)
-- **Exit:** renders existing score sub-fields; reveal motion untouched; suite green.
+**PR 4 — §10 Reveal FriendCard bucket math · ☑ (shipped 2026-05-19)** *(Red Bull hex already resolved in PR 2)*
+- [x] Per-row badges (`✓ Exact +5` success / `⊙ On podium` warning / `× Miss` fg-subtle) via shared `slotOutcome`
+- [x] Bucket-tally row (dashed `--surface-2`, `+wrongSlotBucket(n)` warning, only when `slot_mismatches>0 && exact<3`)
+- [x] `★ Perfect Podium · +3 bonus` pill (replaces "Perfect podium"); card score Boldonse 32 tier-coloured (≥10 success / >0 fg / 0 fg-subtle)
+- [x] §4 rule single-sourced: exported `wrongSlotBucket` + new `slotOutcome`; `computeScore` refactored to consume `slotOutcome` (12 original tests = behaviour-preserving gate)
+- **Exit:** ✓ reveal motion untouched (FriendCard is markup inside FlipCard); full suite 179/179; Playwright capture verified all variants on seeded Japan fixture; no hydration errors.
 
 **PR 5 — §3 Show Reel redesign · ☐**
 - [ ] Hero (`SHOW / REEL` Boldonse 120 `data-tight`; meta + total `pts so far`)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeScore } from "./computeScores";
+import { computeScore, wrongSlotBucket, slotOutcome } from "./computeScores";
 
 /**
  * Scoring contract (from changes.md §4 — new point system):
@@ -148,5 +148,36 @@ describe("computeScore — sprint (unchanged: P1 only)", () => {
     expect(s.slot_mismatches).toBe(0);
     expect(s.dnf_zeros).toBe(1);
     expect(s.perfect_bonus).toBe(false);
+  });
+});
+
+// Phase 14 PR 4 (design_handoff_phase11 §10): the FriendCard bucket-tally
+// must reuse the SAME bucket math as scoring — these lock the shared helper.
+describe("wrongSlotBucket — non-linear on-podium-wrong-slot bucket", () => {
+  it("maps {0→0, 1→1, 2→2, 3→4} and clamps >3 → 0", () => {
+    expect(wrongSlotBucket(0)).toBe(0);
+    expect(wrongSlotBucket(1)).toBe(1);
+    expect(wrongSlotBucket(2)).toBe(2);
+    expect(wrongSlotBucket(3)).toBe(4);
+    expect(wrongSlotBucket(4)).toBe(0);
+  });
+});
+
+describe("slotOutcome — per-slot classification (shared by FriendCard badges)", () => {
+  const ACT = { p1: 1, p2: 4, p3: 16 };
+  it("exact: predicted driver finished in that exact slot", () => {
+    expect(slotOutcome(1, ACT, "p1")).toBe("exact");
+    expect(slotOutcome(16, ACT, "p3")).toBe("exact");
+  });
+
+  it("onPodium: predicted driver is on the podium but a different slot", () => {
+    expect(slotOutcome(4, ACT, "p1")).toBe("onPodium"); // P2 driver picked P1
+    expect(slotOutcome(1, ACT, "p3")).toBe("onPodium"); // P1 driver picked P3
+  });
+
+  it("miss: null pick, or a driver that finished off the podium", () => {
+    expect(slotOutcome(null, ACT, "p1")).toBe("miss");
+    expect(slotOutcome(99, ACT, "p1")).toBe("miss"); // off podium
+    expect(slotOutcome(99, ACT, "p3")).toBe("miss");
   });
 });
