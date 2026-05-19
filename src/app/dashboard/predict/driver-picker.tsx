@@ -8,28 +8,9 @@ import type { SubmitPredictionResult } from "@/lib/submitPrediction";
 import { DriverPortrait } from "@/components/DriverPortrait";
 import { teamMeta } from "@/lib/design/teams";
 import { formatAtTrack } from "@/lib/nudges/format";
+import { formPillColor } from "@/lib/nudges/formColor";
 
 const EASE_OUT_QUART = [0.22, 1, 0.36, 1] as const;
-
-/** Color a single Form-L5 position pill by finish class. */
-function formPillColors(token: string): { bg: string; fg: string } {
-  const t = token.trim().toUpperCase();
-  if (t === "DNF" || t === "DNS" || t === "DSQ" || t === "—") {
-    return { bg: "color-mix(in oklch, var(--error) 18%, transparent)", fg: "var(--error)" };
-  }
-  const m = t.match(/^P?(\d+)$/);
-  if (m) {
-    const n = Number(m[1]);
-    if (n >= 1 && n <= 3)
-      return {
-        bg: "color-mix(in oklch, var(--success) 22%, transparent)",
-        fg: "var(--success)",
-      };
-    if (n >= 4 && n <= 10)
-      return { bg: "var(--surface-2)", fg: "var(--fg)" };
-  }
-  return { bg: "var(--surface-2)", fg: "var(--fg-muted)" };
-}
 
 type Driver = {
   id: number;
@@ -363,43 +344,73 @@ export function DriverPicker({
                   >
                     <div className="flex items-center justify-between gap-4">
                       <dt className="text-xs">Form L5</dt>
-                      <dd className="flex flex-wrap justify-end gap-1">
-                        {/* recent_form is stored most-recent-first; reverse
-                            so the latest result sits rightmost (sports
-                            convention — see changes.md §2). */}
-                        {(n.recent_form || "")
-                          .split("·")
-                          .map((s) => s.trim())
-                          .filter((s) => s.length > 0)
-                          .reverse()
-                          .map((tok, i) => {
-                            const c = formPillColors(tok);
+                      <dd className="flex items-center justify-end gap-1">
+                        {(() => {
+                          // Stored most-recent-first; reverse so the latest
+                          // result sits rightmost (sports convention —
+                          // changes.md §2 / design_handoff_phase11 §11).
+                          const toks = (n.recent_form || "")
+                            .split("·")
+                            .map((s) => s.trim())
+                            .filter((s) => s.length > 0);
+                          toks.reverse();
+                          if (toks.length === 0) {
                             return (
                               <span
-                                key={i}
-                                className="px-1.5 py-0.5 text-[11px]"
-                                style={{
-                                  background: c.bg,
-                                  color: c.fg,
-                                  fontFamily:
-                                    "var(--font-mono), ui-monospace, monospace",
-                                  fontWeight: 600,
-                                  letterSpacing: "0.04em",
-                                }}
+                                className="text-[color:var(--fg-subtle)]"
                                 data-tabular
                               >
-                                {tok}
+                                —
                               </span>
                             );
-                          })}
-                        {!(n.recent_form && n.recent_form.length > 0) && (
-                          <span
-                            className="text-[color:var(--fg-subtle)]"
-                            data-tabular
-                          >
-                            —
-                          </span>
-                        )}
+                          }
+                          return (
+                            <>
+                              {toks.map((tok, i) => {
+                                const latest = i === toks.length - 1;
+                                return (
+                                  <span
+                                    key={i}
+                                    data-tabular
+                                    style={{
+                                      display: "inline-flex",
+                                      justifyContent: "center",
+                                      minWidth: 24,
+                                      padding: "2px 5px",
+                                      fontFamily:
+                                        "var(--font-mono), ui-monospace, monospace",
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                      letterSpacing: "0.04em",
+                                      color: formPillColor(tok),
+                                      background: latest
+                                        ? "var(--surface-2)"
+                                        : "transparent",
+                                      border: latest
+                                        ? "1px solid var(--border)"
+                                        : "1px solid transparent",
+                                    }}
+                                  >
+                                    {tok}
+                                  </span>
+                                );
+                              })}
+                              <span
+                                aria-hidden
+                                data-tabular
+                                className="uppercase text-[color:var(--fg-subtle)]"
+                                style={{
+                                  fontFamily:
+                                    "var(--font-mono), ui-monospace, monospace",
+                                  fontSize: 8,
+                                  letterSpacing: "0.1em",
+                                }}
+                              >
+                                ↑ LATEST
+                              </span>
+                            </>
+                          );
+                        })()}
                       </dd>
                     </div>
 

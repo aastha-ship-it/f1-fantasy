@@ -8,6 +8,21 @@
 
 ## Session log
 
+**2026-05-19 — Phase 14 PR 3 shipped: Predict last-5 form-strip polish (design_handoff_phase11 §11).** Smallest PR of the port ("verify/polish — core shipped"). Committed on `main` after PR 2 (`9a19843`); not pushed. executing-plans + org-core:tdd; TDD slice = the form-pip colour map (L5-1..L5-4), strip render = Playwright visual.
+
+Delivered:
+- **`src/lib/nudges/formColor.ts`** (new, pure) + **`formColor.test.ts`** (L5-1..L5-4) — `formPillColor(token)` extracted from an un-exported inline `formPillColors` in `driver-picker.tsx`. Verbatim README §11 map: DNF/DNS/DSQ/— → `--error`, P1–P3 → `--success`, P4–P10 → `--fg`, else → `--fg-subtle`. **Fixed a latent bug:** the old inline copy returned `--fg-muted` for the "else" bucket (P11+/unknown) — spec is `--fg-subtle`; now locked.
+- **`src/app/dashboard/predict/driver-picker.tsx`** — strip rebuilt to README §11 anatomy: pips are **colour-of-text only** (removed the per-pip `color-mix` bg tint that deviated from spec), Geist Mono 11px 600, `min-width:24` centred, `padding:2px 5px`; the latest (rightmost) pip gets a `var(--surface-2)` + `1px var(--border)` box; a tiny `↑ LATEST` tag (Geist Mono 8px 0.1em `--fg-subtle`) at the right edge. The `.reverse()` (most-recent-first → latest-rightmost, changes.md §2) was already correct — untouched. Empty-state `—` kept.
+
+Verification: L5-1..L5-4 red-green. Full suite **175/175** (was 171 → +4 L5, zero regressions). lint+typecheck exit 0. Playwright capture (`plans/designs/form-strip-20260519/`, gitignored) with a seeded `driver_nudges` row (`recent_form='DNF·P2·P11·P7·P1'` spanning all 4 buckets) — screenshot visually verified: P1/P2 success-green, P7 `--fg`, P11 `--fg-subtle` (the bug-fixed dimmer), DNF error-red + boxed as latest, `↑ LATEST` tag present. No hydration/browser errors.
+
+Gotchas:
+- The plan/tracker pointed at `src/app/dashboard/predict/[eventId]/driver-picker.tsx`; the real file is `src/app/dashboard/predict/driver-picker.tsx` (shared by the `[eventId]` route). Stale plan path — corrected in CLAUDE.md + `design-handoff.md`. Verify file paths before trusting plan docs for PRs 4–9.
+- README §11's "colour map" lists only text colours, and the anatomy explicitly says pips are colour-of-text with **only the latest** pip boxed. The pre-existing implementation tinted every pip's background — a silent deviation. Lesson: when the spec enumerates an anatomy, treat unlisted decoration (per-pip bg) as *out*, not as a kept enhancement, unless the owner says otherwise.
+- Visual verification needed a seeded `driver_nudges` row (table was empty: backfill-jolpica/refresh-nudges hadn't run on this dev DB). Future predict-detail captures must seed nudges or the strip is just the `—` empty state.
+
+---
+
 **2026-05-19 — Phase 14 PR 2 shipped: Lobby preview/expand redesign + Red Bull hex → #4A77DB (design_handoff_phase11 §1/§2).** Second PR of the design-fidelity port. PR 1 was committed first (`7dd01c5`, on `main`, not pushed) per owner choice, then PR 2 built on top. The blocking Red Bull hex 3-way mismatch was resolved with the owner: adopt the handoff's `#4A77DB`. Executed via executing-plans; TDD slices (org-core:tdd) = Red Bull hex (D26) + the phase-line copy/tone mapping (PL1–PL5), both red-green; the Lobby UI is pure-visual → Playwright capture.
 
 Delivered:
@@ -770,7 +785,7 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 
 ---
 
-### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–2 shipped; PRs 3–9 pending)
+### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–3 shipped; PRs 4–9 pending)
 
 **Goal:** Apply the `design_handoff_phase11/` visual design pass over the Phases 10–13 functionality (changes.md §1–§8). 9 PRs, one per phase, executed in BUILD ORDER. Plan of record: `plans/design-handoff.md`. UI-only — no schema/data changes. §11 already shipped in code → verify/polish only; §9+§4 combined into PR 1. Do not start PR N+1 until PR N's exit criteria are green.
 
@@ -791,9 +806,10 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 - [x] Red Bull hex → `#4A77DB` in `teams.ts` + `globals.css` (D26 regression); server-component + client-island split fixes the date hydration mismatch
 - **Exit:** ✓ matches README §1/§2 (Playwright preview+expanded verified); `revealGate.ts` untouched; full suite 171/171 green.
 
-**PR 3 — §11 Predict last-5 form strip · ☐** *(verify/polish — core shipped)*
-- [ ] Confirm `.reverse()` + DNF/P1-3/P4-10 color map; add `↑ LATEST` tag + latest-pip highlight if missing
-- **Exit:** matches README §11 anatomy; suite green.
+**PR 3 — §11 Predict last-5 form strip · ☑ (shipped 2026-05-19)**
+- [x] `.reverse()` confirmed correct (unchanged); colour map **extracted** to pure `src/lib/nudges/formColor.ts` + locked **L5-1..L5-4** (fixed a latent `--fg-muted`→`--fg-subtle` "else"-bucket bug)
+- [x] §11 render polish in `driver-picker.tsx`: colour-of-text pips (dropped per-pip bg tint), Geist Mono 11px 600 `min-width:24` centred `padding:2px 5px`, latest pip `--surface-2`+`1px --border` box, `↑ LATEST` tag (8px 0.1em `--fg-subtle`)
+- **Exit:** ✓ matches README §11 (Playwright capture — all 4 colour buckets + latest box + LATEST tag verified); full suite 175/175; no hydration/browser errors.
 
 **PR 4 — §10 Reveal FriendCard bucket math · ☐** *(blocked: Red Bull hex decision)*
 - [ ] Per-row badges (`✓ Exact +5` / `⊙ On podium` / `× Miss`)

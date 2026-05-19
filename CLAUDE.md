@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18) + Phase 13 (changes.md §8: scoring legend relocated to a global TopBar "How Scoring Works" modal — 2026-05-18) + Phase 14 PR 1 (design_handoff_phase11 §9+§4 visual-fidelity pass: ScoringHelp modal shell + ScoringLegendBody chrome/copy — 2026-05-18) + Phase 14 PR 2 (design_handoff_phase11 §1: Lobby preview/expand redesign + Red Bull hex → #4A77DB — 2026-05-19).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 145 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
+**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18) + Phase 13 (changes.md §8: scoring legend relocated to a global TopBar "How Scoring Works" modal — 2026-05-18) + Phase 14 PR 1 (design_handoff_phase11 §9+§4 visual-fidelity pass: ScoringHelp modal shell + ScoringLegendBody chrome/copy — 2026-05-18) + Phase 14 PR 2 (design_handoff_phase11 §1: Lobby preview/expand redesign + Red Bull hex → #4A77DB — 2026-05-19) + Phase 14 PR 3 (design_handoff_phase11 §11: Predict last-5 form-strip polish — 2026-05-19).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 149 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
 
 ### Design system (Pass 1–4 shipped 2026-04-28)
 
@@ -212,6 +212,22 @@ DriverPortrait + team-colour border. **Red Bull livery hex is now
 `#4A77DB`** (`teams.ts` + `globals.css --team-redbull`/`-hex`), bumped for
 dark-bg accessibility per the handoff; regression-locked by `teams.test.ts`
 D26. (Supersedes the Phase 8 A2 `#3671C6` and the older `#1E2A6E`.)
+
+**PR 3 — §11 Predict last-5 form-strip (shipped 2026-05-19).** The
+recent-form pip colour is now a pure `src/lib/nudges/formColor.ts`
+`formPillColor(token)` (extracted from an inline copy in
+`driver-picker.tsx`), unit-locked **L5-1..L5-4**: DNF/DNS/DSQ/— →
+`--error`, P1–P3 → `--success`, P4–P10 → `--fg`, else → `--fg-subtle`
+(fixes a latent `--fg-muted` regression on the "else" bucket). The strip
+itself (`driver-picker.tsx`, predict-detail telemetry panel) now matches
+README §11 anatomy: pips are colour-of-text only (no per-pip bg tint),
+Geist Mono 11px 600, `min-width:24` centred, `padding:2px 5px`; the latest
+(rightmost) pip gets a `var(--surface-2)` + `1px var(--border)` box; a tiny
+`↑ LATEST` tag (Geist Mono 8px 0.1em `--fg-subtle`) sits at the right edge.
+The most-recent-first→`.reverse()` flip (changes.md §2) was already correct
+and is unchanged. (Note: the canonical file is
+`src/app/dashboard/predict/driver-picker.tsx`, shared by the `[eventId]`
+route — the plan's `…/[eventId]/driver-picker.tsx` path was stale.)
 
 Design context (fonts, palette, principles, anti-patterns) lives in `.impeccable.md` at the project root.
 
