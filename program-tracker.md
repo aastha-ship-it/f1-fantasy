@@ -8,6 +8,23 @@
 
 ## Session log
 
+**2026-05-19 — Phase 14 PR 7 shipped: Predict-list FP banner reframe (design_handoff_phase11 §6).** Committed on `main` after PR 6 (`5419d60`); not pushed. executing-plans + org-core:tdd. "blocked: Red Bull hex" was already cleared by PR 2 → no real blocker.
+
+Delivered:
+- **`src/lib/practice/lapCell.ts`** (new, pure) + **`lapCell.test.ts`** (FP-L1..FP-L4) — the §6 lap-cell variant: admin→`{kind:'ovr'}`; OpenF1+no/invalid lap→`{kind:'awaiting'}`; OpenF1 leader (pos 1)→`{kind:'time', formatLapTime(abs)}`; OpenF1 non-leader→`{kind:'time', '+'+(lap-leader).toFixed(3)}`. Reuses `formatLapTime`. Extracted the cell decision out of the component so the four forms are regression-locked.
+- **`src/components/PracticeBanner.tsx`** rebuilt to canvas `screens-aux.jsx` FpResultsBanner: framed `--surface` section (1px `--border`, **no border-radius**, `overflow:hidden`); header strip (`--surface-2`, bottom border) — `Free Practice · pace check` Boldonse 14/0.04em + `Source: OpenF1` pill (mono 9/0.14em, 3×8, 1px border) + right `Top-3 fastest · use to gauge form before locking` (→ `Sprint weekend · FP1 only` when `sessions.length<=1`); body `repeat(N,1fr)` grid with 1px `--border` dividers; per column a header (label Boldonse 13 upper + `startLabel`) and `<ul>` of 3 rows (grid `32px auto 1fr auto`, `--surface-2`, **3px team-colour left border**, P-label Boldonse 20 with P1 `--accent`, `DriverPortrait` 28, code Boldonse 14, lap cell via `lapCell`). **No footer** — README §6 explicitly removes the canvas's footer/legend strip.
+- **`src/lib/practice/loadPractice.ts`** — `FpSession` gained `startLabel: string | null` (server-`formatLocal`'d from the OpenF1 session `date_start`, added `date_start` to `OpenF1Session`); set on both the override and live paths (the OpenF1 session exists either way). TZ-safe: formatted server-side only, passed as a plain prop (no hydration — banner + round page are server components). No schema change.
+- **`src/app/dashboard/predict/round/[round]/page.tsx`** — `<PracticeBanner>` moved from below the weekend hero to **above** it (README §6 / plan §7).
+
+Verification: FP-L1..L4 red-green. Full suite **186/186** (36 files; was 182 → +4 FP-L, zero regressions — `parsePractice`/`formatLapTime` and the `loadPractice` consumers all green despite the `FpSession` shape change). lint+typecheck exit 0. Playwright (`plans/designs/fpbanner-20260519/`, gitignored) on **round 3 (Japan)** — past FPs → **live OpenF1**: FP1/FP2 rendered real openf1 cells (absolute leader `1:31.666` + `+0.026` gaps) and a **seeded `practice_overrides` FP3** rendered `— OVR`; header strip, dividers, server `startLabel` times, team-colour rows (VER shows the PR 2 `#4A77DB`), no footer — all visually verified vs canvas §6. Override fixture **purged**; final clean-DB gate re-confirmed 186/186, no hydration/browser errors.
+
+Gotchas:
+- §6's column-header session **time** isn't in `FpSession` — added a server-formatted `startLabel` (same pattern as PR 2's `timeLabel` / PR 6's counts: meet the spec via a small in-memory, server-side data addition, never a schema change or client-side TZ recompute).
+- README §6 **deliberately drops the canvas's footer** ("the previous developer-facing legend strip has been removed"). When README prose contradicts the canvas, README wins for this port — don't faithfully port the footer.
+- `loadPractice` hits **OpenF1 live**; a past round (FPs `date_end <= now`) returns real data so the openf1 cells render without seeding. The deterministic OVR/Awaiting variants are unit-locked (FP-L), and a one-row `practice_overrides` seed exercises OVR for the screenshot — cheaper/more reliable than depending on live data for every variant. (`practice_overrides` is service-role/no-RLS and not predictions, so it doesn't pollute I6 — but still purged per the discipline.)
+
+---
+
 **2026-05-19 — Phase 14 PR 6 shipped: Profile calendar-sync 2-col panel (design_handoff_phase11 §5).** Committed on `main` after PR 5 (`e448762`); not pushed. executing-plans. **First PR with no TDD slice** — §5 is pure layout + copy + a client clipboard interaction with no deterministic pure logic (unlike PRs 1–5's phaseLine/formColor/wrongSlotBucket/pillFill). Surfaced this in Step-1 review; owner chose **visual-only, no unit test** — verified via Playwright + the suite staying green.
 
 Delivered:
@@ -833,7 +850,7 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 
 ---
 
-### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–6 shipped; PRs 7–9 pending)
+### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–7 shipped; PRs 8–9 pending)
 
 **Goal:** Apply the `design_handoff_phase11/` visual design pass over the Phases 10–13 functionality (changes.md §1–§8). 9 PRs, one per phase, executed in BUILD ORDER. Plan of record: `plans/design-handoff.md`. UI-only — no schema/data changes. §11 already shipped in code → verify/polish only; §9+§4 combined into PR 1. Do not start PR N+1 until PR N's exit criteria are green.
 
@@ -878,10 +895,11 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 - [x] **Real stats counts** — `profile/page.tsx` counts the ICS feed's exact set (`season in [year,year+1]`) → events (distinct rounds) + sessions; passed as props (no schema change); dead `hasToken` prop dropped
 - **Exit:** ✓ matches canvas §5 (Playwright initial + revealed verified); mint/reveal flow intact; full suite **182/182**; lint+typecheck clean; no hydration errors; capture-minted token purged.
 
-**PR 7 — §6 Predict-list FP banner · ☐** *(blocked: Red Bull hex decision)*
-- [ ] Framed banner: header strip (`Source: OpenF1` pill) + N-col session grid + 1px dividers
-- [ ] Lap-time variants (OpenF1 / `OVR` / `Awaiting`); no footer; lap time only when OpenF1
-- **Exit:** matches README §6; suite green.
+**PR 7 — §6 Predict-list FP banner · ☑ (shipped 2026-05-19)** *(Red Bull hex already resolved in PR 2)*
+- [x] Framed `--surface` banner (1px border, no radius, overflow:hidden): header strip (`Source: OpenF1` pill + sprint-aware right copy) + `repeat(N,1fr)` grid w/ 1px `--border` dividers; per-col header w/ server-formatted session time; rows grid `32px auto 1fr auto`, 3px team-colour left border, DriverPortrait 28
+- [x] Lap-cell variants via pure `lapCell` (FP-L1..L4): leader absolute / non-leader `+gap` / admin `OVR` / OpenF1-no-time `Awaiting`; **no footer** (README §6 overrides the canvas); lap only when OpenF1
+- [x] `FpSession.startLabel` added (server-formatted from OpenF1 `date_start`, TZ-safe); banner remounted **above** the weekend hero
+- **Exit:** ✓ matches canvas §6 (Playwright: live FP1/FP2 OpenF1 + seeded FP3 OVR, all variants verified); full suite **186/186**; lint+typecheck clean; no hydration; override fixture purged.
 
 **PR 8 — §7 Admin OpenF1 fetch banner · ☐** *(open: §7 `Accept as official` action?)*
 - [ ] New 4-state banner (idle/provisional/official/revealed) above podium form — strings verbatim from `screens-aux.jsx:OpenF1FetchBanner`

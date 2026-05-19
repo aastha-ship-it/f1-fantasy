@@ -162,6 +162,8 @@ export default async function PredictRoundPage({
           </Link>
         </p>
 
+        <PracticeBanner sessions={practice} />
+
         <section className="grid items-end gap-12 border-b border-[color:var(--border)] pb-8 lg:grid-cols-[1.4fr_1fr]">
           <div>
             <p
@@ -218,8 +220,6 @@ export default async function PredictRoundPage({
             />
           </div>
         </section>
-
-        <PracticeBanner sessions={practice} />
 
         <section className="mt-10 grid gap-px bg-[color:var(--border)] border border-[color:var(--border)]">
           {grouped.sessions.map((s) => {

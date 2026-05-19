@@ -18,6 +18,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { OPENF1, fetchJson, sleep } from "@/lib/sync/openf1";
 import { canonicalizeName } from "@/lib/text/canonicalize";
+import { formatLocal } from "@/lib/sessionLabel";
 import { parsePractice, type FpPodiumEntry } from "./parsePractice";
 
 const REVALIDATE = { next: { revalidate: 900 } } as const; // ~15 min
@@ -34,12 +35,15 @@ export type FpSession = {
   fpIndex: 1 | 2 | 3;
   label: string;
   source: FpSource;
+  /** Server-formatted session start (TZ-safe — never recomputed client-side). */
+  startLabel: string | null;
   top3: FpPodiumEntry[];
 };
 
 type OpenF1Session = {
   session_key: number;
   session_name: string;
+  date_start: string;
   date_end: string;
 };
 type OpenF1Driver = { driver_number: number; full_name: string };
@@ -134,7 +138,13 @@ export async function loadPracticeForRound(
           },
         );
         if (top3.length > 0)
-          out.push({ fpIndex: idx, label: `FP${idx}`, source: "admin", top3 });
+          out.push({
+            fpIndex: idx,
+            label: `FP${idx}`,
+            source: "admin",
+            startLabel: formatLocal(s.date_start),
+            top3,
+          });
         continue;
       }
 
@@ -168,6 +178,7 @@ export async function loadPracticeForRound(
             fpIndex: idx,
             label: `FP${idx}`,
             source: "openf1",
+            startLabel: formatLocal(s.date_start),
             top3,
           });
       } catch {
