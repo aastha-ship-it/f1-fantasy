@@ -8,6 +8,21 @@
 
 ## Session log
 
+**2026-05-19 — Phase 14 PR 5 shipped: Show Reel /reveal index redesign (design_handoff_phase11 §3).** Committed on `main` after PR 4 (`a97aab4`); not pushed. executing-plans + org-core:tdd. Mostly visual-fidelity tightening of `src/app/reveal/page.tsx` (server component) against the canvas `screens-lobby.jsx` ShowReelScreen; TDD slice = the pure pill-fill map.
+
+Delivered:
+- **`src/lib/reveal/pillFill.ts`** (new, pure) + **`pillFill.test.ts`** (SR1–SR3) — `pillFill(perfect, pts)` → 28 / 18 / 10 (perfect / ≥10 / else+null), mirrors canvas:636, null-safe for unscored sessions. Replaces an inline ternary in `page.tsx`.
+- **`src/app/reveal/page.tsx`** — hero: caption Geist Mono 11/0.18em; `Show`/`Reel` Boldonse `clamp(56,9vw,120)` `data-tight` lh0.86 -0.025em (the §4-rule cinematic exception); subtext 14/1.6/maxW420; right meta Geist Mono 11/0.12em rewritten to the **verbatim** canvas string `{r} rounds · {s} sessions · {p} perfect podium` (dropped the conditional pluralization — canvas is always "rounds"/"sessions", singular "perfect podium"); big total Boldonse `clamp(40,5vw,56)` now **`--accent`** + `pts so far` Geist Mono 16. Round rows: grid → `60px 80px 36px 1fr auto auto auto`, padding tokenized `--space-lg/--space-xl`, R-code 11px, `TrackDiagram` 64→80, flag 22→24, GP `text-lg`→Boldonse 20/1.05/0.005em, `Latest` 0.1→0.12em, pills `padding:6px 12px` + `pillFill`, round total → `Σ +{n}` Boldonse 22 two-tier (`≥10 --accent` else `--fg`, was 3-tier), `min-width:80`, **`aria-label="Total"`**, always `Σ +{n}` (dropped the `—` for 0 to match canvas). Empty `NO REVEALS YET` + `LOCK PICKS →` untouched.
+
+Verification: SR1–SR3 red-green. Full suite **182/182** (35 files; was 179 → +3 SR, zero regressions). lint+typecheck exit 0. Playwright (`plans/designs/showreel-20260519/`, gitignored) captured **both** states — `empty` (NO REVEALS YET, no seed needed) and `populated` (seeded a kataria perfect Japan pick → hero `18`/accent, 1 round row, `R +18` pill, `Σ +18` accent) — both visually verified vs canvas §3; fixture purged immediately after. No hydration/browser errors (page is server-rendered).
+
+Gotchas:
+- **The recurring "pre-existing I6 RLS flake" is self-inflicted fixture pollution, now root-caused.** PR 4's capture seeded a revealed Japan GP (4 fake users + predictions + results + scores + `revealed_at`) into the **shared local Supabase** via `session_replication_role=replica` (FK/trigger bypass). `resetTestData` only cleans the integration suite's own fixtures, not ad-hoc psql inserts — so `I6 · User A cannot SELECT User B's predictions pre-reveal` started failing (181/182). PR 5 touched **zero** RLS/predictions/policy/migration code (only `reveal/page.tsx` + new `pillFill`), so it could not be a code regression. Purging this session's ad-hoc fixtures deterministically restored **182/182**. **Standing rule for PRs 6–9 (and retroactively): any capture that seeds the DB MUST purge its fixtures before the integration suite runs / before declaring done.** Prior sessions' "pre-existing I6 flake" notes were almost certainly the same unpurged-capture pollution, not an inherent test bug.
+- README §3 meta line is verbatim non-pluralized ("1 rounds", "1 sessions", singular "perfect podium"). Looks grammatically odd at n=1 but it's the canvas spec — match it, don't "fix" the grammar (handoff: match copy character-for-character).
+- The 120px `data-tight` hero is intentionally huge and sits tight above the subtext at desktop widths — that crowding is inherent to the exact spec (120px + lh0.86 + data-tight) and matches the canvas's cinematic intent; not a bug.
+
+---
+
 **2026-05-19 — Phase 14 PR 4 shipped: Reveal FriendCard bucket math (design_handoff_phase11 §10).** Committed on `main` after PR 3 (`3ffa7ea`); not pushed. The "blocked: Red Bull hex" tag was already cleared by PR 2 (#4A77DB applied project-wide) → no new blocker. executing-plans + org-core:tdd; TDD slice = the §4 scoring helpers; FriendCard render = Playwright visual on a seeded reveal.
 
 Delivered:
@@ -802,7 +817,7 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 
 ---
 
-### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–4 shipped; PRs 5–9 pending)
+### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–5 shipped; PRs 6–9 pending)
 
 **Goal:** Apply the `design_handoff_phase11/` visual design pass over the Phases 10–13 functionality (changes.md §1–§8). 9 PRs, one per phase, executed in BUILD ORDER. Plan of record: `plans/design-handoff.md`. UI-only — no schema/data changes. §11 already shipped in code → verify/polish only; §9+§4 combined into PR 1. Do not start PR N+1 until PR N's exit criteria are green.
 
@@ -835,10 +850,11 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 - [x] §4 rule single-sourced: exported `wrongSlotBucket` + new `slotOutcome`; `computeScore` refactored to consume `slotOutcome` (12 original tests = behaviour-preserving gate)
 - **Exit:** ✓ reveal motion untouched (FriendCard is markup inside FlipCard); full suite 179/179; Playwright capture verified all variants on seeded Japan fixture; no hydration errors.
 
-**PR 5 — §3 Show Reel redesign · ☐**
-- [ ] Hero (`SHOW / REEL` Boldonse 120 `data-tight`; meta + total `pts so far`)
-- [ ] 7-col round rows `60/80/36/1fr/auto/auto/auto`; session pills; `Σ` total + `aria-label="Total"`
-- **Exit:** matches README §3; empty `NO REVEALS YET` kept; suite green.
+**PR 5 — §3 Show Reel redesign · ☑ (shipped 2026-05-19)**
+- [x] Hero: caption mono 11/0.18em; `Show`/`Reel` Boldonse clamp→120 `data-tight` lh0.86 -0.025em; subtext 14/1.6/maxW420; meta mono 11/0.12em verbatim; total Boldonse 56 **--accent** + `pts so far` mono 16
+- [x] 7-col rows `60/80/36/1fr/auto/auto/auto`; TrackDiagram 80; flag 24; GP Boldonse 20; pills pad 6/12 via `pillFill` (SR1–SR3); `Σ +{n}` Boldonse 22 (≥10 accent else fg) minW80 `aria-label="Total"`
+- [x] Empty `NO REVEALS YET` block unchanged (captured + verified)
+- **Exit:** ✓ matches canvas §3 (empty + populated Playwright captures verified); full suite **182/182**; no hydration errors.
 
 **PR 6 — §5 Profile calendar-sync panel · ☐**
 - [ ] 1-col → 2-col (left copy/URL/3-step; right 240px stats card + SVG glyph)

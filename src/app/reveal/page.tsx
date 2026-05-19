@@ -6,6 +6,7 @@ import { TrackDiagram } from "@/components/TrackDiagram";
 import { shortEventName, eventCountry } from "@/lib/design/eventName";
 import { countryFlag } from "@/lib/design/drivers";
 import { sessionLabel } from "@/lib/sessionLabel";
+import { pillFill } from "@/lib/reveal/pillFill";
 
 /**
  * /reveal — index of every revealed cinematic in the current season.
@@ -177,25 +178,40 @@ export default async function RevealIndexPage() {
         <section className="grid items-end gap-8 border-b border-[color:var(--border)] pb-6 lg:grid-cols-[1.5fr_1fr]">
           <div>
             <p
-              className="mb-3 text-xs uppercase text-[color:var(--fg-subtle)]"
-              style={{ letterSpacing: "0.18em" }}
+              className="uppercase text-[color:var(--fg-subtle)]"
+              style={{
+                fontFamily: "var(--font-mono), ui-monospace, monospace",
+                fontSize: 11,
+                letterSpacing: "0.18em",
+                marginBottom: "var(--space-md)",
+              }}
               data-tabular
             >
               Reveals · {currentSeason} Season
             </p>
             <h1
-              className="m-0 leading-[0.9]"
+              className="m-0 uppercase"
+              data-tight
               style={{
                 fontFamily: "var(--font-boldonse), ui-sans-serif",
-                fontSize: "clamp(48px, 7vw, 88px)",
-                letterSpacing: "-0.015em",
+                fontSize: "clamp(56px, 9vw, 120px)",
+                lineHeight: 0.86,
+                letterSpacing: "-0.025em",
               }}
             >
-              SHOW
+              Show
               <br />
-              REEL
+              Reel
             </h1>
-            <p className="mt-4 max-w-xl text-sm text-[color:var(--fg-muted)]">
+            <p
+              className="text-[color:var(--fg-muted)]"
+              style={{
+                marginTop: "var(--space-lg)",
+                fontSize: 14,
+                lineHeight: 1.6,
+                maxWidth: 420,
+              }}
+            >
               Every cinematic that&rsquo;s landed this season. Replay the
               moment, see how the group lined up.
             </p>
@@ -203,24 +219,34 @@ export default async function RevealIndexPage() {
 
           <div className="flex flex-col gap-2 lg:items-end">
             <p
-              className="text-xs uppercase text-[color:var(--fg-subtle)]"
-              style={{ letterSpacing: "0.12em" }}
+              className="uppercase text-[color:var(--fg-subtle)]"
+              style={{
+                fontFamily: "var(--font-mono), ui-monospace, monospace",
+                fontSize: 11,
+                letterSpacing: "0.12em",
+                marginBottom: "var(--space-sm)",
+              }}
               data-tabular
             >
-              {rounds.length} round{rounds.length === 1 ? "" : "s"} ·{" "}
-              {events.length} session{events.length === 1 ? "" : "s"} ·{" "}
+              {rounds.length} rounds · {events.length} sessions ·{" "}
               {perfectCount} perfect podium
-              {perfectCount === 1 ? "" : "s"}
             </p>
             <p
-              className="leading-none"
+              className="leading-none text-[color:var(--accent)]"
               style={{
                 fontFamily: "var(--font-boldonse), ui-sans-serif",
                 fontSize: "clamp(40px, 5vw, 56px)",
               }}
             >
-              <span data-tabular>{totalScore}</span>
-              <span className="ml-2 text-base text-[color:var(--fg-subtle)]">
+              {totalScore}
+              <span
+                className="text-[color:var(--fg-subtle)]"
+                style={{
+                  fontFamily: "var(--font-mono), ui-monospace, monospace",
+                  fontSize: 16,
+                  marginLeft: "var(--space-sm)",
+                }}
+              >
                 pts so far
               </span>
             </p>
@@ -252,40 +278,44 @@ export default async function RevealIndexPage() {
             </Link>
           </section>
         ) : (
-          <ul className="mt-10 grid gap-px border border-[color:var(--border)] bg-[color:var(--border)]">
+          <ul className="mt-[var(--space-2xl)] grid gap-px border border-[color:var(--border)] bg-[color:var(--border)]">
             {rounds.map((r) => {
               const short = shortEventName(r.name);
               const flag = countryFlag(eventCountry(r.name));
               return (
                 <li
                   key={r.round}
-                  className="grid items-center gap-6 bg-[color:var(--surface)] px-5 py-4"
+                  className="grid items-center gap-[var(--space-xl)] bg-[color:var(--surface)]"
                   style={{
+                    padding: "var(--space-lg) var(--space-xl)",
                     gridTemplateColumns:
-                      "44px 64px 32px minmax(0,1fr) auto minmax(0,auto) auto",
+                      "60px 80px 36px 1fr auto auto auto",
                   }}
                 >
                   <span
-                    className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
-                    style={{ letterSpacing: "0.14em" }}
+                    className="uppercase text-[color:var(--fg-subtle)]"
+                    style={{ fontSize: 11, letterSpacing: "0.14em" }}
                     data-tabular
                   >
                     R{String(r.round).padStart(2, "0")}
                   </span>
                   <TrackDiagram
                     circuit={r.ergast_circuit_id ?? r.circuit}
-                    size={64}
+                    size={80}
                     stroke="var(--fg-subtle)"
                     strokeWidth={1.5}
                   />
-                  <span aria-hidden style={{ fontSize: 22, lineHeight: 1 }}>
+                  <span aria-hidden style={{ fontSize: 24, lineHeight: 1 }}>
                     {flag}
                   </span>
                   <div className="min-w-0">
                     <p
-                      className="truncate text-lg leading-tight"
+                      className="truncate uppercase"
                       style={{
                         fontFamily: "var(--font-boldonse), ui-sans-serif",
+                        fontSize: 20,
+                        lineHeight: 1.05,
+                        letterSpacing: "0.005em",
                       }}
                     >
                       {short.toUpperCase()}
@@ -300,7 +330,7 @@ export default async function RevealIndexPage() {
                   </div>
                   <span
                     className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
-                    style={{ letterSpacing: "0.1em" }}
+                    style={{ letterSpacing: "0.12em" }}
                     data-tabular
                   >
                     Latest {formatRevealedAgo(r.latestRevealedAt)}
@@ -316,18 +346,15 @@ export default async function RevealIndexPage() {
                       const sc = scoreByEvent.get(s.id);
                       const pts = sc ? Number(sc.points) : null;
                       const perfect = sc?.perfect_bonus ?? false;
-                      const fillPct = perfect
-                        ? 28
-                        : pts != null && pts >= 10
-                          ? 18
-                          : 10;
+                      const fillPct = pillFill(perfect, pts);
                       return (
                         <Link
                           key={s.id}
                           href={`/reveal/${s.id}`}
                           aria-label={`Watch ${sessionLabel(s.session_type)} reveal`}
-                          className="flex items-center gap-2 px-2.5 py-1.5 transition-colors"
+                          className="flex items-center gap-2 transition-colors"
                           style={{
+                            padding: "6px 12px",
                             background: `color-mix(in oklch, var(--accent) ${fillPct}%, transparent)`,
                             border: "1px solid var(--accent)",
                           }}
@@ -363,20 +390,19 @@ export default async function RevealIndexPage() {
                   </div>
 
                   <span
-                    className="min-w-12 text-right"
+                    aria-label="Total"
+                    className="text-right"
                     style={{
                       fontFamily: "var(--font-boldonse), ui-sans-serif",
                       fontSize: 22,
+                      minWidth: 80,
                       color:
                         r.totalPoints >= 10
                           ? "var(--accent)"
-                          : r.totalPoints > 0
-                            ? "var(--fg)"
-                            : "var(--fg-subtle)",
+                          : "var(--fg)",
                     }}
-                    data-tabular
                   >
-                    {r.totalPoints > 0 ? `Σ +${r.totalPoints}` : "—"}
+                    Σ +{r.totalPoints}
                   </span>
                 </li>
               );

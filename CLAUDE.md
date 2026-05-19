@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18) + Phase 13 (changes.md §8: scoring legend relocated to a global TopBar "How Scoring Works" modal — 2026-05-18) + Phase 14 PR 1 (design_handoff_phase11 §9+§4 visual-fidelity pass: ScoringHelp modal shell + ScoringLegendBody chrome/copy — 2026-05-18) + Phase 14 PR 2 (design_handoff_phase11 §1: Lobby preview/expand redesign + Red Bull hex → #4A77DB — 2026-05-19) + Phase 14 PR 3 (design_handoff_phase11 §11: Predict last-5 form-strip polish — 2026-05-19) + Phase 14 PR 4 (design_handoff_phase11 §10: Reveal FriendCard bucket math — per-row badges + bucket-tally + perfect pill — 2026-05-19).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 153 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
+**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18) + Phase 13 (changes.md §8: scoring legend relocated to a global TopBar "How Scoring Works" modal — 2026-05-18) + Phase 14 PR 1 (design_handoff_phase11 §9+§4 visual-fidelity pass: ScoringHelp modal shell + ScoringLegendBody chrome/copy — 2026-05-18) + Phase 14 PR 2 (design_handoff_phase11 §1: Lobby preview/expand redesign + Red Bull hex → #4A77DB — 2026-05-19) + Phase 14 PR 3 (design_handoff_phase11 §11: Predict last-5 form-strip polish — 2026-05-19) + Phase 14 PR 4 (design_handoff_phase11 §10: Reveal FriendCard bucket math — per-row badges + bucket-tally + perfect pill — 2026-05-19) + Phase 14 PR 5 (design_handoff_phase11 §3: Show Reel /reveal index redesign — 2026-05-19).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 156 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
 
 ### Design system (Pass 1–4 shipped 2026-04-28)
 
@@ -248,6 +248,22 @@ exact_matches<3`; a `★ Perfect Podium · +3 bonus` pill (replaces the old
 choreography untouched (`FriendCard` is plain markup inside the existing
 `FlipCard` motion wrapper). Helper coverage: `computeScores.test.ts` +4
 (wrongSlotBucket + slotOutcome exact/onPodium/miss).
+
+**PR 5 — §3 Show Reel redesign (shipped 2026-05-19).** `/reveal` index
+(`src/app/reveal/page.tsx`, server component) tightened to the canvas
+(`screens-lobby.jsx` ShowReelScreen): hero caption Geist Mono 11px/0.18em;
+title `Show`/`Reel` Boldonse `clamp(56px,9vw,120px)` `data-tight`
+`line-height:0.86` `-0.025em`; subtext 14px/1.6/maxW420; right meta Geist
+Mono 11px/0.12em (verbatim `{r} rounds · {s} sessions · {p} perfect
+podium` — always plural rounds/sessions, singular podium); big total
+Boldonse `clamp(40,5vw,56)` **`--accent`** + `pts so far` Geist Mono 16px.
+Round rows: 7-col `60px 80px 36px 1fr auto auto auto`, `TrackDiagram`
+80px, flag 24px, GP Boldonse 20px/1.05/0.005em, `Latest …` 0.12em, session
+pills `padding:6px 12px`, round total `Σ +{n}` Boldonse 22px (`≥10 →
+--accent` else `--fg`, `min-width:80`, `aria-label="Total"`). Empty
+`NO REVEALS YET` block unchanged. Session-pill accent fill % extracted to
+pure `src/lib/reveal/pillFill.ts` (perfect→28 / ≥10→18 / else→10),
+unit-locked **SR1–SR3**.
 
 Design context (fonts, palette, principles, anti-patterns) lives in `.impeccable.md` at the project root.
 
