@@ -1,28 +1,37 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { teamMeta } from "@/lib/design/teams";
+import {
+  overrideBadge,
+  type OverrideStatus,
+} from "@/lib/practice/overrideBadge";
 import {
   savePracticeOverrideAction,
   clearPracticeOverrideAction,
 } from "./practice-actions";
 
 /**
- * Admin FP-override editor (changes.md §6). One block per FP slot — three
- * driver selects. Saving makes that slot win over the live OpenF1 fetch in
- * the Practice banner; Clear reverts to the live fetch. Drivers only — the
- * banner's lap-time column is populated solely from OpenF1.
+ * Admin FP-override editor (changes.md §6 / design_handoff_phase11 §8).
  *
- * Sprint weekends only ever surface FP1 in the banner (it's all OpenF1
- * exposes), but all three slots are editable for simplicity.
+ * One row per FP slot — three driver `<select>`s. Saving makes that slot
+ * win over the live OpenF1 fetch in the predict-round Practice banner;
+ * Clear reverts to the live fetch. Drivers only — the banner's lap-time
+ * column is OpenF1-sourced. Status badge: persistent `Using OpenF1` /
+ * `Override active`, with a transient ~2s `✓ Saved …` / `✓ Cleared …`
+ * flash after the action (owner decision; canvas-faithful). The badge
+ * label/colour is the unit-locked pure `overrideBadge`; the
+ * persistent/transient *timing* lives here.
  */
 
-type Driver = { id: number; code: string };
+type Driver = { id: number; code: string; team: string; full_name: string };
 type Existing = Record<
   number,
   { p1: number; p2: number; p3: number } | undefined
 >;
 
 const FP_SLOTS = [1, 2, 3] as const;
+const SUBTITLE_REVERT_MS = 2000;
 
 export function PracticeOverridesForm({
   season,
@@ -36,33 +45,85 @@ export function PracticeOverridesForm({
   existing: Existing;
 }) {
   return (
-    <section className="mt-12">
-      <h2
-        className="mb-1"
+    <section
+      style={{
+        marginTop: "var(--space-3xl)",
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+      }}
+    >
+      <header
+        className="flex items-baseline justify-between"
         style={{
-          fontFamily: "var(--font-boldonse), ui-sans-serif",
-          fontSize: 22,
+          padding: "var(--space-xl) var(--space-2xl)",
+          borderBottom: "1px solid var(--border)",
         }}
       >
-        FP OVERRIDES
-      </h2>
-      <p className="mb-5 text-xs text-[color:var(--fg-subtle)]">
-        Optional. A saved slot overrides the live OpenF1 fetch in the predict
-        banner (use when OpenF1 is late, wrong, or the session was cancelled).
-        Sprint weekends only show FP1.
-      </p>
-      <div className="grid gap-px border border-[color:var(--border)] bg-[color:var(--border)]">
-        {FP_SLOTS.map((fp) => (
-          <FpRow
-            key={fp}
-            season={season}
-            round={round}
-            fpIndex={fp}
-            drivers={drivers}
-            initial={existing[fp]}
-          />
-        ))}
+        <div>
+          <h2
+            className="m-0 uppercase"
+            style={{
+              fontFamily: "var(--font-boldonse), ui-sans-serif",
+              fontSize: 20,
+              letterSpacing: "0.02em",
+            }}
+          >
+            FP Overrides
+          </h2>
+          <p
+            style={{
+              margin: "var(--space-xs) 0 0",
+              fontSize: 12,
+              color: "var(--fg-muted)",
+              lineHeight: 1.5,
+              maxWidth: 720,
+            }}
+          >
+            Override the live OpenF1 podium for any FP session. All three
+            slots must be filled with distinct drivers — blanks and
+            duplicates are rejected. Saved overrides win over the live fetch
+            on the participant banner at{" "}
+            <code style={{ color: "var(--accent)" }}>
+              /dashboard/predict/round/{round}
+            </code>
+            .
+          </p>
+        </div>
+      </header>
+
+      <div
+        className="grid items-center uppercase text-[color:var(--fg-subtle)]"
+        style={{
+          gridTemplateColumns: "120px repeat(3, 1fr) auto auto",
+          gap: "var(--space-lg)",
+          padding: "var(--space-md) var(--space-2xl)",
+          fontFamily: "var(--font-mono), ui-monospace, monospace",
+          fontSize: 10,
+          letterSpacing: "0.14em",
+          borderBottom: "1px solid var(--border)",
+          background: "var(--surface-2)",
+        }}
+        data-tabular
+      >
+        <span>Session</span>
+        <span>P1</span>
+        <span>P2</span>
+        <span>P3</span>
+        <span className="text-right">Status</span>
+        <span className="text-right">Actions</span>
       </div>
+
+      {FP_SLOTS.map((fp, i) => (
+        <FpRow
+          key={fp}
+          season={season}
+          round={round}
+          fpIndex={fp}
+          drivers={drivers}
+          initial={existing[fp]}
+          isLast={i === FP_SLOTS.length - 1}
+        />
+      ))}
     </section>
   );
 }
@@ -73,22 +134,42 @@ function FpRow({
   fpIndex,
   drivers,
   initial,
+  isLast,
 }: {
   season: number;
   round: number;
   fpIndex: number;
   drivers: Driver[];
   initial: { p1: number; p2: number; p3: number } | undefined;
+  isLast: boolean;
 }) {
   const [p1, setP1] = useState<number | "">(initial?.p1 ?? "");
   const [p2, setP2] = useState<number | "">(initial?.p2 ?? "");
   const [p3, setP3] = useState<number | "">(initial?.p3 ?? "");
-  const [msg, setMsg] = useState<string | null>(
-    initial ? "Override active" : null,
+  const [status, setStatus] = useState<OverrideStatus>(
+    initial ? "active" : "using",
   );
+  const [err, setErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const revertRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (revertRef.current) clearTimeout(revertRef.current);
+    };
+  }, []);
+
+  function flash(transient: OverrideStatus, settled: OverrideStatus) {
+    setStatus(transient);
+    if (revertRef.current) clearTimeout(revertRef.current);
+    revertRef.current = setTimeout(
+      () => setStatus(settled),
+      SUBTITLE_REVERT_MS,
+    );
+  }
 
   function save() {
+    setErr(null);
     startTransition(async () => {
       const res = await savePracticeOverrideAction({
         season,
@@ -98,123 +179,148 @@ function FpRow({
         p2DriverId: Number(p2),
         p3DriverId: Number(p3),
       });
-      setMsg(res.ok ? "Saved · overrides OpenF1" : res.error);
+      if (res.ok) flash("saved", "active");
+      else setErr(res.error);
     });
   }
 
   function clear() {
+    setErr(null);
     startTransition(async () => {
-      const res = await clearPracticeOverrideAction({
-        season,
-        round,
-        fpIndex,
-      });
+      const res = await clearPracticeOverrideAction({ season, round, fpIndex });
       if (res.ok) {
         setP1("");
         setP2("");
         setP3("");
-        setMsg("Cleared · using OpenF1");
+        flash("cleared", "using");
       } else {
-        setMsg(res.error);
+        setErr(res.error);
       }
     });
   }
 
-  const sel = (
-    value: number | "",
-    onChange: (v: number | "") => void,
-    label: string,
-  ) => (
-    <label className="flex items-center gap-2">
-      <span
-        className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
-        style={{ letterSpacing: "0.1em" }}
-        data-tabular
-      >
-        {label}
-      </span>
+  const byId = new Map(drivers.map((d) => [d.id, d]));
+  const empty = !p1 && !p2 && !p3;
+  const badge = overrideBadge(status);
+
+  function slot(value: number | "", onChange: (v: number | "") => void) {
+    const d = value === "" ? null : byId.get(Number(value));
+    const hex = d ? (teamMeta(d.team)?.hex ?? null) : null;
+    return (
       <select
         value={value}
         onChange={(e) =>
           onChange(e.target.value === "" ? "" : Number(e.target.value))
         }
-        className="bg-[color:var(--surface-2)] px-2 py-1.5 text-sm"
-        style={{ border: "1px solid var(--border)", color: "var(--fg)" }}
-      >
-        <option value="">—</option>
-        {drivers.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.code}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-
-  return (
-    <div className="flex flex-wrap items-center gap-4 bg-[color:var(--surface)] px-5 py-4">
-      <span
-        className="w-12 shrink-0 text-sm uppercase"
+        className="w-full text-sm"
         style={{
+          background: "var(--surface-2)",
+          color: d ? "var(--fg)" : "var(--fg-subtle)",
+          border: "1px solid var(--border)",
+          borderLeft: hex
+            ? `3px solid ${hex}`
+            : "1px solid var(--border)",
+          padding: "8px 12px",
           fontFamily: "var(--font-mono), ui-monospace, monospace",
-          letterSpacing: "0.1em",
         }}
         data-tabular
       >
+        <option value="">Pick driver</option>
+        {drivers.map((dr) => (
+          <option key={dr.id} value={dr.id}>
+            {dr.code} · {dr.full_name}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <div
+      className="grid items-center"
+      style={{
+        gridTemplateColumns: "120px repeat(3, 1fr) auto auto",
+        gap: "var(--space-lg)",
+        padding: "var(--space-lg) var(--space-2xl)",
+        borderBottom: isLast ? "none" : "1px solid var(--border)",
+      }}
+    >
+      <span
+        className="uppercase"
+        style={{
+          fontFamily: "var(--font-boldonse), ui-sans-serif",
+          fontSize: 16,
+          letterSpacing: "0.02em",
+        }}
+      >
         FP{fpIndex}
       </span>
-      <div className="flex flex-wrap items-center gap-3">
-        {sel(p1, setP1, "P1")}
-        {sel(p2, setP2, "P2")}
-        {sel(p3, setP3, "P3")}
-      </div>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={save}
-          disabled={pending}
-          className="px-3 py-1.5 text-[11px] uppercase"
-          style={{
-            fontFamily: "var(--font-mono), ui-monospace, monospace",
-            letterSpacing: "0.08em",
-            background: "var(--accent)",
-            color: "#000",
-            fontWeight: 600,
-            opacity: pending ? 0.6 : 1,
-          }}
-        >
-          {pending ? "…" : "Save"}
-        </button>
+
+      {slot(p1, setP1)}
+      {slot(p2, setP2)}
+      {slot(p3, setP3)}
+
+      <span
+        className="justify-self-end uppercase"
+        style={{
+          fontFamily: "var(--font-mono), ui-monospace, monospace",
+          fontSize: 10,
+          letterSpacing: "0.08em",
+          color: err ? "var(--error)" : badge.color,
+          background: err ? "transparent" : badge.bg,
+          padding: badge.bg === "transparent" || err ? 0 : "5px 10px",
+          border:
+            badge.bg === "transparent" || err
+              ? "none"
+              : "1px solid var(--border)",
+          whiteSpace: "nowrap",
+        }}
+        data-tabular
+      >
+        {err ?? badge.label}
+      </span>
+
+      <div className="flex justify-self-end gap-2">
         <button
           type="button"
           onClick={clear}
-          disabled={pending}
-          className="px-3 py-1.5 text-[11px] uppercase"
+          disabled={empty || pending}
+          className="uppercase"
           style={{
             fontFamily: "var(--font-mono), ui-monospace, monospace",
+            fontSize: 10,
             letterSpacing: "0.08em",
+            padding: "8px 14px",
+            background: "transparent",
+            color: empty ? "var(--fg-subtle)" : "var(--fg)",
             border: "1px solid var(--border)",
-            color: "var(--fg-muted)",
+            cursor: empty ? "not-allowed" : "pointer",
             opacity: pending ? 0.6 : 1,
           }}
         >
           Clear
         </button>
-      </div>
-      {msg && (
-        <span
-          className="text-[11px] uppercase"
+        <button
+          type="button"
+          onClick={save}
+          disabled={pending}
+          className="uppercase"
           style={{
-            color: msg.includes("·")
-              ? "var(--success)"
-              : "var(--fg-subtle)",
-            letterSpacing: "0.06em",
+            fontFamily: "var(--font-mono), ui-monospace, monospace",
+            fontSize: 10,
+            letterSpacing: "0.08em",
+            padding: "8px 14px",
+            background: "var(--accent)",
+            color: "#000",
+            border: "none",
+            fontWeight: 600,
+            cursor: "pointer",
+            opacity: pending ? 0.6 : 1,
           }}
-          data-tabular
         >
-          {msg}
-        </span>
-      )}
+          {pending ? "…" : "Save"}
+        </button>
+      </div>
     </div>
   );
 }

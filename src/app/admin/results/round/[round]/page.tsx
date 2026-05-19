@@ -137,10 +137,12 @@ export default async function AdminResultsRoundPage({
   const [{ data: fpDrivers }, { data: fpOverrides }] = await Promise.all([
     svc
       .from("drivers")
-      .select("id, code")
+      .select("id, code, team, full_name")
       .eq("active", true)
       .order("code", { ascending: true })
-      .returns<{ id: number; code: string }[]>(),
+      .returns<
+        { id: number; code: string; team: string; full_name: string }[]
+      >(),
     svc
       .from("practice_overrides")
       .select("fp_index, p1_driver_id, p2_driver_id, p3_driver_id")

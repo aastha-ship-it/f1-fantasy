@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18) + Phase 13 (changes.md §8: scoring legend relocated to a global TopBar "How Scoring Works" modal — 2026-05-18) + Phase 14 PR 1 (design_handoff_phase11 §9+§4 visual-fidelity pass: ScoringHelp modal shell + ScoringLegendBody chrome/copy — 2026-05-18) + Phase 14 PR 2 (design_handoff_phase11 §1: Lobby preview/expand redesign + Red Bull hex → #4A77DB — 2026-05-19) + Phase 14 PR 3 (design_handoff_phase11 §11: Predict last-5 form-strip polish — 2026-05-19) + Phase 14 PR 4 (design_handoff_phase11 §10: Reveal FriendCard bucket math — per-row badges + bucket-tally + perfect pill — 2026-05-19) + Phase 14 PR 5 (design_handoff_phase11 §3: Show Reel /reveal index redesign — 2026-05-19) + Phase 14 PR 6 (design_handoff_phase11 §5: Profile calendar-sync 2-col panel — 2026-05-19) + Phase 14 PR 7 (design_handoff_phase11 §6: Predict-list FP banner reframe — 2026-05-19) + Phase 14 PR 8 (design_handoff_phase11 §7: admin OpenF1-fetch 4-state banner + Accept-as-official — 2026-05-19).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 164 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
+**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18) + Phase 13 (changes.md §8: scoring legend relocated to a global TopBar "How Scoring Works" modal — 2026-05-18) + Phase 14 PR 1 (design_handoff_phase11 §9+§4 visual-fidelity pass: ScoringHelp modal shell + ScoringLegendBody chrome/copy — 2026-05-18) + Phase 14 PR 2 (design_handoff_phase11 §1: Lobby preview/expand redesign + Red Bull hex → #4A77DB — 2026-05-19) + Phase 14 PR 3 (design_handoff_phase11 §11: Predict last-5 form-strip polish — 2026-05-19) + Phase 14 PR 4 (design_handoff_phase11 §10: Reveal FriendCard bucket math — per-row badges + bucket-tally + perfect pill — 2026-05-19) + Phase 14 PR 5 (design_handoff_phase11 §3: Show Reel /reveal index redesign — 2026-05-19) + Phase 14 PR 6 (design_handoff_phase11 §5: Profile calendar-sync 2-col panel — 2026-05-19) + Phase 14 PR 7 (design_handoff_phase11 §6: Predict-list FP banner reframe — 2026-05-19) + Phase 14 PR 8 (design_handoff_phase11 §7: admin OpenF1-fetch 4-state banner + Accept-as-official — 2026-05-19) + Phase 14 PR 9 (design_handoff_phase11 §8: admin FP-overrides section reframe — Phase 14 COMPLETE, all 9 PRs — 2026-05-19).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 168 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
 
 ### Design system (Pass 1–4 shipped 2026-04-28)
 
@@ -165,11 +165,17 @@ indicator is dropped (still shown on League/Standings). Dialog scrim + a
 light reduced-motion-safe fade live in `globals.css`. Pure UI relocation —
 no logic/test changes.
 
-### Phase 14 — design-fidelity port (`design_handoff_phase11`, in progress)
+### Phase 14 — design-fidelity port (`design_handoff_phase11`) — COMPLETE (9 PRs, 2026-05-18→19)
 
-Visual pass over the Phases 10–13 features. 9 PRs, one per phase, in BUILD
-ORDER. Plan of record: `plans/design-handoff.md`; trackable phase breakdown +
-session log in `plans/program-tracker.md` "Phase 14". UI-only.
+Visual pass over the Phases 10–13 features. **All 9 BUILD-ORDER PRs shipped**
+(one per phase; committed on `main`, not pushed). Plan of record:
+`plans/design-handoff.md`; trackable phase breakdown + session log in
+`plans/program-tracker.md` "Phase 14". UI-only — the one schema-adjacent
+note is Red Bull hex `#4A77DB` (PR 2). Every pure mapping a screen depends
+on was extracted + unit-locked (SL/PL/L5/D26/SR/FP-L/BS/FP-OB +
+`wrongSlotBucket`/`slotOutcome`); pure-visual screens (§5) verified by
+Playwright only. Each PR purged its own capture fixtures (the I6
+"flake" was self-inflicted capture pollution — see PR 5 log).
 
 **PR 1 — §9 + §4 (shipped 2026-05-18).** `ScoringHelp.tsx` modal shell rebuilt
 to README §9 prose (no canvas artboard exists for it): bordered transparent
@@ -333,6 +339,30 @@ tag/title/instructional sub are rendered verbatim, but the meta line is
 fabricated time clauses are dropped (truth over fixture, per the PR 5/6/7
 precedent). Freeze consequence of `acceptAsOfficial` is already covered
 by `results-source` S1–S5 + `freezeResults`.
+
+**PR 9 — §8 Admin FP-overrides section (shipped 2026-05-19, Phase 14
+complete).** `src/app/admin/results/round/[round]/practice-overrides-form.tsx`
+rebuilt to canvas `screens-aux.jsx` `AdminFpOverrideScreen`: framed
+`--surface` section (1px `--border`, **no border-radius**); header `FP
+Overrides` Boldonse 20/0.02em + verbatim subtitle (12px `--fg-muted`,
+maxW720, accent `/dashboard/predict/round/{round}` code); a
+`Session · P1 · P2 · P3 · Status · Actions` column-header strip (Geist
+Mono 10/0.14em, `--surface-2`, Status/Actions right-aligned); 3 rows
+(grid `120px repeat(3,1fr) auto auto`, bottom-bordered except last) —
+col1 `FP{n}` Boldonse 16 (no fabricated session time — honest, per the
+PR 7/8 precedent), cols2-4 styled `<select>` (functional, README §8 says
+ship a `<select>`; `--surface-2`, **3px team-colour left edge when a
+driver is chosen** else 1px `--border`), col5 status badge, col6
+`Clear`(outlined, disabled-when-empty)/`Save`(`--accent`/#000). Status
+badge label/colour is the pure unit-locked `src/lib/practice/overrideBadge.ts`
+(**FP-OB1..FP-OB4**); the **transient flash** (owner decision,
+canvas-faithful) lives in the form — Save→`✓ Saved · overrides OpenF1`
+(success) / Clear→`✓ Cleared · using OpenF1` (fg-muted) for ~2s then
+revert to the persistent `Override active` / `Using OpenF1` (cleared via
+a `useEffect`-tracked timeout). Reuses the existing
+`save`/`clearPracticeOverrideAction`; the round page's drivers query
+gained `team, full_name` (existing cols, no schema change). Errors
+render in-place (`--error`) without overwriting the badge.
 
 Design context (fonts, palette, principles, anti-patterns) lives in `.impeccable.md` at the project root.
 

@@ -8,6 +8,20 @@
 
 ## Session log
 
+**2026-05-19 — Phase 14 PR 9 shipped: Admin FP-overrides section reframe (design_handoff_phase11 §8) — PHASE 14 COMPLETE (all 9 PRs).** Committed on `main` after PR 8; not pushed (13 unpushed Phase-14 commits total). executing-plans + org-core:tdd. The flagged open Q3 (badge persistence) was raised at Step 1; owner chose **transient flash (canvas-faithful)**.
+
+Delivered:
+- **`src/lib/practice/overrideBadge.ts`** (new, pure) + **`overrideBadge.test.ts`** (FP-OB1–FP-OB4) — `overrideBadge(status)` → `{label,color,bg}` for `active`/`saved`/`cleared`/`using`. Locked so the four §8 status strings + colours can't drift (saved/cleared also drive the transient flash). Exports `OverrideStatus`.
+- **`practice-overrides-form.tsx`** rebuilt to canvas `screens-aux.jsx:AdminFpOverrideScreen`/`FpOverrideRow`: framed `--surface` section (1px `--border`, no radius); header `FP Overrides` Boldonse 20/0.02em + verbatim §8 subtitle (12px `--fg-muted`, maxW720, accent `<code>/dashboard/predict/round/{round}</code>`); `Session·P1·P2·P3·Status·Actions` column-header strip (mono 10/0.14em, `--surface-2`, Status/Actions right). 3 `FpRow`s grid `120px repeat(3,1fr) auto auto`: `FP{n}` Boldonse 16, three styled `<select>` (functional — README §8 says ship a `<select>`; `--surface-2`, **3px team-colour left edge when a driver is chosen** via `teamMeta(d.team).hex`, options `{code} · {full_name}`), status span (`overrideBadge`, err shown instead when present), `Clear` (outlined, disabled-when-empty) + `Save` (`--accent`/#000). Transient flash: `flash(transient,settled)` sets transient then a `revertRef` `setTimeout(2000)`→settled, cleared on unmount via `useEffect`.
+- **`admin/results/round/[round]/page.tsx`** drivers query `.select("id, code")` → `.select("id, code, team, full_name")` (existing cols, **no schema change**); mount unchanged. Reused existing `savePracticeOverrideAction`/`clearPracticeOverrideAction` (UI-only PR).
+
+Verification: FP-OB1–FP-OB4 red-green. Full suite **194/194** (38 files; was 190 → +4 FP-OB, zero regressions). lint+typecheck exit 0. Playwright (`plans/designs/fpoverrides-20260519/`, gitignored): seeded an R3 FP2 override, signed in as admin, captured `active.png` (FP1/FP3 `Using OpenF1` + FP2 `Override active` amber, team-colour select edges incl. VER `#4A77DB`) then clicked FP2 Save → `saved.png` (transient `✓ Saved · overrides OpenF1` green) — both visually matched the canvas. `practice_overrides` fixture purged; final clean-DB gate re-confirmed 194/194, zero hydration/browser errors.
+
+Gotchas:
+- **No fabricated session time in col1.** The canvas `FpOverrideRow` shows a `r.when` line under `FP{n}`; we have no per-FP scheduled time in `events` (practice is deliberately not in the schema — Phase 11). Rendering an invented time would be a lie. Consistent with the PR 5/6/7/8 honesty-over-fixture rule: dropped the line, kept `FP{n}` alone. README §8 copy is otherwise verbatim.
+- **`<select>` over a custom `DriverDropdown`.** README §8 anatomy describes a photo/`▾` dropdown, but the README body explicitly says ship a real `<select>` (accessibility + zero new client complexity). Honoured the README body; styled the native control to the canvas idiom (team-colour left edge, `--surface-2`, mono options) rather than building a bespoke listbox.
+- **Transient-flash owner decision.** Q3 had no canvas artboard for the post-action state; the canvas `FpOverrideRow` only shows persistent. Owner chose the transient flash (matches the `✓ Saved`/`✓ Cleared` strings the server action already returns). The pure `overrideBadge` owns label/colour; the persistent↔transient *timing* lives in the form (untestable timer kept out of the unit-locked helper).
+
 **2026-05-19 — Phase 14 PR 8 shipped: Admin OpenF1-fetch 4-state banner + Accept-as-official (design_handoff_phase11 §7).** Committed on `main` after PR 7 (`91d17f8`); not pushed. executing-plans + org-core:tdd. The flagged open Q3 was raised at Step 1; owner chose **a new one-click `Accept as official` action**.
 
 Delivered:
@@ -867,7 +881,7 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 
 ---
 
-### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–8 shipped; PR 9 pending)
+### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ☑ COMPLETE (all 9 PRs shipped 2026-05-18→19)
 
 **Goal:** Apply the `design_handoff_phase11/` visual design pass over the Phases 10–13 functionality (changes.md §1–§8). 9 PRs, one per phase, executed in BUILD ORDER. Plan of record: `plans/design-handoff.md`. UI-only — no schema/data changes. §11 already shipped in code → verify/polish only; §9+§4 combined into PR 1. Do not start PR N+1 until PR N's exit criteria are green.
 
@@ -925,16 +939,19 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 - [x] Meta line server-derived from real `fetched_at`/`revealed_at` (canvas's fabricated "6h ago / session_key / cron" demo data **not** rendered — honesty over fixture)
 - **Exit:** ✓ all 4 states Playwright-verified vs canvas §7; full suite **190/190** (results-source/freezeResults/computeScore green = freeze intact); lint+typecheck clean; fixtures purged; no hydration.
 
-**PR 9 — §8 Admin FP overrides section · ☐** *(blocked: Red Bull hex; open: badge persistence)*
-- [ ] Section frame + `Session · P1 · P2 · P3 · Status · Actions` column-header strip
-- [ ] `DriverDropdown` (real `<select>`, 3px team-color left edge) ×3/row; 6-col rows
-- [ ] Status badges + `Clear`/`Save` styling; strip `borderRadius`; reuse `practice-actions.ts`
-- **Exit:** matches README §8; server contract unchanged; suite green.
+**PR 9 — §8 Admin FP overrides section · ☑ (shipped 2026-05-19 — Phase 14 complete)** *(Red Bull hex already resolved in PR 2; open Q3 resolved: owner chose transient flash, canvas-faithful)*
+- [x] Section frame (`--surface`, 1px border, **no radius**) + header (`FP Overrides` Boldonse 20 + verbatim §8 subtitle w/ accent `/dashboard/predict/round/{round}` code) + `Session · P1 · P2 · P3 · Status · Actions` column-header strip (mono 10/0.14em `--surface-2`, Status/Actions right)
+- [x] 3 rows grid `120px repeat(3,1fr) auto auto`: col1 `FP{n}` Boldonse 16 (no fabricated session time — honest, per PR 7/8 precedent); cols2-4 styled `<select>` (`--surface-2`, **3px team-colour left edge when chosen** else 1px `--border`, options `{code} · {full_name}`); col5 status badge; col6 `Clear` (outlined, disabled-when-empty) + `Save` (`--accent`/#000)
+- [x] Status badge label/colour **extracted** to pure `src/lib/practice/overrideBadge.ts` + locked **FP-OB1..FP-OB4**; **transient flash** (owner decision) lives in the form — Save→`✓ Saved · overrides OpenF1` (success) / Clear→`✓ Cleared · using OpenF1` (fg-muted) for 2s then revert to persistent `Override active`/`Using OpenF1` (`useEffect`-tracked timeout); in-place errors don't overwrite the badge
+- [x] Round page drivers query gained `team, full_name` (existing cols, no schema change); reused `save`/`clearPracticeOverrideAction`
+- **Exit:** ✓ matches canvas §8 (Playwright: FP1/FP3 `Using OpenF1` + FP2 `Override active` amber + team-colour select edges incl. VER `#4A77DB`; FP2 Save → transient `✓ Saved` green captured); full suite **194/194** (38 files); lint+typecheck clean; no hydration; `practice_overrides` fixture purged.
 
 **Open decisions (resolve before the dependent PR):**
 1. **Red Bull hex** — handoff `#4A77DB` vs `globals.css`/`teams.ts` `#3671C6` vs `data.jsx` `#1E2A6E`. Blocks PR 2/4/7/9. Rec: adopt `#4A77DB` in `teams.ts` + `globals.css` + new numbered `D#` test.
 2. **§7 `Accept as official`** — explicit code action or manual-entry only? (PR 8)
-3. **§8 override status badge** — persistent vs transient flash? (PR 9)
+3. **§8 override status badge** — persistent vs transient flash? (PR 9) → **RESOLVED 2026-05-19: transient flash (canvas-faithful).** Persistent `Using OpenF1`/`Override active`; Save/Clear flash `✓ Saved · overrides OpenF1`/`✓ Cleared · using OpenF1` for 2s then revert.
+
+**Phase 14 — all 9 PRs shipped 2026-05-18→19; 13 unpushed commits on `main` (12 PRs 1–8 + this PR 9). Plan of record `plans/design-handoff.md` fully ☑.**
 4. **§3 `Σ` prefix** — `aria-label="Total"` (confirmed; no blocker).
 
 **Phase exit criteria:** all 9 PRs merged · each visually matches its canvas artboard / README prose within tolerances (colors exact, spacing ≤4px, font face exact) · per-PR suite green against the live baseline · `CLAUDE.md` + this tracker updated per PR · no banned `.impeccable.md` pattern reintroduced.
