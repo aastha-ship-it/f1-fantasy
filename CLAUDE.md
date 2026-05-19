@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18) + Phase 13 (changes.md §8: scoring legend relocated to a global TopBar "How Scoring Works" modal — 2026-05-18) + Phase 14 PR 1 (design_handoff_phase11 §9+§4 visual-fidelity pass: ScoringHelp modal shell + ScoringLegendBody chrome/copy — 2026-05-18).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 139 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
+**Phases 0–5 shipped + telemetry nudges + Track B + Jolpica historical layer + Design port Pass 1+2+3+4 + screenshot-driven refinement pass + admin pages port + qualifying ingest + cron telemetry + Phase 8 (UI-issues triage Buckets A + B + C) + Phase 8.5 (at-track wins/podiums split + telemetry readability redesign) + Phase 9 (reveal-discovery surfaces) + Phase 9.5 (2026 grid: Audi rebrand + Cadillac as 11th constructor — 2026-04-30) + Phase 10 (changes.md: new bucket scoring, Lobby tab, ICS calendar feed, scoring legend, telemetry order flip, next-round nudge coverage — 2026-05-18) + Phase 11 (changes.md §6: on-demand Free Practice form-guide banner on the predict round page + admin override — 2026-05-18) + Phase 12 (changes.md §7: admin "Fetch from OpenF1" button for scoring sessions + results.source freeze rule + reveal fallback 10m→1h — 2026-05-18) + Phase 13 (changes.md §8: scoring legend relocated to a global TopBar "How Scoring Works" modal — 2026-05-18) + Phase 14 PR 1 (design_handoff_phase11 §9+§4 visual-fidelity pass: ScoringHelp modal shell + ScoringLegendBody chrome/copy — 2026-05-18) + Phase 14 PR 2 (design_handoff_phase11 §1: Lobby preview/expand redesign + Red Bull hex → #4A77DB — 2026-05-19).** Auth is now Google OAuth (magic link removed), pages are fluid-width, first-time users go through a mandatory profile-setup welcome flow. Sign-out keeps the invite cookie sticky so returning users don't get kicked back to /join. **Vitest green:** 145 unit + 26 integration (integration requires local Supabase; 2 Playwright specs unchanged, E1 uses a test-only password sign-in endpoint to stand in for the unscriptable Google consent UI). Typecheck, lint, and production build all clean.
 
 ### Design system (Pass 1–4 shipped 2026-04-28)
 
@@ -189,6 +189,29 @@ project's first `src/components/*.test.tsx`). Token-only spacing throughout
 Gotcha: the owner-dropped `design_handoff_phase11/` JSX bundle is now eslint-
 ignored (mirrors the existing `design/**` ignore — canvas reference, not
 source).
+
+**PR 2 — §1 Lobby redesign (shipped 2026-05-19).** Each scoring session is a
+compact preview card by default (4-col grid: Boldonse label + server-
+preformatted time, `phaseLine` status, per-friend lock dots, `N/M LOCKED ·
+Expand ▾`); tapping one expands it (one at a time) into a 3-column
+`ParticipantBlock` grid. `lobby-view.tsx` stays a **server component**
+(hero + `formatLocal`/`formatDateRange` run server-side, zero hydration);
+the expand/collapse `useState` lives in a small client island
+`lobby-sessions.tsx` that receives the session time already formatted as a
+string — SSR and hydration render identically. *(Gotcha lesson: a naive
+"add `use client` to the whole view" caused a hydration mismatch because
+`formatLocal` is timezone-aware — server UTC vs browser TZ. The
+server-component + client-island split with a server-preformatted
+`timeLabel` string is the fix; never recompute locale/TZ-sensitive strings
+in a component that both SSRs and hydrates.)* Phase-line copy + tone are
+unit-locked (`src/lib/lobby/phaseLine.ts`, PL1–PL5). `loadLobbyWeekend`
+gained a defensive `session_type` allowlist (FP isn't in the schema) and
+its gated `LobbySlotPick` now also carries `lastName` + `team` (same
+reveal-authorised data class — never P1) so the mini-card can show the
+DriverPortrait + team-colour border. **Red Bull livery hex is now
+`#4A77DB`** (`teams.ts` + `globals.css --team-redbull`/`-hex`), bumped for
+dark-bg accessibility per the handoff; regression-locked by `teams.test.ts`
+D26. (Supersedes the Phase 8 A2 `#3671C6` and the older `#1E2A6E`.)
 
 Design context (fonts, palette, principles, anti-patterns) lives in `.impeccable.md` at the project root.
 

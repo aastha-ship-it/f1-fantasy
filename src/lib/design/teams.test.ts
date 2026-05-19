@@ -39,4 +39,10 @@ describe("teamMeta", () => {
   it("D6 · ALL_TEAMS is exactly 11 (2026 grid: 10 returning + Cadillac)", () => {
     expect(ALL_TEAMS).toHaveLength(11);
   });
+
+  it("D26 · Red Bull hex bumped to #4A77DB for dark-bg accessibility (design_handoff_phase11)", () => {
+    expect(teamMeta("redbull")?.hex).toBe("#4A77DB");
+    expect(teamHex("Red Bull Racing")).toBe("#4A77DB");
+    expect(teamMeta("redbull")?.livery[0]).toBe("#4A77DB");
+  });
 });

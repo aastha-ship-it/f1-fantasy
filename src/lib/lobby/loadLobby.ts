@@ -17,7 +17,18 @@ import { groupByRound, type GroupableEvent } from "../predict/groupByRound";
 import { sessionLabel } from "../sessionLabel";
 import { revealState } from "./revealGate";
 
-export type LobbySlotPick = { label: "P2" | "P3"; code: string | null };
+export type LobbySlotPick = {
+  label: "P2" | "P3";
+  code: string | null;
+  /**
+   * Uppercased-at-render last name + canonical team string — feeds the
+   * ParticipantBlock mini-card (design_handoff_phase11 §1: team-colour
+   * border + last name). Same reveal-authorised data class as `code`
+   * (only P3/P2 after the gate opens; P1 is never read in).
+   */
+  lastName: string | null;
+  team: string | null;
+};
 
 export type LobbyParticipant = {
   userId: string;
@@ -114,6 +125,10 @@ export async function loadLobbyWeekend(
     )
     .eq("season", opts.season)
     .eq("round", opts.round)
+    // Lobby is scoring-sessions only — Sprint Quali / Sprint / Quali / Race.
+    // FP isn't in the schema, so this is defensive intent, not a real filter
+    // (design_handoff_phase11 §1).
+    .in("session_type", ["sprint_quali", "sprint_race", "quali", "race"])
     .order("session_start_at", { ascending: true })
     .returns<GroupableEvent[]>();
 
@@ -137,13 +152,27 @@ export async function loadLobbyWeekend(
         .returns<PredictionRow[]>(),
       svc
         .from("drivers")
-        .select("id, code")
-        .returns<{ id: number; code: string }[]>(),
+        .select("id, code, team, full_name")
+        .returns<
+          {
+            id: number;
+            code: string;
+            team: string | null;
+            full_name: string | null;
+          }[]
+        >(),
     ]);
 
   const roster = users ?? [];
-  const codeById = new Map(
-    (drivers ?? []).map((d) => [d.id, d.code]),
+  const metaById = new Map(
+    (drivers ?? []).map((d) => [
+      d.id,
+      {
+        code: d.code,
+        team: d.team ?? null,
+        lastName: d.full_name?.trim().split(/\s+/).at(-1) ?? null,
+      },
+    ]),
   );
   // (eventId → userId → prediction row)
   const predByEvent = new Map<string, Map<string, PredictionRow>>();
@@ -165,25 +194,21 @@ export async function loadLobbyWeekend(
       const revealed: LobbySlotPick[] = [];
       // Only quali/race ever reveal picks, and only the opened slots.
       // P1 is intentionally never read into the response.
+      const pick = (
+        label: "P2" | "P3",
+        driverId: number | null,
+      ): LobbySlotPick => {
+        const m = driverId != null ? metaById.get(driverId) : undefined;
+        return {
+          label,
+          code: m?.code ?? null,
+          lastName: m?.lastName ?? null,
+          team: m?.team ?? null,
+        };
+      };
       if (gate.progressive && pred) {
-        if (gate.showP3) {
-          revealed.push({
-            label: "P3",
-            code:
-              pred.p3_driver_id != null
-                ? (codeById.get(pred.p3_driver_id) ?? null)
-                : null,
-          });
-        }
-        if (gate.showP2) {
-          revealed.push({
-            label: "P2",
-            code:
-              pred.p2_driver_id != null
-                ? (codeById.get(pred.p2_driver_id) ?? null)
-                : null,
-          });
-        }
+        if (gate.showP3) revealed.push(pick("P3", pred.p3_driver_id));
+        if (gate.showP2) revealed.push(pick("P2", pred.p2_driver_id));
       }
       return {
         userId: u.id,

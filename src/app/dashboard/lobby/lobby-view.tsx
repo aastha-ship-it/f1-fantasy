@@ -4,155 +4,18 @@ import { shortEventName } from "@/lib/design/eventName";
 import { circuitMeta } from "@/lib/design/circuits";
 import { formatDateRange } from "@/lib/design/dateRange";
 import { formatLocal } from "@/lib/sessionLabel";
-import type { LobbyWeekend, LobbySession } from "@/lib/lobby/loadLobby";
+import type { LobbyWeekend } from "@/lib/lobby/loadLobby";
+import { LobbySessions, type LobbySessionView } from "./lobby-sessions";
 
 /**
  * Lobby — weekend lock roster + progressive pick reveal (changes.md §1).
- * Presentational only; all gating happened in loadLobbyWeekend.
+ *
+ * design_handoff_phase11 §1/§2 redesign. SERVER component: the hero +
+ * timezone-sensitive `formatLocal`/`formatDateRange` run once on the server
+ * (no hydration). The interactive expand/collapse lives in the
+ * `LobbySessions` client island, which receives the session time already
+ * formatted as a string (`timeLabel`) so SSR and client hydrate identically.
  */
-
-function phaseLabel(s: LobbySession): string {
-  if (!s.progressive) return "Lock status only";
-  if (s.sessionOver) return "P3 + P2 revealed · P1 in the Reveal";
-  if (s.showP2) return "P3 + P2 revealed";
-  if (s.showP3) return "P3 revealed";
-  return "Picks hidden — revealing as the session runs";
-}
-
-function SessionBlock({ s }: { s: LobbySession }) {
-  return (
-    <section
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 4,
-      }}
-    >
-      <header
-        className="flex flex-wrap items-baseline justify-between gap-3 px-5 py-4"
-        style={{ borderBottom: "1px solid var(--border)" }}
-      >
-        <div>
-          <h2
-            style={{
-              fontFamily: "var(--font-boldonse), ui-sans-serif",
-              fontSize: 24,
-              letterSpacing: "0.005em",
-            }}
-          >
-            {s.label.toUpperCase()}
-          </h2>
-          <p
-            className="mt-1 text-[11px] uppercase text-[color:var(--fg-muted)]"
-            style={{ letterSpacing: "0.06em" }}
-            data-tabular
-          >
-            {formatLocal(s.sessionStartAt).toUpperCase()} · {phaseLabel(s)}
-          </p>
-        </div>
-        <span
-          className="text-sm"
-          style={{
-            fontFamily: "var(--font-mono), ui-monospace, monospace",
-            color: "var(--fg-muted)",
-          }}
-          data-tabular
-        >
-          {s.lockedCount}/{s.totalCount} locked in
-        </span>
-      </header>
-
-      <ul style={{ display: "grid" }}>
-        {s.participants.map((p) => (
-          <li
-            key={p.userId}
-            className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
-            style={{ borderBottom: "1px solid var(--border)" }}
-          >
-            <span className="flex items-center gap-2">
-              <span
-                aria-hidden
-                className="inline-block size-1.5 rounded-full"
-                style={{
-                  background: p.locked
-                    ? "var(--success)"
-                    : "var(--fg-subtle)",
-                }}
-              />
-              <span
-                className="text-sm"
-                style={{
-                  color: p.isMe ? "var(--accent)" : "var(--fg)",
-                  fontWeight: p.isMe ? 600 : 400,
-                }}
-              >
-                {p.name}
-                {p.isMe ? " (you)" : ""}
-              </span>
-            </span>
-
-            <span className="flex items-center gap-2">
-              {p.revealed.length > 0 ? (
-                p.revealed.map((slot) => (
-                  <span
-                    key={slot.label}
-                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs"
-                    style={{
-                      background: "var(--surface-2)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 4,
-                    }}
-                  >
-                    <span
-                      className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
-                      style={{ letterSpacing: "0.1em" }}
-                      data-tabular
-                    >
-                      {slot.label}
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-boldonse), ui-sans-serif",
-                      }}
-                    >
-                      {slot.code ?? "—"}
-                    </span>
-                  </span>
-                ))
-              ) : (
-                <span
-                  className="text-xs uppercase text-[color:var(--fg-subtle)]"
-                  style={{ letterSpacing: "0.08em" }}
-                  data-tabular
-                >
-                  {p.locked ? "Locked" : "No pick"}
-                </span>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      {s.progressive && s.sessionOver && (
-        <div className="px-5 py-4">
-          <Link
-            href={`/reveal/${s.eventId}`}
-            className="inline-block px-4 py-2 text-[11px] uppercase"
-            style={{
-              fontFamily: "var(--font-mono), ui-monospace, monospace",
-              letterSpacing: "0.08em",
-              background: "var(--accent)",
-              color: "#000",
-            }}
-          >
-            P1 &amp; final results await in the Reveal →
-          </Link>
-        </div>
-      )}
-    </section>
-  );
-}
-
 export function LobbyView({
   weekend,
   prevRound,
@@ -164,6 +27,10 @@ export function LobbyView({
 }) {
   const meta = circuitMeta(weekend.ergastCircuitId ?? weekend.circuit);
   const short = shortEventName(weekend.name);
+  const sessions: LobbySessionView[] = weekend.sessions.map((s) => ({
+    ...s,
+    timeLabel: formatLocal(s.sessionStartAt).toUpperCase(),
+  }));
 
   return (
     <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
@@ -257,11 +124,7 @@ export function LobbyView({
         </div>
       </section>
 
-      <div className="mt-10 grid gap-6">
-        {weekend.sessions.map((s) => (
-          <SessionBlock key={s.eventId} s={s} />
-        ))}
-      </div>
+      <LobbySessions sessions={sessions} />
     </main>
   );
 }

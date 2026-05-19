@@ -8,6 +8,25 @@
 
 ## Session log
 
+**2026-05-19 — Phase 14 PR 2 shipped: Lobby preview/expand redesign + Red Bull hex → #4A77DB (design_handoff_phase11 §1/§2).** Second PR of the design-fidelity port. PR 1 was committed first (`7dd01c5`, on `main`, not pushed) per owner choice, then PR 2 built on top. The blocking Red Bull hex 3-way mismatch was resolved with the owner: adopt the handoff's `#4A77DB`. Executed via executing-plans; TDD slices (org-core:tdd) = Red Bull hex (D26) + the phase-line copy/tone mapping (PL1–PL5), both red-green; the Lobby UI is pure-visual → Playwright capture.
+
+Delivered:
+- **Red Bull hex → `#4A77DB`** — `src/lib/design/teams.ts` (`redbull.hex` + `livery[0]`; livery now `["#4A77DB","#1E2A6E","#FFD400"]` per canvas `data.jsx`) and `src/app/globals.css` (`--team-redbull-hex` `#3671C6`→`#4A77DB`; `--team-redbull` oklch → `oklch(60% 0.17 265)`). Supersedes Phase 8 A2's `#3671C6` and the older `#1E2A6E`. Regression-locked: **`teams.test.ts` D26**.
+- **`src/lib/lobby/phaseLine.ts`** (new, pure) + **`phaseLine.test.ts`** (new, PL1–PL5) — the 5 verbatim README §1 preview-card status strings + tone (muted/accent/success), unit-locked exactly like PR 1's §4 copy. Replaces the old inline `phaseLabel`.
+- **`src/lib/lobby/loadLobby.ts`** — defensive 4-scoring-session `.in("session_type", …)` allowlist (FP isn't in the schema, so intent not a real filter); drivers query now `id, code, team, full_name`; `LobbySlotPick` extended to `{label,code,lastName,team}` (server-derived `lastName` from `full_name`). Security-reviewed: same reveal-authorised data class as `code` — only P3/P2 after the gate opens, **P1 still never read in**; no schema change.
+- **`src/app/dashboard/lobby/lobby-view.tsx`** — kept a **server component** (hero + `formatLocal`/`formatDateRange` server-side, zero hydration); precomputes a `timeLabel` string per session and delegates to a new client island.
+- **`src/app/dashboard/lobby/lobby-sessions.tsx`** (new, `"use client"`) — the expand/collapse `useState(expandedId)` island. Compact `PreviewCard` (4-col grid `1.2fr 1.4fr auto auto`, Boldonse label + server `timeLabel`, `phaseLine` status, 9×9 lock dots, `N/M LOCKED · Expand ▾`); one-at-a-time `ExpandedCard` (accent border + 4px halo) → 3-col `ParticipantBlock` grid. `ParticipantBlock` per README §1: name + `✓ Locked`/`✗ Not locked` badge; no-reveal → dashed placeholder + 56px Boldonse `✓`/`✕`; revealed → team-colour `MiniCard`s (DriverPortrait + `code` + uppercased last name) + dashed `P2 Reveals soon` / `P1 Reveals in the cinematic` rows. Both old `borderRadius:4` stripped. Empty state teaches.
+
+Verification: D26 + PL1–PL5 red-green. Full suite **171/171** (33 files; was 165 → +1 D26, +5 PL, zero regressions — existing lobby/integration green despite the `LobbySlotPick` extension + filter). lint+typecheck exit 0. Playwright capture (`plans/designs/lobby-20260519/`, gitignored): invite-gate → sign-in → `/dashboard/lobby` → preview screenshot → expand → expanded screenshot; both visually verified against README §1/§2 (4 sessions only, correct phase lines, accent halo, `✕` glyph block, sharp corners).
+
+Gotchas:
+- **Hydration mismatch caught in verification.** Naively adding `"use client"` to the whole `lobby-view` broke hydration: `formatLocal` is timezone-aware → server (UTC) vs browser-TZ render different date text. Root-caused (not papered over) and fixed the idiomatic way: keep the view a **server component**, extract only the interactive bit into a client island, and pass the locale/TZ-sensitive value down as a **server-preformatted string** (`timeLabel`) so SSR and hydration emit identical markup. Rule for future PRs (3–9): never recompute locale/TZ/`Date.now()`-derived strings inside a component that both SSRs and hydrates — precompute server-side and pass as a string prop.
+- The README §1 `ParticipantBlock` needs driver **team + last name**, which `LobbySlotPick {label,code}` didn't carry and the design lib can't derive from `code`. Extending the **gated** loader payload (selecting existing `drivers.team`/`full_name`) is the correct minimal fix — it's the same security class as the already-revealed pick, not a schema change. Plan's "UI-only" wording shouldn't be read as "never touch the loader's in-memory shape".
+- Pre-existing `next/image` warning on `/assets/cars/ferrari.png` (width/height not both set) appears during the capture nav flow — **unrelated to Lobby** (Lobby renders no car images); noted, out of PR 2 scope.
+- Red Bull was a genuine 3-way split (`teams.ts` `#1E2A6E` / `globals.css` `#3671C6` / canvas `#4A77DB`); the README explicitly designates `teamHex` as source of truth and the bump intentional. Decision recorded so a future reader doesn't "re-fix" it back to the Phase 8 value.
+
+---
+
 **2026-05-18 — Phase 14 PR 1 shipped: ScoringHelp modal shell + ScoringLegendBody fidelity (design_handoff_phase11 §9 + §4).** First PR of the design-fidelity port. Executed via the executing-plans skill; §4 copy slice done red-green with the org-core:tdd skill (owner scoped TDD to copy only — the rest is pure-visual, verified by Playwright capture). Implemented **on `main`** with explicit owner consent (4 prior unpushed commits ride along; not pushed).
 
 Delivered:
@@ -751,7 +770,7 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 
 ---
 
-### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PR 1 shipped 2026-05-18; PRs 2–9 pending)
+### Phase 14 — Design-fidelity port (`design_handoff_phase11`) · ◐ (PRs 1–2 shipped; PRs 3–9 pending)
 
 **Goal:** Apply the `design_handoff_phase11/` visual design pass over the Phases 10–13 functionality (changes.md §1–§8). 9 PRs, one per phase, executed in BUILD ORDER. Plan of record: `plans/design-handoff.md`. UI-only — no schema/data changes. §11 already shipped in code → verify/polish only; §9+§4 combined into PR 1. Do not start PR N+1 until PR N's exit criteria are green.
 
@@ -764,12 +783,13 @@ Six phases, executed in order. Each phase has a goal, deliverables, exit criteri
 - [x] Capture via `/profile` (invite-gate → sign-in → click trigger, screenshot + visual diff); full suite 165/165 green
 - **Exit:** ✓ modal matches README §9 prose + body matches `screens-lobby.jsx`; lint + typecheck + vitest + playwright all green.
 
-**PR 2 — §1 Lobby redesign · ☐** *(blocked: Red Bull hex decision)*
-- [ ] 4-scoring-session filter in `loadLobbyWeekend.ts` (no FP)
-- [ ] Compact preview card (4-col grid, per-friend lock-dot row, `Expand ▾`)
-- [ ] Expanded card (one-at-a-time `useState`, accent halo) + `ParticipantBlock` (RevealState-driven body)
-- [ ] Strip `borderRadius:4` on SessionBlock; empty + loading states
-- **Exit:** matches README §1/§2 artboards; `revealGate.ts` untouched; suite green.
+**PR 2 — §1 Lobby redesign · ☑ (shipped 2026-05-19)** *(Red Bull hex resolved → #4A77DB)*
+- [x] 4-scoring-session allowlist in `loadLobby.ts` (defensive — FP isn't in schema); `LobbySlotPick` extended with `lastName`+`team` (gated, never P1)
+- [x] Compact preview card (4-col grid, per-friend 9×9 lock dots, `phaseLine` status, `N/M LOCKED · Expand ▾`)
+- [x] Expanded card (one-at-a-time `useState`, accent border + halo) + `ParticipantBlock` (RevealState body: ✓/✕ glyph or team-colour mini-cards + dashed unrevealed rows)
+- [x] Stripped both `borderRadius:4`; empty state; phase-line copy/tone unit-locked PL1–PL5
+- [x] Red Bull hex → `#4A77DB` in `teams.ts` + `globals.css` (D26 regression); server-component + client-island split fixes the date hydration mismatch
+- **Exit:** ✓ matches README §1/§2 (Playwright preview+expanded verified); `revealGate.ts` untouched; full suite 171/171 green.
 
 **PR 3 — §11 Predict last-5 form strip · ☐** *(verify/polish — core shipped)*
 - [ ] Confirm `.reverse()` + DNF/P1-3/P4-10 color map; add `↑ LATEST` tag + latest-pip highlight if missing
