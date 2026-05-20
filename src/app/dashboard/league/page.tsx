@@ -325,7 +325,7 @@ export default async function LeaguePage() {
                       </p>
                       {r.streak?.current_p1_streak ? (
                         <p
-                          className="mt-3 flex items-center gap-1 text-xs text-[color:var(--fg-muted)]"
+                          className="mt-3 flex items-center gap-2 whitespace-nowrap text-xs text-[color:var(--fg-muted)]"
                           style={{
                             fontFamily:
                               "apple color emoji, noto color emoji, sans-serif",
@@ -335,7 +335,13 @@ export default async function LeaguePage() {
                           <span data-tabular>
                             {r.streak.current_p1_streak}
                           </span>
-                          <span className="ml-1 text-[10px] uppercase tracking-[0.1em] text-[color:var(--fg-subtle)]">
+                          <span
+                            aria-hidden
+                            className="text-[color:var(--fg-subtle)]"
+                          >
+                            ·
+                          </span>
+                          <span className="text-[10px] uppercase tracking-[0.06em] text-[color:var(--fg-subtle)]">
                             P1 streak
                           </span>
                         </p>
@@ -351,6 +357,9 @@ export default async function LeaguePage() {
               <section className="mt-8 border border-[color:var(--border)] bg-[color:var(--surface)]">
                 {rest.map((r) => {
                   const fav = teamMeta(r.user!.favorite_team);
+                  const favDriverCode = r.user!.favorite_driver
+                    ? driverCodeById.get(r.user!.favorite_driver) ?? null
+                    : null;
                   const pct =
                     leaderPts > 0 ? (r.points / leaderPts) * 100 : 0;
                   const isMe = r.userId === me;
@@ -400,6 +409,7 @@ export default async function LeaguePage() {
                           data-tabular
                         >
                           {fav ? `Team ${fav.name}` : "No favorite team"}
+                          {favDriverCode && ` · ${favDriverCode}`}
                           {r.perfects > 0 && ` · ${r.perfects} PP`}
                           {r.streak?.current_p1_streak
                             ? ` · 🔥 ${r.streak.current_p1_streak}`

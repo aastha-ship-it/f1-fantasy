@@ -5,6 +5,7 @@ import {
   computeConstructorStandings,
   combineStandings,
   selectBackstopRows,
+  isRaceFinisher,
 } from "./computeStandings";
 
 describe("pointsForPosition", () => {
@@ -116,6 +117,30 @@ describe("computeConstructorStandings", () => {
 
   it("S8 · empty input → empty array", () => {
     expect(computeConstructorStandings([], DRIVERS)).toEqual([]);
+  });
+});
+
+describe("isRaceFinisher (Bug-002 regression — DNF over-count)", () => {
+  // Real 2026 Jolpica statuses observed in `historical_results`.
+  it("DNF1: 'Finished' is a finisher", () => {
+    expect(isRaceFinisher("Finished")).toBe(true);
+  });
+  it("DNF2: 'Lapped' is a finisher (was over-counted as DNF pre-fix)", () => {
+    expect(isRaceFinisher("Lapped")).toBe(true);
+  });
+  it("DNF3: legacy Ergast '+1 Lap' / '+2 Laps' are finishers", () => {
+    expect(isRaceFinisher("+1 Lap")).toBe(true);
+    expect(isRaceFinisher("+2 Laps")).toBe(true);
+  });
+  it("DNF4: 'Retired', 'Did not start', 'Disqualified' are NOT finishers", () => {
+    expect(isRaceFinisher("Retired")).toBe(false);
+    expect(isRaceFinisher("Did not start")).toBe(false);
+    expect(isRaceFinisher("Disqualified")).toBe(false);
+  });
+  it("DNF5: null / empty / undefined → not a finisher (defensive)", () => {
+    expect(isRaceFinisher(null)).toBe(false);
+    expect(isRaceFinisher(undefined)).toBe(false);
+    expect(isRaceFinisher("")).toBe(false);
   });
 });
 

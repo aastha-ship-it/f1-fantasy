@@ -76,3 +76,41 @@ export function eventCountry(eventNameOrShort: string): string | null {
   const short = shortEventName(eventNameOrShort);
   return EVENT_COUNTRY[short.toUpperCase()] ?? null;
 }
+
+/**
+ * ISO 3166-1 alpha-3 country code (e.g. `AUS`, `JPN`, `USA`) for a
+ * `shortEventName(name)` result — the 3-letter "AUS"/"JPN" chip on the
+ * `WinnerCard` header (design_handoff_standings § PR-2). Same alias
+ * resolution as `eventCountry`. Returns null if unmapped.
+ */
+const EVENT_COUNTRY_3: Record<string, string> = {
+  AUSTRALIA: "AUS",
+  CHINA: "CHN",
+  JAPAN: "JPN",
+  BAHRAIN: "BHR",
+  "SAUDI ARABIA": "SAU",
+  MIAMI: "USA",
+  IMOLA: "ITA",
+  MONACO: "MCO",
+  SPAIN: "ESP",
+  CANADA: "CAN",
+  AUSTRIA: "AUT",
+  BRITAIN: "GBR",
+  HUNGARY: "HUN",
+  BELGIUM: "BEL",
+  NETHERLANDS: "NLD",
+  ITALY: "ITA",
+  AZERBAIJAN: "AZE",
+  SINGAPORE: "SGP",
+  USA: "USA",
+  MEXICO: "MEX",
+  BRAZIL: "BRA",
+  "LAS VEGAS": "USA",
+  QATAR: "QAT",
+  "ABU DHABI": "ARE",
+};
+
+export function eventCountry3(eventNameOrShort: string): string | null {
+  const short = shortEventName(eventNameOrShort);
+  return EVENT_COUNTRY_3[short.toUpperCase()] ?? null;
+}

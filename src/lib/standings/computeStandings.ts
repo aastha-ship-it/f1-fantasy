@@ -31,6 +31,27 @@ export type ConstructorStanding = {
   points: number;
 };
 
+/**
+ * Whether a `historical_results.status` value means the driver completed
+ * the race. Jolpica labels are: "Finished", "Lapped" (finished but >1 lap
+ * down — still a finisher), "Retired", "Did not start", "Disqualified",
+ * plus the legacy Ergast "+N Lap(s)" form. Anything not in the finisher
+ * set counts as a DNF for the `/dashboard/standings` summary tile.
+ *
+ * Bug-002 regression-locked: pre-fix the regex didn't include "Lapped"
+ * (Jolpica's actual literal), so all lapped finishers were over-counted
+ * as DNF — inflated the tile from the real 18 to a displayed 47 against
+ * the 2026 mock data.
+ */
+const FINISHER_STATUSES = new Set(["Finished", "Lapped"]);
+const LEGACY_LAP_DOWN_RE = /^\+\d+ Laps?$/i;
+export function isRaceFinisher(status: string | null | undefined): boolean {
+  if (!status) return false;
+  return (
+    FINISHER_STATUSES.has(status) || LEGACY_LAP_DOWN_RE.test(status)
+  );
+}
+
 export function pointsForPosition(
   position: number | null,
   isSprint: boolean,

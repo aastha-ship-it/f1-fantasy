@@ -7,16 +7,31 @@ import { TrackDiagram } from "@/components/TrackDiagram";
 import { DriverPortrait } from "@/components/DriverPortrait";
 import { teamMeta } from "@/lib/design/teams";
 import { driverCountry, countryFlag } from "@/lib/design/drivers";
-import { shortEventName } from "@/lib/design/eventName";
+import {
+  shortEventName,
+  eventCountry,
+  eventCountry3,
+} from "@/lib/design/eventName";
 import {
   combineStandings,
+  isRaceFinisher,
   selectBackstopRows,
   type DriverInfo,
   type EventInfo,
   type JolpicaTotal,
 } from "@/lib/standings/computeStandings";
+import { SeasonSummary } from "./season-summary";
+import type {
+  ChipDatum,
+  FlRoundDatum,
+} from "./season-summary-helpers";
+import {
+  RecentWinners,
+  type WinnerCardDatum,
+} from "./recent-winners";
 
 const CURRENT_SEASON = new Date().getUTCFullYear();
+const TOTAL_ROUNDS = 24;
 
 type DriverRow = {
   id: number;
@@ -221,18 +236,14 @@ export default async function StandingsPage() {
 
   const fastestLapRows = statRows.filter((r) => r.fastest_lap);
   const fastestLapsCount = fastestLapRows.length;
-  const distinctFastestLapDrivers = new Set(
-    fastestLapRows.map((r) => r.driver_id),
-  ).size;
 
   // DNFs — race rows where the driver wasn't classified at the flag.
-  // "Finished" + "+N Lap(s)" are the only finisher statuses; everything
-  // else (Engine, Collision, Disqualified, Retired, "Did not start") is a DNF.
-  const FINISHED_RE = /^(Finished|\+\d+ Laps?)$/i;
+  // Finisher set: "Finished", "Lapped" (Jolpica's literal for finishers
+  // >1 lap down), and the legacy Ergast "+N Lap(s)" form. Anything else
+  // (Retired, Did not start, Disqualified, Collision, etc.) is a DNF.
+  // See `isRaceFinisher` (Bug-002 regression-locked DNF1..DNF5).
   const dnfsCount = statRows.filter(
-    (r) =>
-      r.session_kind === "race" &&
-      (r.position == null || !(r.status && FINISHED_RE.test(r.status))),
+    (r) => r.session_kind === "race" && !isRaceFinisher(r.status),
   ).length;
 
   // Recent winners strip — last 5 races by round desc.
@@ -255,17 +266,20 @@ export default async function StandingsPage() {
       winnerByRound.set(r.round, r.driver_id);
     }
   }
-  const eventByRound = new Map<
-    number,
-    { id: string; circuit: string | null; name: string }
-  >();
-  // We need event circuit + name for the recent winners strip — fetch via
-  // a lightweight extra query rather than expanding the original Promise.all.
+  // Build the event lookup keyed by `ergast_circuit_id` (the stable
+  // identifier both Jolpica and OpenF1 agree on — same pattern as Bug-001
+  // / `selectBackstopRows`). Round numbers diverge between the two sources
+  // when F1 cancels a race (Miami = Jolpica round 4 vs our events.round 6
+  // in 2026), so keying on round drops the Jolpica row entirely.
   const { data: raceEvents } = await supabase
     .from("events")
     .select("id, round, circuit, name, ergast_circuit_id")
     .eq("season", CURRENT_SEASON)
     .eq("session_type", "race");
+  const eventByCircuit = new Map<
+    string,
+    { id: string; circuit: string | null; name: string }
+  >();
   for (const e of (raceEvents ?? []) as {
     id: string;
     round: number;
@@ -273,35 +287,142 @@ export default async function StandingsPage() {
     name: string;
     ergast_circuit_id: string | null;
   }[]) {
-    eventByRound.set(e.round, {
+    if (!e.ergast_circuit_id) continue;
+    eventByCircuit.set(e.ergast_circuit_id, {
       id: e.id,
       circuit: e.ergast_circuit_id ?? e.circuit,
       name: e.name,
     });
   }
+  // Chronological order (oldest left, newest right) so the header's
+  // "most recent →" arrow points the right way; keep only the last 5.
   const recentWinners: RecentWinner[] = ((histRaces ?? []) as {
     season: number;
     round: number;
     race_date: string;
+    ergast_circuit_id: string | null;
   }[])
-    .slice(-5)
-    .reverse()
     .map((r) => {
-      const ev = eventByRound.get(r.round);
+      const ev = r.ergast_circuit_id
+        ? eventByCircuit.get(r.ergast_circuit_id)
+        : null;
       const did = winnerByRound.get(r.round);
       return {
         round: r.round,
         raceDate: r.race_date,
         driverId: did ?? -1,
         eventId: ev?.id ?? null,
-        circuitKey: ev?.circuit ?? null,
+        // Defensive: prefer the events-row circuit, fall back to the
+        // Jolpica row's circuit_id when our events table is missing the
+        // race (e.g. mid-season ingest order races).
+        circuitKey: ev?.circuit ?? r.ergast_circuit_id ?? null,
         eventName: ev?.name ?? null,
       };
     })
-    .filter((w) => w.driverId !== -1);
+    .filter((w) => w.driverId !== -1)
+    .slice(-5); // last 5 in chronological order; newest is rightmost
   const driversById = new Map(
     driverInfos.map((d) => [d.id, d]),
   );
+
+  // PR-1 season-summary aggregations — derived from the existing histRows
+  // (handoff "keep the data layer untouched"). Three new Maps power the
+  // detail rows on S02/S03/S04.
+  const winCountsByDriver = new Map<number, number>();
+  const poleCountsByDriver = new Map<number, number>();
+  type FlByRound = { round: number; driverId: number };
+  const flByRoundMap = new Map<number, number>();
+  for (const r of statRows) {
+    if (r.session_kind === "race" && r.position === 1) {
+      winCountsByDriver.set(
+        r.driver_id,
+        (winCountsByDriver.get(r.driver_id) ?? 0) + 1,
+      );
+    }
+    if (r.session_kind === "qualifying" && r.position === 1) {
+      poleCountsByDriver.set(
+        r.driver_id,
+        (poleCountsByDriver.get(r.driver_id) ?? 0) + 1,
+      );
+    }
+    if (r.session_kind === "race" && r.fastest_lap) {
+      // statRows has `round` even though the type alias didn't list it —
+      // the underlying histRows select includes it.
+      const round = (r as unknown as { round: number }).round;
+      flByRoundMap.set(round, r.driver_id);
+    }
+  }
+  const fastestLapByRound: FlByRound[] = [...flByRoundMap.entries()]
+    .map(([round, driverId]) => ({ round, driverId }))
+    .sort((a, b) => a.round - b.round);
+
+  const buildChips = (counts: Map<number, number>): ChipDatum[] =>
+    [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0] - b[0])
+      .map(([driverId, count]) => {
+        const d = driversById.get(driverId);
+        if (!d) return null;
+        return {
+          code: d.code,
+          count,
+          hex: teamMeta(d.team)?.hex ?? "var(--fg-subtle)",
+        };
+      })
+      .filter((c): c is ChipDatum => c !== null);
+
+  const winnerChips = buildChips(winCountsByDriver);
+  const poleChips = buildChips(poleCountsByDriver);
+
+  const fastestLapRoundData: FlRoundDatum[] = fastestLapByRound.map(
+    ({ round, driverId }) => {
+      const d = driversById.get(driverId);
+      return {
+        r: `R${String(round).padStart(2, "0")}`,
+        code: d?.code ?? "—",
+        hex: d ? (teamMeta(d.team)?.hex ?? "var(--fg-subtle)") : "var(--fg-subtle)",
+      };
+    },
+  );
+
+  const dnfsPerRace = completedRounds > 0 ? dnfsCount / completedRounds : null;
+
+  // PR-2 — enrich recentWinners with the WinnerCard data shape (date,
+  // flag emoji, ISO-3 cc, last name, team meta). Server-side only.
+  const SHORT_MONTH = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  const shortDate = (iso: string): string => {
+    const [y, m, d] = iso.split("-").map((s) => Number(s));
+    if (!y || !m || !d) return iso;
+    return `${SHORT_MONTH[m - 1]} ${d}`;
+  };
+  const lastNameOf = (full: string): string => {
+    const parts = full.trim().split(/\s+/);
+    return parts[parts.length - 1] ?? full;
+  };
+  const recentWinnerData: WinnerCardDatum[] = recentWinners
+    .map((w) => {
+      const d = driversById.get(w.driverId);
+      if (!d) return null;
+      const meta = teamMeta(d.team);
+      const iso2 = w.eventName ? eventCountry(w.eventName) : null;
+      const cc3 = w.eventName ? eventCountry3(w.eventName) : null;
+      return {
+        round: w.round,
+        gp: w.eventName ? shortEventName(w.eventName) : "—",
+        date: shortDate(w.raceDate),
+        flag: iso2 ? countryFlag(iso2) : "",
+        cc: cc3 ?? "—",
+        code: d.code,
+        lastName: lastNameOf(d.full_name),
+        team: d.team,
+        teamShort: meta?.short ?? d.team.slice(0, 3).toUpperCase(),
+        teamHex: meta?.hex ?? "var(--fg-subtle)",
+        track: w.circuitKey,
+      } satisfies WinnerCardDatum;
+    })
+    .filter((w): w is WinnerCardDatum => w !== null);
 
   return (
     <>
@@ -735,191 +856,24 @@ export default async function StandingsPage() {
           </section>
         )}
 
-        {/* Season summary stat strip — full canvas 5-cell layout. */}
+        {/* Season summary stat strip — design_handoff_standings § PR-1. */}
         {hasData && (
-          <section
-            className="mt-12 grid border border-[color:var(--border)]"
-            style={{
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: 1,
-              background: "var(--border)",
-            }}
-          >
-            {[
-              {
-                label: "Races complete",
-                value: `${completedRounds}`,
-                sub: "of 24",
-              },
-              {
-                label: "Different winners",
-                value: `${distinctRaceWinners}`,
-                sub:
-                  distinctRaceWinners === 1
-                    ? "1 driver on top"
-                    : `${distinctRaceWinners} drivers on top`,
-              },
-              {
-                label: "Pole sitters",
-                value: `${distinctPoleSitters}`,
-                sub:
-                  distinctPoleSitters === 0
-                    ? "no qualifying yet"
-                    : distinctPoleSitters === 1
-                      ? "1 driver on pole"
-                      : `${distinctPoleSitters} drivers on pole`,
-              },
-              {
-                label: "Fastest laps",
-                value: `${fastestLapsCount}`,
-                sub:
-                  fastestLapsCount === 0
-                    ? "—"
-                    : `${distinctFastestLapDrivers} driver${distinctFastestLapDrivers === 1 ? "" : "s"}`,
-              },
-              {
-                label: "DNFs total",
-                value: `${dnfsCount}`,
-                sub:
-                  completedRounds > 0
-                    ? `${(dnfsCount / completedRounds).toFixed(1)} per race`
-                    : "—",
-              },
-            ].map((s) => (
-              <div
-                key={s.label}
-                className="bg-[color:var(--surface)] p-6"
-              >
-                <p
-                  className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
-                  style={{ letterSpacing: "0.12em" }}
-                  data-tabular
-                >
-                  {s.label}
-                </p>
-                <p
-                  className="mt-2 leading-none"
-                  style={{
-                    fontFamily: "var(--font-boldonse), ui-sans-serif",
-                    fontSize: 48,
-                  }}
-                  data-tabular
-                >
-                  {s.value}
-                </p>
-                <p
-                  className="mt-1.5 text-xs text-[color:var(--fg-muted)]"
-                  style={{ letterSpacing: "0.04em" }}
-                  data-tabular
-                >
-                  {s.sub}
-                </p>
-              </div>
-            ))}
-          </section>
+          <SeasonSummary
+            completedRounds={completedRounds}
+            totalRounds={TOTAL_ROUNDS}
+            distinctRaceWinners={distinctRaceWinners}
+            winnerChips={winnerChips}
+            distinctPoleSitters={distinctPoleSitters}
+            poleChips={poleChips}
+            fastestLapsCount={fastestLapsCount}
+            fastestLapRounds={fastestLapRoundData}
+            dnfsCount={dnfsCount}
+            dnfsPerRace={dnfsPerRace}
+          />
         )}
 
-        {/* Recent winners strip */}
-        {recentWinners.length > 0 && (
-          <section className="mt-12">
-            <h2
-              className="m-0 mb-5 text-2xl"
-              style={{
-                fontFamily: "var(--font-boldonse), ui-sans-serif",
-                letterSpacing: "-0.005em",
-              }}
-            >
-              RECENT WINNERS
-            </h2>
-            <ul
-              className="grid"
-              style={{
-                gridTemplateColumns: `repeat(${recentWinners.length}, 1fr)`,
-                gap: 12,
-              }}
-            >
-              {recentWinners.map((w) => {
-                const d = driversById.get(w.driverId);
-                const t = d ? teamMeta(d.team) : null;
-                const short = w.eventName ? shortEventName(w.eventName) : "—";
-                return (
-                  <li
-                    key={w.round}
-                    className="bg-[color:var(--surface)] p-4"
-                    style={{
-                      borderTop: `3px solid ${t?.hex ?? "var(--fg-subtle)"}`,
-                    }}
-                  >
-                    <div className="mb-3 flex items-baseline justify-between">
-                      <span
-                        className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
-                        style={{ letterSpacing: "0.14em" }}
-                        data-tabular
-                      >
-                        R{String(w.round).padStart(2, "0")}
-                      </span>
-                      <span
-                        className="text-[10px] text-[color:var(--fg-muted)]"
-                        data-tabular
-                      >
-                        {w.raceDate}
-                      </span>
-                    </div>
-                    <p
-                      className="text-sm leading-tight"
-                      style={{
-                        fontFamily: "var(--font-boldonse), ui-sans-serif",
-                        letterSpacing: "0.01em",
-                      }}
-                    >
-                      {short.toUpperCase()}
-                    </p>
-                    {w.circuitKey && (
-                      <div className="mt-2 flex justify-center">
-                        <TrackDiagram
-                          circuit={w.circuitKey}
-                          size={120}
-                          stroke="var(--fg-subtle)"
-                          strokeWidth={1.5}
-                        />
-                      </div>
-                    )}
-                    {d && t ? (
-                      <div className="mt-3 flex items-center gap-2 border-t border-[color:var(--border)] pt-3">
-                        <DriverPortrait
-                          code={d.code}
-                          team={d.team}
-                          size={28}
-                        />
-                        <div className="min-w-0">
-                          <p
-                            className="truncate text-[11px]"
-                            style={{
-                              fontFamily:
-                                "var(--font-boldonse), ui-sans-serif",
-                            }}
-                          >
-                            {d.full_name}
-                          </p>
-                          <p
-                            className="text-[9px] uppercase"
-                            style={{
-                              color: t.hex,
-                              letterSpacing: "0.1em",
-                            }}
-                            data-tabular
-                          >
-                            {t.short}
-                          </p>
-                        </div>
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
+        {/* Recent Winners — design_handoff_standings § PR-2 */}
+        <RecentWinners winners={recentWinnerData} />
       </main>
     </>
   );

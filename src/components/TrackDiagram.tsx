@@ -16,6 +16,7 @@ import { trackImg, trackRatio, trackPath } from "@/lib/design/tracks";
 export function TrackDiagram({
   circuit,
   size = 200,
+  height,
   stroke = "currentColor",
   strokeWidth = 2,
   className,
@@ -23,6 +24,14 @@ export function TrackDiagram({
 }: {
   circuit: string | null | undefined;
   size?: number;
+  /**
+   * When supplied (design_handoff_standings § PR-2 WinnerCard), the rendered
+   * tile is exactly `height` pixels tall and the width is derived from the
+   * per-circuit aspect ratio. Lets multiple cards align tracks on a uniform
+   * vertical band regardless of circuit shape. When omitted, behaviour is
+   * unchanged: `size` is the width and height is derived from the ratio.
+   */
+  height?: number;
   stroke?: string;
   strokeWidth?: number;
   className?: string;
@@ -33,14 +42,16 @@ export function TrackDiagram({
 
   if (img) {
     const ratio = trackRatio(circuit);
+    const w = height != null ? height * ratio : size;
+    const h = height != null ? height : size / ratio;
     return (
       <div
         role="img"
         aria-label={label}
         className={className}
         style={{
-          width: size,
-          height: size / ratio,
+          width: w,
+          height: h,
           backgroundColor: stroke,
           WebkitMaskImage: `url(${img})`,
           maskImage: `url(${img})`,
@@ -57,11 +68,15 @@ export function TrackDiagram({
   }
 
   const d = trackPath(circuit);
+  // SVG fallback uses the legacy 200×120 viewBox aspect ratio.
+  const FALLBACK_RATIO = 200 / 120;
+  const svgW = height != null ? height * FALLBACK_RATIO : size;
+  const svgH = height != null ? height : (size * 120) / 200;
   return (
     <svg
       viewBox="0 0 200 120"
-      width={size}
-      height={(size * 120) / 200}
+      width={svgW}
+      height={svgH}
       role="img"
       aria-label={label}
       className={className}
