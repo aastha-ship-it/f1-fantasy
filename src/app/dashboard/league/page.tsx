@@ -324,14 +324,16 @@ export default async function LeaguePage() {
                         </span>
                       </p>
                       {r.streak?.current_p1_streak ? (
-                        <p
-                          className="mt-3 flex items-center gap-2 whitespace-nowrap text-xs text-[color:var(--fg-muted)]"
-                          style={{
-                            fontFamily:
-                              "apple color emoji, noto color emoji, sans-serif",
-                          }}
-                        >
-                          🔥
+                        <p className="mt-3 flex items-center gap-2 whitespace-nowrap text-xs text-[color:var(--fg-muted)]">
+                          <span
+                            aria-hidden
+                            style={{
+                              fontFamily:
+                                "apple color emoji, noto color emoji, sans-serif",
+                            }}
+                          >
+                            🔥
+                          </span>
                           <span data-tabular>
                             {r.streak.current_p1_streak}
                           </span>
@@ -341,7 +343,7 @@ export default async function LeaguePage() {
                           >
                             ·
                           </span>
-                          <span className="text-[10px] uppercase tracking-[0.06em] text-[color:var(--fg-subtle)]">
+                          <span className="text-[11px] uppercase tracking-[0.1em] text-[color:var(--fg-subtle)]">
                             P1 streak
                           </span>
                         </p>
