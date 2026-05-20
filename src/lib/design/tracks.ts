@@ -59,7 +59,11 @@ const TRACK_IMG: Record<string, string> = {
   albert_park: "australia",
   americas: "usa",
   baku: "azerbaijan",
-  catalunya: "spain",
+  // Catalunya/Barcelona GP (traditional Spanish GP venue) → barcelona.png.
+  // Madrid GP (new 2026 round, also called the "Spanish GP" → Madring) →
+  // spain.png. Two distinct circuits, two distinct PNGs.
+  catalunya: "barcelona",
+  madring: "spain",
   hungaroring: "hungary",
   interlagos: "brazil",
   losail: "qatar",
@@ -96,7 +100,7 @@ const TRACK_IMG: Record<string, string> = {
   "yas marina": "abu_dhabi",
   "yas marina circuit": "abu_dhabi",
   montreal: "canada",
-  barcelona: "spain",
+  barcelona: "barcelona",
 };
 
 /** Per-image width/height (ADDENDUM §B, verbatim). */

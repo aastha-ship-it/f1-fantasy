@@ -34,10 +34,12 @@ const UI_CIRCUIT_KEYS_2026 = [
 
 /**
  * Circuits with no shipped silhouette (PNG or SVG) → TrackDiagram renders
- * its rounded-rect placeholder (never null). `madring` is the brand-new
- * 2026 Madrid GP; no asset exists in the handoff or the legacy SVG set.
+ * its rounded-rect placeholder (never null). Currently empty: every 2026
+ * UI key resolves to a PNG. (Madring = the new Madrid GP = spain.png;
+ * Catalunya = the traditional Barcelona GP = barcelona.png. Don't confuse
+ * them — the handoff ships both.)
  */
-const KNOWN_RECT_FALLBACK = new Set(["madring"]);
+const KNOWN_RECT_FALLBACK = new Set<string>();
 
 /**
  * T1.. — track PNG-silhouette resolver (design_handoff_phase11/ADDENDUM §B).
@@ -56,6 +58,20 @@ describe("trackImg — circuit → silhouette PNG", () => {
     expect(trackImg("yas_marina")).toBe("/assets/tracks/abu_dhabi.png");
   });
 
+  // Regression: ISSUE-001 — TRACK_IMG had catalunya→spain.png inverted
+  // (spain.png is actually the new Madrid/Madring silhouette, not Catalunya).
+  // Catalunya/Barcelona GP → barcelona.png; Madring/Madrid GP → spain.png.
+  // Found by /qa on 2026-05-20.
+  it("T2b: Catalunya vs Madrid — two different circuits, two different PNGs", () => {
+    expect(trackImg("catalunya")).toBe("/assets/tracks/barcelona.png");
+    expect(trackImg("madring")).toBe("/assets/tracks/spain.png");
+    // OpenF1 short-name "Barcelona" must also resolve to barcelona.png
+    expect(trackImg("Barcelona")).toBe("/assets/tracks/barcelona.png");
+    // Ratios must follow the resolved base
+    expect(trackRatio("catalunya")).toBe(1.6867); // → barcelona
+    expect(trackRatio("madring")).toBe(1.7766); // → spain
+  });
+
   it("T3: OpenF1 short-name, case-insensitive", () => {
     expect(trackImg("Sakhir")).toBe("/assets/tracks/bahrain.png");
     expect(trackImg("Monte Carlo")).toBe("/assets/tracks/monaco.png");
@@ -64,8 +80,8 @@ describe("trackImg — circuit → silhouette PNG", () => {
   });
 
   it("T4: no-asset / empty / unknown → null", () => {
-    expect(trackImg("madring")).toBeNull();
     expect(trackImg("jeddah")).toBeNull(); // SVG-only fallback
+    expect(trackImg("imola")).toBeNull(); // SVG-only fallback
     expect(trackImg("")).toBeNull();
     expect(trackImg(null)).toBeNull();
     expect(trackImg(undefined)).toBeNull();
@@ -82,7 +98,7 @@ describe("trackRatio — aspect-correct height", () => {
     expect(trackRatio("miami")).toBe(1.3333); // miami → miami
     expect(trackRatio("albert_park")).toBe(1.6667); // → australia
     expect(trackRatio("baku")).toBe(1.6055); // → azerbaijan
-    expect(trackRatio("madring")).toBe(1.6667); // unknown → sane default
+    // madring is now mapped → spain.png (covered in T2b)
     expect(trackRatio(null)).toBe(1.6667);
   });
 });
