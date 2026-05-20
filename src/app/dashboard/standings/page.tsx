@@ -10,12 +10,12 @@ import { driverCountry, countryFlag } from "@/lib/design/drivers";
 import { shortEventName } from "@/lib/design/eventName";
 import {
   combineStandings,
-  type ClassificationRow,
+  selectBackstopRows,
   type DriverInfo,
+  type EventInfo,
   type JolpicaTotal,
 } from "@/lib/standings/computeStandings";
 
-const SPRINT_TYPES = new Set(["sprint_race", "sprint_quali"]);
 const CURRENT_SEASON = new Date().getUTCFullYear();
 
 type DriverRow = {
@@ -55,7 +55,7 @@ export default async function StandingsPage() {
       .eq("season", CURRENT_SEASON),
     supabase
       .from("historical_races")
-      .select("season, round, race_date")
+      .select("season, round, race_date, ergast_circuit_id")
       .eq("season", CURRENT_SEASON)
       .order("round", { ascending: true }),
     supabase
@@ -66,7 +66,7 @@ export default async function StandingsPage() {
       .select("id, code, full_name, team"),
     supabase
       .from("events")
-      .select("id, season, round, session_type"),
+      .select("id, season, round, session_type, ergast_circuit_id"),
   ]);
 
   // Jolpica totals (sum points across race + sprint)
@@ -86,36 +86,36 @@ export default async function StandingsPage() {
     ([driver_id, points]) => ({ driver_id, points }),
   );
 
-  // Backstop rows (rounds Jolpica hasn't yet ingested)
-  const eventsById = new Map(
+  // Backstop rows (circuits Jolpica hasn't yet ingested). Dedup key is the
+  // circuit id, NOT (season, round) — Jolpica/Ergast renumbers the season
+  // around real cancellations while our OpenF1-keyed `events.round`
+  // preserves the meeting index, so the two systems disagree on round
+  // numbers but always agree on `ergast_circuit_id`. See selectBackstopRows
+  // + Bug-001 in plans/program-tracker.md.
+  const eventsById = new Map<string, EventInfo>(
     ((events ?? []) as {
       id: string;
       season: number;
       round: number;
-      session_type: string;
+      session_type: EventInfo["session_type"];
+      ergast_circuit_id: string | null;
     }[]).map((e) => [e.id, e]),
   );
-  const ingestedRounds = new Set(
-    ((histRaces ?? []) as { season: number; round: number }[]).map(
-      (r) => `${r.season}-${r.round}`,
-    ),
+  const ingestedCircuits = new Set(
+    ((histRaces ?? []) as { ergast_circuit_id: string | null }[])
+      .map((r) => r.ergast_circuit_id)
+      .filter((id): id is string => !!id),
   );
-  const backstopRows: ClassificationRow[] = [];
-  for (const c of (classifications ?? []) as {
-    event_id: string;
-    driver_id: number;
-    position: number | null;
-  }[]) {
-    const ev = eventsById.get(c.event_id);
-    if (!ev || ev.season !== CURRENT_SEASON) continue;
-    if (ingestedRounds.has(`${ev.season}-${ev.round}`)) continue;
-    backstopRows.push({
-      event_id: c.event_id,
-      driver_id: c.driver_id,
-      position: c.position,
-      is_sprint: SPRINT_TYPES.has(ev.session_type),
-    });
-  }
+  const backstopRows = selectBackstopRows(
+    (classifications ?? []) as {
+      event_id: string;
+      driver_id: number;
+      position: number | null;
+    }[],
+    eventsById,
+    ingestedCircuits,
+    CURRENT_SEASON,
+  );
 
   const driverInfos: DriverInfo[] = ((drivers ?? []) as DriverRow[]).map(
     (d) => ({

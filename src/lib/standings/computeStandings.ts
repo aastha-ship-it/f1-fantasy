@@ -71,6 +71,72 @@ export type JolpicaTotal = {
 };
 
 /**
+ * Minimal `events` shape `selectBackstopRows` reads. The page loader maps
+ * its row shape onto this.
+ */
+export type EventInfo = {
+  id: string;
+  season: number;
+  round: number;
+  session_type: "race" | "quali" | "sprint_race" | "sprint_quali";
+  ergast_circuit_id: string | null;
+};
+
+/**
+ * Assemble the OpenF1-backstop row set fed to `combineStandings`.
+ *
+ * Two filters that the inline page loop missed (Bug-001):
+ *  1. Only `race` and `sprint_race` award F1 championship points — drop
+ *     `quali` and `sprint_quali` rows so the pole-sitter never accidentally
+ *     gets scored as a race winner.
+ *  2. Dedup against Jolpica by **circuit**, not by `(season, round)`. Real
+ *     F1 cancellations renumber the season in Jolpica/Ergast (e.g. Miami =
+ *     Jolpica round 4 vs OpenF1 round 6 in our 2026 seed), and a
+ *     round-number dedup misses that → the same race gets counted twice.
+ *     `ergast_circuit_id` is the stable identifier on both sides.
+ *
+ * Events with a null `ergast_circuit_id` are allowed through (defensive —
+ * they cannot be in `ingestedCircuits` by construction); the caller should
+ * still feed them, since they're the only signal we have for a freshly-
+ * added round before the Jolpica resolver runs.
+ */
+const SCORING_SESSION_TYPES = new Set([
+  "race",
+  "sprint_race",
+] as const);
+
+export function selectBackstopRows(
+  classifications: {
+    event_id: string;
+    driver_id: number;
+    position: number | null;
+  }[],
+  eventsById: Map<string, EventInfo>,
+  ingestedCircuits: Set<string>,
+  currentSeason: number,
+): ClassificationRow[] {
+  const out: ClassificationRow[] = [];
+  for (const c of classifications) {
+    const ev = eventsById.get(c.event_id);
+    if (!ev) continue;
+    if (ev.season !== currentSeason) continue;
+    if (!SCORING_SESSION_TYPES.has(ev.session_type as "race" | "sprint_race")) {
+      continue;
+    }
+    if (ev.ergast_circuit_id && ingestedCircuits.has(ev.ergast_circuit_id)) {
+      continue;
+    }
+    out.push({
+      event_id: c.event_id,
+      driver_id: c.driver_id,
+      position: c.position,
+      is_sprint: ev.session_type === "sprint_race",
+    });
+  }
+  return out;
+}
+
+/**
  * Combine Jolpica-canonical season totals with OpenF1-backstop classification
  * rows for races Jolpica hasn't ingested yet. Returns sorted driver +
  * constructor standings.

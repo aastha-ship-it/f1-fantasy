@@ -4,6 +4,7 @@ import {
   computeDriverStandings,
   computeConstructorStandings,
   combineStandings,
+  selectBackstopRows,
 } from "./computeStandings";
 
 describe("pointsForPosition", () => {
@@ -115,5 +116,103 @@ describe("computeConstructorStandings", () => {
 
   it("S8 · empty input → empty array", () => {
     expect(computeConstructorStandings([], DRIVERS)).toEqual([]);
+  });
+});
+
+describe("selectBackstopRows (Bug-001 regression)", () => {
+  // Two events at the same circuit (miami) — one race, one quali, etc. —
+  // under our OpenF1 round 6. Jolpica has miami under round 4 (the
+  // renumber-around-cancellations gap). Dedup key must be the circuit,
+  // not the round.
+  const eventsById = new Map([
+    ["miami-race", {
+      id: "miami-race", season: 2026, round: 6,
+      session_type: "race" as const, ergast_circuit_id: "miami",
+    }],
+    ["miami-quali", {
+      id: "miami-quali", season: 2026, round: 6,
+      session_type: "quali" as const, ergast_circuit_id: "miami",
+    }],
+    ["miami-sprintr", {
+      id: "miami-sprintr", season: 2026, round: 6,
+      session_type: "sprint_race" as const, ergast_circuit_id: "miami",
+    }],
+    ["miami-sprintq", {
+      id: "miami-sprintq", season: 2026, round: 6,
+      session_type: "sprint_quali" as const, ergast_circuit_id: "miami",
+    }],
+    ["canada-race", {
+      id: "canada-race", season: 2026, round: 7,
+      session_type: "race" as const, ergast_circuit_id: "villeneuve",
+    }],
+    ["last-year-race", {
+      id: "last-year-race", season: 2025, round: 1,
+      session_type: "race" as const, ergast_circuit_id: "albert_park",
+    }],
+    ["circuitless-race", {
+      id: "circuitless-race", season: 2026, round: 8,
+      session_type: "race" as const, ergast_circuit_id: null,
+    }],
+  ]);
+
+  it("SB1 · drops quali and sprint_quali rows (no F1 points awarded)", () => {
+    const got = selectBackstopRows(
+      [
+        { event_id: "miami-race", driver_id: 12, position: 1 },
+        { event_id: "miami-quali", driver_id: 12, position: 1 },
+        { event_id: "miami-sprintr", driver_id: 12, position: 1 },
+        { event_id: "miami-sprintq", driver_id: 12, position: 1 },
+      ],
+      eventsById,
+      new Set<string>(),   // nothing ingested
+      2026,
+    );
+    expect(got.map((r) => [r.event_id, r.is_sprint])).toEqual([
+      ["miami-race", false],
+      ["miami-sprintr", true],
+    ]);
+  });
+
+  it("SB2 · drops events whose ergast_circuit_id is already in ingestedCircuits (Bug-B)", () => {
+    const got = selectBackstopRows(
+      [
+        { event_id: "miami-race", driver_id: 12, position: 1 },
+        { event_id: "canada-race", driver_id: 12, position: 1 },
+      ],
+      eventsById,
+      new Set(["miami"]),  // Miami is in Jolpica (under whatever round number)
+      2026,
+    );
+    expect(got.map((r) => r.event_id)).toEqual(["canada-race"]);
+  });
+
+  it("SB3 · keeps non-ingested events; null circuit_id is allowed through", () => {
+    const got = selectBackstopRows(
+      [
+        { event_id: "canada-race", driver_id: 12, position: 2 },
+        { event_id: "circuitless-race", driver_id: 12, position: 3 },
+      ],
+      eventsById,
+      new Set(["miami"]),
+      2026,
+    );
+    expect(got.map((r) => r.event_id)).toEqual([
+      "canada-race",
+      "circuitless-race",
+    ]);
+  });
+
+  it("SB4 · drops other-season events and unknown event_ids", () => {
+    const got = selectBackstopRows(
+      [
+        { event_id: "last-year-race", driver_id: 12, position: 1 },
+        { event_id: "unknown-id", driver_id: 12, position: 1 },
+        { event_id: "miami-race", driver_id: 12, position: 1 },
+      ],
+      eventsById,
+      new Set<string>(),
+      2026,
+    );
+    expect(got.map((r) => r.event_id)).toEqual(["miami-race"]);
   });
 });
