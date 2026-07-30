@@ -141,18 +141,18 @@ export function DriverStandingsRowMobile(p: DriverRowProps) {
   const t = teamMeta(p.team);
   return (
     <details
-      className="relative border-b border-[color:var(--border)]"
+      className="border-b border-[color:var(--border)]"
       style={{ background: p.isLeader ? "var(--surface-2)" : "transparent" }}
     >
-      <span
-        aria-hidden
-        className="absolute left-0 top-2 bottom-2 w-[3px]"
-        style={{ background: t?.hex ?? "var(--fg-subtle)" }}
-      />
       <summary
-        className="grid cursor-pointer list-none items-center gap-3 py-3 pl-3 pr-4 [&::-webkit-details-marker]:hidden"
+        className="relative grid cursor-pointer list-none items-center gap-3 py-3 pl-3 pr-4 [&::-webkit-details-marker]:hidden"
         style={{ gridTemplateColumns: "28px 40px minmax(0,1fr) auto" }}
       >
+        <span
+          aria-hidden
+          className="absolute left-0 top-2 bottom-2 w-[3px]"
+          style={{ background: t?.hex ?? "var(--fg-subtle)" }}
+        />
         <span
           className="leading-none"
           style={{

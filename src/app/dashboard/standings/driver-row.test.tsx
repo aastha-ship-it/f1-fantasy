@@ -67,4 +67,12 @@ describe("DriverStandingsRowDesktop", () => {
     expect(screen.getByText("4")).toBeInTheDocument();
     expect(screen.getByText("9")).toBeInTheDocument();
   });
+
+  it("uses the driver's DB id in the subtitle when provided, never the standings position — the original row read `s.driver.id`, and silently substituting `pos` would be an undetected ≥1024px content change", () => {
+    const withId: DriverRowProps = { ...NOR, id: 33 };
+    const { container } = render(<DriverStandingsRowDesktop {...withId} />);
+    const subtitle = container.querySelector("div.min-w-0 p:last-child")!;
+    expect(subtitle.textContent).toContain("#33");
+    expect(subtitle.textContent).not.toContain("#2");
+  });
 });
