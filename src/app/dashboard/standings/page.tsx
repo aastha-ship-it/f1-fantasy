@@ -30,6 +30,11 @@ import {
   RecentWinners,
   type WinnerCardDatum,
 } from "./recent-winners";
+import {
+  DriverStandingsRowDesktop,
+  DriverStandingsRowMobile,
+  type DriverRowProps,
+} from "./driver-row";
 
 const CURRENT_SEASON = new Date().getUTCFullYear();
 const TOTAL_ROUNDS = 24;
@@ -481,7 +486,7 @@ export default async function StandingsPage() {
                 boxShadow: `inset 0 -3px 0 ${leaderTeam.hex}`,
               }}
             >
-              <div className="grid grid-cols-[1fr_auto] items-center gap-6">
+              <div className="grid grid-cols-1 items-center gap-6 md:grid-cols-[1fr_auto]">
                 <div>
                   <p
                     className="mb-2 text-[10px] uppercase"
@@ -613,123 +618,39 @@ export default async function StandingsPage() {
                 </span>
               </div>
 
-              <ol>
-                {driverStandings.map((s, idx) => {
-                  const t = teamMeta(s.driver.team);
-                  const isLeader = idx === 0;
-                  const wins = winsByDriver.get(s.driver.id) ?? 0;
-                  const pods = podiumsByDriver.get(s.driver.id) ?? 0;
-                  const country = driverCountry(s.driver.code);
-                  const gap = isLeader ? "LEADER" : `+${leaderPts - s.points}`;
-                  return (
-                    <li
-                      key={s.driver.id}
-                      className="relative grid items-center gap-3 border-b border-[color:var(--border)] py-3.5 pl-3"
-                      style={{
-                        gridTemplateColumns:
-                          "32px 56px minmax(0,1fr) 84px 48px 48px 64px",
-                        background: isLeader ? "var(--surface-2)" : "transparent",
-                      }}
-                    >
-                      <span
-                        aria-hidden
-                        className="absolute left-0 top-2 bottom-2 w-[3px]"
-                        style={{ background: t?.hex ?? "var(--fg-subtle)" }}
-                      />
-                      <span
-                        className="leading-none"
-                        style={{
-                          fontFamily: "var(--font-boldonse), ui-sans-serif",
-                          fontSize: 22,
-                          color: isLeader ? "var(--accent)" : "var(--fg)",
-                        }}
-                        data-tabular
-                      >
-                        {idx + 1}
-                      </span>
-                      <DriverPortrait
-                        code={s.driver.code}
-                        team={s.driver.team}
-                        size={48}
-                      />
-                      <div className="min-w-0">
-                        <p
-                          className="truncate"
-                          style={{
-                            fontFamily: "var(--font-boldonse), ui-sans-serif",
-                            fontSize: 16,
-                            letterSpacing: "0.02em",
-                          }}
-                        >
-                          {s.driver.full_name}
-                        </p>
-                        <p
-                          className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
-                          style={{ letterSpacing: "0.08em" }}
-                          data-tabular
-                        >
-                          #{s.driver.id}
-                          {country && ` · ${countryFlag(country)}`} · {gap}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {t && (
-                          <Image
-                            src={t.logoSrc}
-                            alt={t.name}
-                            width={20}
-                            height={20}
-                            className="h-5 w-5 object-contain"
-                            unoptimized
-                          />
-                        )}
-                        <span
-                          className="text-[11px]"
-                          style={{
-                            color: t?.hex ?? "var(--fg-muted)",
-                            letterSpacing: "0.06em",
-                            fontWeight: 600,
-                            fontFamily:
-                              "var(--font-mono), ui-monospace, monospace",
-                          }}
-                        >
-                          {t?.short ?? s.driver.team.slice(0, 3).toUpperCase()}
-                        </span>
-                      </div>
-                      <span
-                        className="text-right text-sm"
-                        style={{
-                          color: wins > 0 ? "var(--fg)" : "var(--fg-subtle)",
-                        }}
-                        data-tabular
-                      >
-                        {wins}
-                      </span>
-                      <span
-                        className="text-right text-sm"
-                        style={{
-                          color: pods > 0 ? "var(--fg)" : "var(--fg-subtle)",
-                        }}
-                        data-tabular
-                      >
-                        {pods}
-                      </span>
-                      <span
-                        className="text-right"
-                        style={{
-                          fontFamily: "var(--font-boldonse), ui-sans-serif",
-                          fontSize: 22,
-                        }}
-                        data-tabular
-                      >
-                        {s.points}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
+              {(() => {
+                const rows: DriverRowProps[] = driverStandings.map(
+                  (s, idx) => ({
+                    pos: idx + 1,
+                    id: s.driver.id,
+                    code: s.driver.code,
+                    fullName: s.driver.full_name,
+                    team: s.driver.team,
+                    points: s.points,
+                    wins: winsByDriver.get(s.driver.id) ?? 0,
+                    podiums: podiumsByDriver.get(s.driver.id) ?? 0,
+                    gap: idx === 0 ? "LEADER" : `+${leaderPts - s.points}`,
+                    country: driverCountry(s.driver.code),
+                    isLeader: idx === 0,
+                  }),
+                );
+                return (
+                  <>
+                    <div className="md:hidden">
+                      {rows.map((r) => (
+                        <DriverStandingsRowMobile key={r.code} {...r} />
+                      ))}
+                    </div>
+                    <ol className="hidden md:block">
+                      {rows.map((r) => (
+                        <DriverStandingsRowDesktop key={r.code} {...r} />
+                      ))}
+                    </ol>
+                  </>
+                );
+              })()}
               <p
-                className="mt-3 grid gap-3 text-[10px] uppercase text-[color:var(--fg-subtle)]"
+                className="mt-3 hidden gap-3 text-[10px] uppercase text-[color:var(--fg-subtle)] md:grid"
                 style={{
                   gridTemplateColumns:
                     "32px 56px minmax(0,1fr) 84px 48px 48px 64px",
@@ -796,12 +717,7 @@ export default async function StandingsPage() {
                           background: `linear-gradient(90deg, ${t.hex}33, transparent)`,
                         }}
                       />
-                      <div
-                        className="relative grid items-center gap-3"
-                        style={{
-                          gridTemplateColumns: "32px 32px minmax(0,1fr) auto",
-                        }}
-                      >
+                      <div className="relative grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 md:grid-cols-[32px_32px_minmax(0,1fr)_auto]">
                         <span
                           style={{
                             fontFamily: "var(--font-boldonse), ui-sans-serif",
@@ -817,7 +733,7 @@ export default async function StandingsPage() {
                           alt={t.name}
                           width={28}
                           height={28}
-                          className="h-7 w-7 object-contain"
+                          className="hidden h-7 w-7 object-contain md:block"
                           unoptimized
                         />
                         <div className="min-w-0">

@@ -43,9 +43,8 @@ export function SeasonSummary({
 }: SeasonSummaryProps) {
   return (
     <section
-      className="mt-12 grid"
+      className="mt-12 grid grid-cols-1 md:[grid-template-columns:repeat(5,1fr)]"
       style={{
-        gridTemplateColumns: "repeat(5, 1fr)",
         gap: 1,
         background: "var(--border)",
         border: "1px solid var(--border)",

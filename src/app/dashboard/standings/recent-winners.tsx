@@ -10,6 +10,7 @@
  * Server-renderable, no client state. Data shape is pre-resolved in
  * page.tsx (no driver lookups here).
  */
+import type { CSSProperties } from "react";
 import { TrackDiagram } from "@/components/TrackDiagram";
 import { DriverPortrait } from "@/components/DriverPortrait";
 
@@ -71,11 +72,13 @@ export function RecentWinners({ winners }: { winners: WinnerCardDatum[] }) {
       </header>
 
       <div
-        className="grid"
-        style={{
-          gridTemplateColumns: `repeat(${winners.length}, 1fr)`,
-          gap: 12,
-        }}
+        className="grid grid-cols-1 md:[grid-template-columns:repeat(var(--rw-cols),1fr)]"
+        style={
+          {
+            gap: 12,
+            "--rw-cols": winners.length,
+          } as CSSProperties
+        }
       >
         {winners.map((w) => (
           <WinnerCard key={w.round} {...w} />
