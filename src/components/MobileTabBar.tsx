@@ -8,11 +8,15 @@ import type { TopBarTab } from "@/components/TopBar";
  * Profile are reachable from the slim mobile top row (see TopBar) rather
  * than crowding six or seven targets across a 375px screen.
  *
- * Deliberately NOT rendered on the two immersive routes:
- *   - /dashboard/predict/[eventId] — the lock bar owns the bottom edge
- *   - /reveal/[eventId]            — the cinematic is chrome-free
- * TopBar is per-page with no nested layout, so that is simply an omission
- * at those call sites.
+ * Deliberately NOT rendered on exactly one immersive route: /reveal/[eventId]
+ * (both TopBar call sites there) — the cinematic is chrome-free. TopBar is
+ * per-page with no nested layout, so that is simply an omission at that call
+ * site.
+ *
+ * /dashboard/predict/[eventId] DOES render this bar and currently overlaps
+ * that page's fixed lock bar — a known interim state, not a bug to "fix" by
+ * removing the bar here. Task 13 resolves the overlap by offsetting the lock
+ * bar above this one.
  */
 const TABS: { id: TopBarTab; label: string; href: string; glyph: string }[] = [
   { id: "calendar", label: "Calendar", href: "/dashboard", glyph: "⚑" },
