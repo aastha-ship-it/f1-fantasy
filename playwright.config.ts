@@ -13,10 +13,14 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
+    { name: "Desktop Chrome", use: { ...devices["Desktop Chrome"] } },
+    // iPhone 14 / iPad Mini device descriptors default to WebKit, which
+    // isn't installed on this machine — pin chromium. Only the viewport
+    // (390x664 / 768x1024) matters for the overflow + fork checks below,
+    // not the rendering engine.
+    { name: "iPhone 14", use: { ...devices["iPhone 14"], browserName: "chromium" } },
+    { name: "Pixel 7", use: { ...devices["Pixel 7"] } },
+    { name: "iPad Mini", use: { ...devices["iPad Mini"], browserName: "chromium" } },
   ],
   webServer: process.env.E2E_BASE_URL
     ? undefined
