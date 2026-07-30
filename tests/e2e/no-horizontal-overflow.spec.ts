@@ -44,6 +44,12 @@ async function signIn(page: Page) {
 /**
  * The single assertion that catches every unprefixed fixed-px grid.
  * 1px tolerance absorbs sub-pixel rounding on fractional-DPR devices.
+ *
+ * Uses `expect.soft` rather than `expect` so a failure on one route does not
+ * abort the rest of the loop — every route in a test gets measured and
+ * reported in a single run, and the test is still marked failed overall if
+ * any route overflowed (Playwright fails the test at the end when a soft
+ * assertion failed, even though execution continued).
  */
 async function expectNoHorizontalOverflow(page: Page, label: string) {
   await page.waitForLoadState("networkidle");
@@ -51,10 +57,13 @@ async function expectNoHorizontalOverflow(page: Page, label: string) {
     const el = document.scrollingElement as HTMLElement;
     const limit = el.clientWidth;
     const culprits = Array.from(document.querySelectorAll<HTMLElement>("*"))
-      .filter((e) => e.getBoundingClientRect().right > limit + 1)
+      .map((e) => ({ e, r: e.getBoundingClientRect() }))
+      .filter(({ r }) => r.right > limit + 1)
+      // Widest offenders first — DOM order alone can bury a wider, later
+      // element behind narrower earlier ones once capped to 6.
+      .sort((a, b) => b.r.right - a.r.right)
       .slice(0, 6)
-      .map((e) => {
-        const r = e.getBoundingClientRect();
+      .map(({ e, r }) => {
         const cls =
           typeof e.className === "string" ? e.className.slice(0, 90) : "";
         return `${e.tagName.toLowerCase()}${cls ? "." + cls : ""} right=${Math.round(r.right)}`;
@@ -62,7 +71,7 @@ async function expectNoHorizontalOverflow(page: Page, label: string) {
     return { scrollWidth: el.scrollWidth, clientWidth: limit, culprits };
   });
 
-  expect(
+  expect.soft(
     scrollWidth,
     `${label} scrolls horizontally (${scrollWidth} > ${clientWidth}). Widest offenders:\n  ${culprits.join("\n  ")}`,
   ).toBeLessThanOrEqual(clientWidth + 1);
