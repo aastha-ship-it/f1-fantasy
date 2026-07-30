@@ -303,11 +303,10 @@ function NextRaceHero({
 
   return (
     <section
-      className="grid items-stretch overflow-hidden border border-[color:var(--border)] lg:grid-cols-[1.3fr_1fr]"
+      className="grid items-stretch overflow-hidden border border-[color:var(--border)] md:min-h-[360px] lg:grid-cols-[1.3fr_1fr]"
       style={{
         background:
           "linear-gradient(105deg, #1a0608 0%, var(--surface) 60%)",
-        minHeight: 360,
       }}
     >
       <div className="flex flex-col justify-between gap-8 p-8 lg:p-12">
@@ -429,7 +428,7 @@ function CalendarGrid({
 }) {
   return (
     <ul
-      className="grid gap-px overflow-hidden border border-[color:var(--border)] bg-[color:var(--border)] sm:grid-cols-2 lg:grid-cols-4"
+      className="grid grid-cols-2 gap-px overflow-hidden border border-[color:var(--border)] bg-[color:var(--border)] lg:grid-cols-4"
     >
       {races.map((r) => {
         const isPast = r.session_start_at < nowIso;
@@ -559,7 +558,7 @@ function DriverStandings({
             return (
               <li
                 key={s.driver.id}
-                className="grid grid-cols-[40px_44px_1fr_4px_56px] items-center gap-4 border-b border-[color:var(--border)] px-5 py-3.5 last:border-b-0"
+                className="grid grid-cols-[28px_36px_1fr_3px_44px] items-center gap-2 border-b border-[color:var(--border)] px-3 py-3 last:border-b-0 md:grid-cols-[40px_44px_1fr_4px_56px] md:gap-4 md:px-5 md:py-3.5"
               >
                 <span
                   className="text-lg leading-none"
@@ -647,7 +646,7 @@ function ConstructorStandings({
           {standings.map((s, idx) => (
             <li
               key={s.meta.slug}
-              className="grid grid-cols-[40px_48px_1fr_4px_56px] items-center gap-4 border-b border-[color:var(--border)] px-5 py-3.5 last:border-b-0"
+              className="grid grid-cols-[28px_40px_1fr_3px_44px] items-center gap-2 border-b border-[color:var(--border)] px-3 py-3 last:border-b-0 md:grid-cols-[40px_48px_1fr_4px_56px] md:gap-4 md:px-5 md:py-3.5"
             >
               <span
                 className="text-lg leading-none"
