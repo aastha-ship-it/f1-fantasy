@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { TopBar } from "@/components/TopBar";
+import { MobileTabBar } from "@/components/MobileTabBar";
 import { loadLobbyWeekend, resolveFocusRound } from "@/lib/lobby/loadLobby";
 import { LobbyView } from "./lobby-view";
 
@@ -33,11 +34,14 @@ export async function LobbyPage({ round }: { round: number | null }) {
     round ?? (await resolveFocusRound(svc, season));
 
   const header = (
-    <TopBar
-      active="lobby"
-      displayName={myDisplayName}
-      email={userData.user?.email ?? null}
-    />
+    <>
+      <TopBar
+        active="lobby"
+        displayName={myDisplayName}
+        email={userData.user?.email ?? null}
+      />
+      <MobileTabBar active="lobby" />
+    </>
   );
 
   if (focusRound == null) {

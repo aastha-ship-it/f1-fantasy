@@ -3,6 +3,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/TopBar";
+import { MobileTabBar } from "@/components/MobileTabBar";
 import { TrackDiagram } from "@/components/TrackDiagram";
 import { DriverPortrait } from "@/components/DriverPortrait";
 import { teamMeta } from "@/lib/design/teams";
@@ -223,8 +224,9 @@ export default async function DashboardPage() {
         displayName={myDisplayName}
         email={userData.user?.email ?? null}
       />
+      <MobileTabBar active="calendar" />
       <RevealNotice candidates={revealCandidates} />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
+      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
         {/* Hero — next race */}
         {nextOpen ? (
           <NextRaceHero

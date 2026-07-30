@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/TopBar";
+import { MobileTabBar } from "@/components/MobileTabBar";
 import { TrackDiagram } from "@/components/TrackDiagram";
 import { DriverPicker } from "../driver-picker";
 import { submitPrediction } from "../actions";
@@ -187,7 +188,8 @@ export default async function PredictEventPage({
         displayName={myDisplayName}
         email={userData.user?.email ?? null}
       />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
+      <MobileTabBar active="predict" />
+      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
         {/* Hero — 3 cols: round info + name | track diagram | countdown */}
         <section className="grid items-end gap-8 border-b border-[color:var(--border)] pb-8 lg:grid-cols-[1.4fr_1fr_1fr]">
           <div>

@@ -2,6 +2,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/TopBar";
+import { MobileTabBar } from "@/components/MobileTabBar";
 import { teamMeta } from "@/lib/design/teams";
 
 type ScoreRow = { user_id: string; points: number; perfect_bonus: boolean };
@@ -143,7 +144,8 @@ export default async function LeaguePage() {
         displayName={myDisplayName}
         email={userData.user?.email ?? null}
       />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
+      <MobileTabBar active="league" />
+      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
         {/* Hero */}
         <section className="grid items-end gap-8 border-b border-[color:var(--border)] pb-8 lg:grid-cols-[2fr_1fr]">
           <div>

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { TopBar } from "@/components/TopBar";
+import { MobileTabBar } from "@/components/MobileTabBar";
 import { TrackDiagram } from "@/components/TrackDiagram";
 import { PracticeBanner } from "@/components/PracticeBanner";
 import { teamMeta } from "@/lib/design/teams";
@@ -139,7 +140,8 @@ export default async function PredictRoundPage({
         displayName={myDisplayName}
         email={userData.user?.email ?? null}
       />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
+      <MobileTabBar active="predict" />
+      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
         <p
           className="mb-3 text-xs uppercase text-[color:var(--fg-muted)]"
           style={{ letterSpacing: "0.12em" }}

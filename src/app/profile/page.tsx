@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/TopBar";
+import { MobileTabBar } from "@/components/MobileTabBar";
 import { updateProfileAction } from "./actions";
 import { ProfileForm } from "./profile-form";
 import { CalendarSync } from "./calendar-sync";
@@ -69,13 +70,16 @@ export default async function ProfilePage({
   return (
     <>
       {!welcome && (
-        <TopBar
-          active="profile"
-          displayName={profile?.display_name}
-          email={userData.user.email ?? null}
-        />
+        <>
+          <TopBar
+            active="profile"
+            displayName={profile?.display_name}
+            email={userData.user.email ?? null}
+          />
+          <MobileTabBar active="profile" />
+        </>
       )}
-      <main className="mx-auto w-full max-w-[1200px] px-6 py-12 sm:px-10 lg:px-16">
+      <main className="mx-auto w-full max-w-[1200px] px-6 py-12 pb-24 sm:px-10 md:pb-12 lg:px-16">
         <div className="mb-12">
           <p
             className="mb-3 text-xs uppercase text-[color:var(--fg-subtle)]"

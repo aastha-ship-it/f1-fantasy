@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/TopBar";
+import { MobileTabBar } from "@/components/MobileTabBar";
 import { TrackDiagram } from "@/components/TrackDiagram";
 import { DriverPortrait } from "@/components/DriverPortrait";
 import { teamMeta } from "@/lib/design/teams";
@@ -431,7 +432,8 @@ export default async function StandingsPage() {
         displayName={myDisplayName}
         email={userData.user?.email ?? null}
       />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
+      <MobileTabBar active="standings" />
+      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
         {/* Hero */}
         <section className="grid items-end gap-12 border-b border-[color:var(--border)] pb-8 lg:grid-cols-[1.4fr_1fr]">
           <div>

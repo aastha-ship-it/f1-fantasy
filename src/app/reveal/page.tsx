@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/TopBar";
+import { MobileTabBar } from "@/components/MobileTabBar";
 import { TrackDiagram } from "@/components/TrackDiagram";
 import { shortEventName, eventCountry } from "@/lib/design/eventName";
 import { countryFlag } from "@/lib/design/drivers";
@@ -174,7 +175,8 @@ export default async function RevealIndexPage() {
         displayName={myDisplayName}
         email={userData.user?.email ?? null}
       />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
+      <MobileTabBar active="reveal" />
+      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
         <section className="grid items-end gap-8 border-b border-[color:var(--border)] pb-6 lg:grid-cols-[1.5fr_1fr]">
           <div>
             <p

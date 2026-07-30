@@ -33,7 +33,7 @@ export function LobbyView({
   }));
 
   return (
-    <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
+    <main className="mx-auto w-full max-w-[1600px] px-6 py-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
       <div className="mb-6 flex items-center justify-between text-xs uppercase text-[color:var(--fg-muted)]">
         <span data-tabular style={{ letterSpacing: "0.12em" }}>
           {prevRound != null ? (
