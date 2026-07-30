@@ -4,6 +4,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/TopBar";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { teamMeta } from "@/lib/design/teams";
+import {
+  LeagueRowDesktop,
+  LeagueRowMobile,
+  type LeagueRowProps,
+} from "./league-row";
 
 type ScoreRow = { user_id: string; points: number; perfect_bonus: boolean };
 type UserRow = {
@@ -21,7 +26,7 @@ type StreakRow = {
   total_perfect_podiums: number;
 };
 
-function displayName(u: UserRow, isMe: boolean): string {
+export function displayName(u: UserRow, isMe: boolean): string {
   if (isMe) return "You";
   return u.display_name?.trim() || u.email.split("@")[0];
 }
@@ -359,94 +364,41 @@ export default async function LeaguePage() {
             {/* Rest of the field — bar chart rows */}
             {rest.length > 0 && (
               <section className="mt-8 border border-[color:var(--border)] bg-[color:var(--surface)]">
-                {rest.map((r) => {
-                  const fav = teamMeta(r.user!.favorite_team);
-                  const favDriverCode = r.user!.favorite_driver
-                    ? driverCodeById.get(r.user!.favorite_driver) ?? null
-                    : null;
-                  const pct =
-                    leaderPts > 0 ? (r.points / leaderPts) * 100 : 0;
-                  const isMe = r.userId === me;
+                {(() => {
+                  const rowsData: LeagueRowProps[] = rest.map((r) => {
+                    const fav = teamMeta(r.user!.favorite_team);
+                    const isMe = r.userId === me;
+                    const name = displayName(r.user!, isMe);
+                    return {
+                      rank: r.rank,
+                      name,
+                      initial: name.charAt(0).toUpperCase(),
+                      points: r.points,
+                      pct: leaderPts > 0 ? (r.points / leaderPts) * 100 : 0,
+                      favTeam: fav?.slug ?? null,
+                      favDriverCode: r.user!.favorite_driver
+                        ? driverCodeById.get(r.user!.favorite_driver) ?? null
+                        : null,
+                      perfects: r.perfects,
+                      streak: r.streak?.current_p1_streak ?? 0,
+                      isMe,
+                    };
+                  });
                   return (
-                    <div
-                      key={r.userId}
-                      className="grid items-center gap-6 border-b border-[color:var(--border)] px-6 py-4 last:border-b-0"
-                      style={{
-                        gridTemplateColumns:
-                          "60px 40px minmax(0,1fr) minmax(120px,200px) 80px",
-                        background: isMe ? "var(--surface-2)" : "transparent",
-                      }}
-                    >
-                      <span
-                        className="leading-none"
-                        style={{
-                          fontFamily: "var(--font-boldonse), ui-sans-serif",
-                          fontSize: 24,
-                        }}
-                        data-tabular
-                      >
-                        {r.rank}
-                      </span>
-                      <span
-                        className="grid place-items-center rounded-full"
-                        style={{
-                          width: 36,
-                          height: 36,
-                          background: "var(--surface-2)",
-                          border: `1px solid ${fav?.hex ?? "var(--border)"}`,
-                          fontFamily: "var(--font-boldonse), ui-sans-serif",
-                          fontSize: 14,
-                        }}
-                      >
-                        {displayName(r.user!, isMe).charAt(0).toUpperCase()}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-base">
-                          {displayName(r.user!, isMe)}
-                        </p>
-                        <p
-                          className="text-[10px] uppercase"
-                          style={{
-                            color: fav?.hex ?? "var(--fg-subtle)",
-                            letterSpacing: "0.1em",
-                          }}
-                          data-tabular
-                        >
-                          {fav ? `Team ${fav.name}` : "No favorite team"}
-                          {favDriverCode && ` · ${favDriverCode}`}
-                          {r.perfects > 0 && ` · ${r.perfects} PP`}
-                          {r.streak?.current_p1_streak
-                            ? ` · 🔥 ${r.streak.current_p1_streak}`
-                            : ""}
-                        </p>
+                    <>
+                      <div className="md:hidden">
+                        {rowsData.map((r) => (
+                          <LeagueRowMobile key={r.rank} {...r} />
+                        ))}
                       </div>
-                      <div
-                        className="relative h-1.5"
-                        style={{ background: "var(--bg)" }}
-                        aria-hidden
-                      >
-                        <div
-                          className="absolute inset-y-0 left-0"
-                          style={{
-                            width: `${pct}%`,
-                            background: fav?.hex ?? "var(--fg-subtle)",
-                          }}
-                        />
+                      <div className="hidden md:block">
+                        {rowsData.map((r) => (
+                          <LeagueRowDesktop key={r.rank} {...r} />
+                        ))}
                       </div>
-                      <span
-                        className="text-right"
-                        style={{
-                          fontFamily:
-                            "var(--font-mono), ui-monospace, monospace",
-                          fontSize: 22,
-                        }}
-                        data-tabular
-                      >
-                        {r.points}
-                      </span>
-                    </div>
+                    </>
                   );
-                })}
+                })()}
               </section>
             )}
           </>
