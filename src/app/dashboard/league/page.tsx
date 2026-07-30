@@ -328,7 +328,7 @@ export default async function LeaguePage() {
                         </span>
                       </p>
                       {r.streak?.current_p1_streak ? (
-                        <p className="mt-3 flex items-center gap-2 whitespace-nowrap text-xs text-[color:var(--fg-muted)]">
+                        <p className="mt-3 flex items-center gap-2 text-xs text-[color:var(--fg-muted)] md:whitespace-nowrap">
                           <span
                             aria-hidden
                             style={{

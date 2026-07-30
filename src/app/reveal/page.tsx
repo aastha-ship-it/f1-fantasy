@@ -287,11 +287,9 @@ export default async function RevealIndexPage() {
               return (
                 <li
                   key={r.round}
-                  className="grid items-center gap-[var(--space-xl)] bg-[color:var(--surface)]"
+                  className="flex flex-col gap-2 bg-[color:var(--surface)] md:grid md:items-center md:gap-[var(--space-xl)] md:[grid-template-columns:60px_80px_36px_1fr_auto_auto_auto]"
                   style={{
                     padding: "var(--space-lg) var(--space-xl)",
-                    gridTemplateColumns:
-                      "60px 80px 36px 1fr auto auto auto",
                   }}
                 >
                   <span
@@ -301,111 +299,128 @@ export default async function RevealIndexPage() {
                   >
                     R{String(r.round).padStart(2, "0")}
                   </span>
+                  {/* Decorative track silhouette — dropped below md so the
+                      fixed 80px art never competes for width on a 390/412px
+                      viewport; the 7-column desktop template (which counts
+                      on this occupying its own 80px track) is restored
+                      unchanged at md via the `hidden md:block` pairing. */}
                   <TrackDiagram
                     circuit={r.ergast_circuit_id ?? r.circuit}
                     size={80}
                     stroke="var(--fg-subtle)"
                     strokeWidth={1.5}
+                    className="hidden md:block"
                   />
-                  <span aria-hidden style={{ fontSize: 24, lineHeight: 1 }}>
-                    {flag}
-                  </span>
-                  <div className="min-w-0">
-                    <p
-                      className="truncate uppercase"
-                      style={{
-                        fontFamily: "var(--font-boldonse), ui-sans-serif",
-                        fontSize: 20,
-                        lineHeight: 1.05,
-                        letterSpacing: "0.005em",
-                      }}
-                    >
-                      {short.toUpperCase()}
-                    </p>
-                    <p
-                      className="mt-0.5 text-[10px] uppercase text-[color:var(--fg-subtle)]"
-                      style={{ letterSpacing: "0.06em" }}
+                  {/* Flag + title group — a single flex row on mobile,
+                      `md:contents` so the two children rejoin the grid as
+                      independent columns (36px / 1fr) at md, matching the
+                      original flat 7-item column order exactly. */}
+                  <div className="flex items-center gap-3 md:contents">
+                    <span aria-hidden style={{ fontSize: 24, lineHeight: 1 }}>
+                      {flag}
+                    </span>
+                    <div className="min-w-0">
+                      <p
+                        className="truncate uppercase"
+                        style={{
+                          fontFamily: "var(--font-boldonse), ui-sans-serif",
+                          fontSize: 20,
+                          lineHeight: 1.05,
+                          letterSpacing: "0.005em",
+                        }}
+                      >
+                        {short.toUpperCase()}
+                      </p>
+                      <p
+                        className="mt-0.5 text-[10px] uppercase text-[color:var(--fg-subtle)]"
+                        style={{ letterSpacing: "0.06em" }}
+                        data-tabular
+                      >
+                        {r.circuit.toUpperCase()}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Latest / pills / total group — same `md:contents`
+                      treatment so it flattens back into the last three grid
+                      columns at md. */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 md:contents">
+                    <span
+                      className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
+                      style={{ letterSpacing: "0.12em" }}
                       data-tabular
                     >
-                      {r.circuit.toUpperCase()}
-                    </p>
-                  </div>
-                  <span
-                    className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
-                    style={{ letterSpacing: "0.12em" }}
-                    data-tabular
-                  >
-                    Latest {formatRevealedAgo(r.latestRevealedAt)}
-                  </span>
+                      Latest {formatRevealedAgo(r.latestRevealedAt)}
+                    </span>
 
-                  {/* Session pills — one per revealed session. Each is the
-                      click target for its own cinematic. Uniformly accent-red
-                      treatment so the row reads as a brand-consistent strip;
-                      perfect podiums + ≥10pt scores get a stronger fill so
-                      the eye still finds the standout sessions. */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    {r.sessions.map((s) => {
-                      const sc = scoreByEvent.get(s.id);
-                      const pts = sc ? Number(sc.points) : null;
-                      const perfect = sc?.perfect_bonus ?? false;
-                      const fillPct = pillFill(perfect, pts);
-                      return (
-                        <Link
-                          key={s.id}
-                          href={`/reveal/${s.id}`}
-                          aria-label={`Watch ${sessionLabel(s.session_type)} reveal`}
-                          className="flex items-center gap-2 transition-colors"
-                          style={{
-                            padding: "6px 12px",
-                            background: `color-mix(in oklch, var(--accent) ${fillPct}%, transparent)`,
-                            border: "1px solid var(--accent)",
-                          }}
-                        >
-                          <span
-                            className="text-[10px] uppercase"
+                    {/* Session pills — one per revealed session. Each is the
+                        click target for its own cinematic. Uniformly accent-red
+                        treatment so the row reads as a brand-consistent strip;
+                        perfect podiums + ≥10pt scores get a stronger fill so
+                        the eye still finds the standout sessions. */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {r.sessions.map((s) => {
+                        const sc = scoreByEvent.get(s.id);
+                        const pts = sc ? Number(sc.points) : null;
+                        const perfect = sc?.perfect_bonus ?? false;
+                        const fillPct = pillFill(perfect, pts);
+                        return (
+                          <Link
+                            key={s.id}
+                            href={`/reveal/${s.id}`}
+                            aria-label={`Watch ${sessionLabel(s.session_type)} reveal`}
+                            className="flex items-center gap-2 transition-colors"
                             style={{
-                              letterSpacing: "0.1em",
-                              color: "var(--fg-muted)",
-                              fontFamily:
-                                "var(--font-mono), ui-monospace, monospace",
+                              padding: "6px 12px",
+                              background: `color-mix(in oklch, var(--accent) ${fillPct}%, transparent)`,
+                              border: "1px solid var(--accent)",
                             }}
-                            data-tabular
                           >
-                            {SESSION_PILL_LABEL[s.session_type]}
-                          </span>
-                          <span
-                            style={{
-                              fontFamily:
-                                "var(--font-mono), ui-monospace, monospace",
-                              fontWeight: 600,
-                              fontSize: 13,
-                              color:
-                                pts == null ? "var(--fg-subtle)" : "var(--fg)",
-                            }}
-                            data-tabular
-                          >
-                            {pts == null ? "—" : `+${pts}`}
-                          </span>
-                        </Link>
-                      );
-                    })}
-                  </div>
+                            <span
+                              className="text-[10px] uppercase"
+                              style={{
+                                letterSpacing: "0.1em",
+                                color: "var(--fg-muted)",
+                                fontFamily:
+                                  "var(--font-mono), ui-monospace, monospace",
+                              }}
+                              data-tabular
+                            >
+                              {SESSION_PILL_LABEL[s.session_type]}
+                            </span>
+                            <span
+                              style={{
+                                fontFamily:
+                                  "var(--font-mono), ui-monospace, monospace",
+                                fontWeight: 600,
+                                fontSize: 13,
+                                color:
+                                  pts == null
+                                    ? "var(--fg-subtle)"
+                                    : "var(--fg)",
+                              }}
+                              data-tabular
+                            >
+                              {pts == null ? "—" : `+${pts}`}
+                            </span>
+                          </Link>
+                        );
+                      })}
+                    </div>
 
-                  <span
-                    aria-label="Total"
-                    className="text-right"
-                    style={{
-                      fontFamily: "var(--font-boldonse), ui-sans-serif",
-                      fontSize: 22,
-                      minWidth: 80,
-                      color:
-                        r.totalPoints >= 10
-                          ? "var(--accent)"
-                          : "var(--fg)",
-                    }}
-                  >
-                    Σ +{r.totalPoints}
-                  </span>
+                    <span
+                      aria-label="Total"
+                      className="text-right"
+                      style={{
+                        fontFamily: "var(--font-boldonse), ui-sans-serif",
+                        fontSize: 22,
+                        minWidth: 80,
+                        color: r.totalPoints >= 10 ? "var(--accent)" : "var(--fg)",
+                      }}
+                    >
+                      Σ +{r.totalPoints}
+                    </span>
+                  </div>
                 </li>
               );
             })}

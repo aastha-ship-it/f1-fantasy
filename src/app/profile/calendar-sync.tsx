@@ -36,14 +36,12 @@ export function CalendarSync({
 
   return (
     <section
-      className="grid items-start"
+      className="grid grid-cols-1 items-start gap-[var(--space-xl)] md:grid-cols-[1fr_auto] md:gap-[var(--space-2xl)]"
       style={{
         marginTop: "var(--space-3xl)",
         background: "var(--surface)",
         border: "1px solid var(--border)",
         padding: "var(--space-2xl)",
-        gridTemplateColumns: "1fr auto",
-        gap: "var(--space-2xl)",
       }}
     >
       <div>
@@ -130,7 +128,7 @@ export function CalendarSync({
                     setTimeout(() => setCopied(false), 2000);
                   });
                 }}
-                className="cursor-pointer whitespace-nowrap"
+                className="cursor-pointer md:whitespace-nowrap"
                 style={{ color: "var(--accent)", fontWeight: 600 }}
               >
                 {copied ? "Copied" : "Copy"}

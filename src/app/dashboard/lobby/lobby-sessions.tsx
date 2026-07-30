@@ -27,8 +27,13 @@ const TONE_COLOR: Record<PhaseTone, string> = {
   success: "var(--success)",
 };
 
+// Mobile base: 2-col fluid grid (title/time paired with phase line on row 1,
+// lock dots paired with lock count on row 2) — the four-column desktop
+// template is an inline pixel-free arbitrary value, but it's still
+// unconditional (applies below md too), which is what overflowed at 390/412.
+// Restored verbatim at md via the same [grid-template-columns:…] syntax.
 const PREVIEW_GRID =
-  "grid items-center gap-[var(--space-lg)] [grid-template-columns:1.2fr_1.4fr_auto_auto]";
+  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-[var(--space-md)] md:gap-[var(--space-lg)] md:[grid-template-columns:1.2fr_1.4fr_auto_auto]";
 
 function SessionMeta({ s }: { s: LobbySessionView }) {
   const pl = phaseLine(s);
@@ -88,7 +93,7 @@ function LockDots({ participants }: { participants: LobbyParticipant[] }) {
 
 function LockCount({ s, action }: { s: LobbySessionView; action: string }) {
   return (
-    <span className="flex items-baseline gap-2 whitespace-nowrap">
+    <span className="flex items-baseline gap-2 md:whitespace-nowrap">
       <span
         style={{
           fontFamily: "var(--font-mono), ui-monospace, monospace",
