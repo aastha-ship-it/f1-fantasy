@@ -366,16 +366,22 @@ export default async function LeaguePage() {
               <section className="mt-8 border border-[color:var(--border)] bg-[color:var(--surface)]">
                 {(() => {
                   const rowsData: LeagueRowProps[] = rest.map((r) => {
-                    const fav = teamMeta(r.user!.favorite_team);
                     const isMe = r.userId === me;
                     const name = displayName(r.user!, isMe);
                     return {
                       rank: r.rank,
+                      userId: r.userId,
                       name,
                       initial: name.charAt(0).toUpperCase(),
                       points: r.points,
                       pct: leaderPts > 0 ? (r.points / leaderPts) * 100 : 0,
-                      favTeam: fav?.slug ?? null,
+                      // Raw free-form string — LeagueRowDesktop/Mobile each
+                      // resolve it via teamMeta() themselves. Do NOT
+                      // pre-resolve to a slug here: teamMeta("kick") has no
+                      // identity alias in TEAM_ALIASES (unlike every other
+                      // TeamSlug), so a slug round-trip silently drops Kick
+                      // Sauber/Audi favourites to "No favorite team".
+                      favTeam: r.user!.favorite_team,
                       favDriverCode: r.user!.favorite_driver
                         ? driverCodeById.get(r.user!.favorite_driver) ?? null
                         : null,
@@ -388,12 +394,12 @@ export default async function LeaguePage() {
                     <>
                       <div className="md:hidden">
                         {rowsData.map((r) => (
-                          <LeagueRowMobile key={r.rank} {...r} />
+                          <LeagueRowMobile key={r.userId} {...r} />
                         ))}
                       </div>
                       <div className="hidden md:block">
                         {rowsData.map((r) => (
-                          <LeagueRowDesktop key={r.rank} {...r} />
+                          <LeagueRowDesktop key={r.userId} {...r} />
                         ))}
                       </div>
                     </>

@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/TopBar";
 import { MobileTabBar } from "@/components/MobileTabBar";
-import { TrackDiagram } from "@/components/TrackDiagram";
 import { DriverPortrait } from "@/components/DriverPortrait";
 import { teamMeta } from "@/lib/design/teams";
 import { driverCountry, countryFlag } from "@/lib/design/drivers";

@@ -2,6 +2,7 @@ import { teamMeta } from "@/lib/design/teams";
 
 export type LeagueRowProps = {
   rank: number;
+  userId: string;
   name: string;
   initial: string;
   points: number;
@@ -172,13 +173,16 @@ export function LeagueRowMobile(p: LeagueRowProps) {
         >
           <Stat label="TEAM" value={fav ? fav.name.toUpperCase() : "—"} />
           <Stat label="DRIVER" value={p.favDriverCode ?? "—"} />
-          <Stat label="PERFECT PODIUMS" value={String(p.perfects)} />
+          <Stat
+            label="PERFECT PODIUMS"
+            value={String(p.perfects)}
+            tabularValue
+          />
           {p.streak > 0 && (
             <div className="flex items-baseline justify-between gap-2">
               <dt
                 className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
                 style={{ letterSpacing: "0.1em" }}
-                data-tabular
               >
                 P1 STREAK
               </dt>
@@ -198,17 +202,26 @@ export function LeagueRowMobile(p: LeagueRowProps) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  tabularValue,
+}: {
+  label: string;
+  value: string;
+  /** Set only when `value` is numeric — Geist Mono is mandatory for
+   * numerics, not for non-numeric labels/values like team or driver code. */
+  tabularValue?: boolean;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-2">
       <dt
         className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
         style={{ letterSpacing: "0.1em" }}
-        data-tabular
       >
         {label}
       </dt>
-      <dd className="text-sm" data-tabular>
+      <dd className="text-sm" data-tabular={tabularValue || undefined}>
         {value}
       </dd>
     </div>
