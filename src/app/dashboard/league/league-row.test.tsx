@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { teamMeta } from "@/lib/design/teams";
 import {
   LeagueRowDesktop,
   LeagueRowMobile,
+  toLeagueRowProps,
   type LeagueRowProps,
 } from "./league-row";
 
@@ -61,5 +63,37 @@ describe("LeagueRowDesktop", () => {
     render(<LeagueRowDesktop {...ME} favTeam="Kick Sauber" />);
     expect(screen.getByText(/Team Audi/)).toBeInTheDocument();
     expect(screen.queryByText("No favorite team")).toBeNull();
+  });
+});
+
+describe("toLeagueRowProps", () => {
+  // This is the actual defect site (round-1 review, Finding 1): the
+  // component-level test above only proves LeagueRowDesktop resolves a raw
+  // team string correctly — it never touches page.tsx's derivation. This
+  // test calls the exact function page.tsx's `rowsData` mapper calls, so a
+  // future regression back to `favTeam: teamMeta(...).slug ?? null` inside
+  // `toLeagueRowProps` itself fails here, not just at the component.
+  const SAUBER_ROW = {
+    rank: 5,
+    userId: "u-sauber-fan",
+    points: 40,
+    perfects: 0,
+    user: {
+      display_name: "Sauber Fan",
+      email: "fan@example.test",
+      favorite_team: "Kick Sauber",
+      favorite_driver: null,
+    },
+    streak: null,
+  };
+  const CTX = {
+    leaderPts: 100,
+    currentUserId: null,
+    driverCodeById: new Map<number, string>(),
+  };
+
+  it("returns a favTeam that teamMeta resolves to the real team, not the pre-resolved slug", () => {
+    const props = toLeagueRowProps(SAUBER_ROW, CTX);
+    expect(teamMeta(props.favTeam)?.name).toBe("Audi");
   });
 });

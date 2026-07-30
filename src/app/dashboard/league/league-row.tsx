@@ -14,6 +14,81 @@ export type LeagueRowProps = {
   isMe: boolean;
 };
 
+type DisplayNameUser = {
+  display_name: string | null;
+  email: string;
+};
+
+/**
+ * Moved here from page.tsx so `toLeagueRowProps` (below) can be a single,
+ * fully self-contained, unit-testable derivation — the row-shaping logic
+ * that produces `LeagueRowProps` (name included) now lives in one place.
+ * Behavior is byte-identical to the original page.tsx helper.
+ */
+export function displayName(u: DisplayNameUser, isMe: boolean): string {
+  if (isMe) return "You";
+  return u.display_name?.trim() || u.email.split("@")[0];
+}
+
+/** Structural shape of one row in page.tsx's `ranked`/`rest` arrays — kept
+ * local (rather than importing page.tsx's types) so this module has no
+ * dependency on the route file. */
+type RankedRow = {
+  rank: number;
+  userId: string;
+  points: number;
+  perfects: number;
+  user?: {
+    display_name: string | null;
+    email: string;
+    favorite_team: string | null;
+    favorite_driver: number | null;
+  };
+  streak?: { current_p1_streak: number } | null;
+};
+
+/**
+ * The single per-row derivation path from a `RankedRow` (+ page-level
+ * context) to `LeagueRowProps`. page.tsx's `rowsData` mapper calls this —
+ * and nothing else builds `LeagueRowProps` — so there is exactly one place
+ * that can regress the favTeam handling below.
+ *
+ * `favTeam` is intentionally the RAW free-form `favorite_team` string, not
+ * a pre-resolved `teamMeta(...).slug`. `LeagueRowDesktop`/`LeagueRowMobile`
+ * each call `teamMeta(p.favTeam)` themselves; `teamMeta("kick")` has no
+ * identity alias in `TEAM_ALIASES` (unlike every other `TeamSlug` — see
+ * `src/lib/design/teams.ts`), so round-tripping through the slug here would
+ * silently drop Kick Sauber/Audi favourites to "No favorite team" at every
+ * breakpoint, including desktop ≥1024px. `league-row.test.tsx` asserts on
+ * this function directly to guard the exact line that regressed once.
+ */
+export function toLeagueRowProps(
+  r: RankedRow,
+  ctx: {
+    leaderPts: number;
+    currentUserId: string | null;
+    driverCodeById: Map<number, string>;
+  },
+): LeagueRowProps {
+  const isMe = r.userId === ctx.currentUserId;
+  const name = displayName(r.user!, isMe);
+  return {
+    rank: r.rank,
+    userId: r.userId,
+    name,
+    initial: name.charAt(0).toUpperCase(),
+    points: r.points,
+    pct: ctx.leaderPts > 0 ? (r.points / ctx.leaderPts) * 100 : 0,
+    favTeam: r.user!.favorite_team,
+    favDriverCode: r.user!.favorite_driver
+      ? ctx.driverCodeById.get(r.user!.favorite_driver) ?? null
+      : null,
+    perfects: r.perfects,
+    streak: r.streak?.current_p1_streak ?? 0,
+    isMe,
+  };
+}
+
 const EMOJI_FONT =
   '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 

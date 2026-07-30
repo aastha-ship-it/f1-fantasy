@@ -7,6 +7,8 @@ import { teamMeta } from "@/lib/design/teams";
 import {
   LeagueRowDesktop,
   LeagueRowMobile,
+  displayName,
+  toLeagueRowProps,
   type LeagueRowProps,
 } from "./league-row";
 
@@ -25,11 +27,6 @@ type StreakRow = {
   current_podium_streak: number;
   total_perfect_podiums: number;
 };
-
-export function displayName(u: UserRow, isMe: boolean): string {
-  if (isMe) return "You";
-  return u.display_name?.trim() || u.email.split("@")[0];
-}
 
 const CURRENT_SEASON = new Date().getUTCFullYear();
 
@@ -365,31 +362,13 @@ export default async function LeaguePage() {
             {rest.length > 0 && (
               <section className="mt-8 border border-[color:var(--border)] bg-[color:var(--surface)]">
                 {(() => {
-                  const rowsData: LeagueRowProps[] = rest.map((r) => {
-                    const isMe = r.userId === me;
-                    const name = displayName(r.user!, isMe);
-                    return {
-                      rank: r.rank,
-                      userId: r.userId,
-                      name,
-                      initial: name.charAt(0).toUpperCase(),
-                      points: r.points,
-                      pct: leaderPts > 0 ? (r.points / leaderPts) * 100 : 0,
-                      // Raw free-form string — LeagueRowDesktop/Mobile each
-                      // resolve it via teamMeta() themselves. Do NOT
-                      // pre-resolve to a slug here: teamMeta("kick") has no
-                      // identity alias in TEAM_ALIASES (unlike every other
-                      // TeamSlug), so a slug round-trip silently drops Kick
-                      // Sauber/Audi favourites to "No favorite team".
-                      favTeam: r.user!.favorite_team,
-                      favDriverCode: r.user!.favorite_driver
-                        ? driverCodeById.get(r.user!.favorite_driver) ?? null
-                        : null,
-                      perfects: r.perfects,
-                      streak: r.streak?.current_p1_streak ?? 0,
-                      isMe,
-                    };
-                  });
+                  const rowsData: LeagueRowProps[] = rest.map((r) =>
+                    toLeagueRowProps(r, {
+                      leaderPts,
+                      currentUserId: me,
+                      driverCodeById,
+                    }),
+                  );
                   return (
                     <>
                       <div className="md:hidden">
