@@ -4,9 +4,12 @@ import type { TopBarTab } from "@/components/TopBar";
 /**
  * Fixed bottom navigation, below the 780px fork only.
  *
- * Five destinations, thumb-reachable one-handed during a race. League and
- * Profile are reachable from the slim mobile top row (see TopBar) rather
- * than crowding six or seven targets across a 375px screen.
+ * Five destinations, thumb-reachable one-handed during a race: League,
+ * Predict, Lobby, Reveal, Standings. Calendar is the landing page and is
+ * reached via the F1 wordmark → /dashboard (TopBar, no responsive class,
+ * visible at every width), so it does not need a tab here. Profile is
+ * reachable from the slim mobile top row (see TopBar) rather than crowding
+ * a sixth target across a 375px screen.
  *
  * Deliberately NOT rendered on exactly one immersive route: /reveal/[eventId]
  * (both TopBar call sites there) — the cinematic is chrome-free. TopBar is
@@ -19,7 +22,7 @@ import type { TopBarTab } from "@/components/TopBar";
  * bar above this one.
  */
 const TABS: { id: TopBarTab; label: string; href: string; glyph: string }[] = [
-  { id: "calendar", label: "Calendar", href: "/dashboard", glyph: "⚑" },
+  { id: "league", label: "League", href: "/dashboard/league", glyph: "▲" },
   { id: "predict", label: "Predict", href: "/dashboard/predict", glyph: "◉" },
   { id: "lobby", label: "Lobby", href: "/dashboard/lobby", glyph: "▦" },
   { id: "reveal", label: "Reveal", href: "/reveal", glyph: "◈" },

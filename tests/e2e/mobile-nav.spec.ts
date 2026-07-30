@@ -42,6 +42,8 @@ test.describe("mobile navigation", () => {
       "/dashboard/lobby",
       "/dashboard/standings",
       "/reveal",
+      "/dashboard/league",
+      "/profile",
     ]) {
       await page.goto(route);
       const bar = page.getByRole("navigation", { name: "Primary" });

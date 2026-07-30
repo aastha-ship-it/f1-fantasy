@@ -9,12 +9,17 @@ describe("MobileTabBar", () => {
     const links = screen.getAllByRole("link");
     expect(links).toHaveLength(5);
     expect(links.map((l) => l.getAttribute("href"))).toEqual([
-      "/dashboard",
+      "/dashboard/league",
       "/dashboard/predict",
       "/dashboard/lobby",
       "/reveal",
       "/dashboard/standings",
     ]);
+  });
+
+  it("marks no tab current when active is calendar (Calendar left the bar)", () => {
+    render(<MobileTabBar active="calendar" />);
+    expect(screen.queryAllByRole("link", { current: "page" })).toHaveLength(0);
   });
 
   it("marks only the active destination with aria-current", () => {

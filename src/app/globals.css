@@ -1,6 +1,19 @@
 @import "tailwindcss";
 
 /*
+ * The plan doc committed under docs/ contains Tailwind-class-shaped code
+ * samples in its snippets. Tailwind's content auto-detection would
+ * otherwise scan that markdown and ship those utilities to users with no
+ * real call site in src/ — exclude the doc tree from source scanning.
+ * Path is relative to THIS file's directory (src/app/), not the repo
+ * root — "docs/**" here would look for src/app/docs and silently match
+ * nothing, so it must stay "../../docs/**".
+ * (Careful: this comment must itself avoid spelling out real utility
+ * names verbatim, or it recreates the exact leak it's warning about.)
+ */
+@source not "../../docs/**";
+
+/*
  * F1 Fantasy — OKLCH tokens (see .impeccable.md for rationale).
  * Dark theme default. All neutrals tinted toward F1-red hue (27°).
  */

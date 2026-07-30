@@ -28,6 +28,7 @@ export function ScoringHelp() {
         type="button"
         onClick={() => ref.current?.showModal()}
         aria-haspopup="dialog"
+        aria-label="How scoring works"
         className="inline-flex cursor-pointer items-center gap-[var(--space-sm)] uppercase text-[color:var(--fg-subtle)] hover:text-[color:var(--fg)] transition-colors"
         data-tabular
         style={{

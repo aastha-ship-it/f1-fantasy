@@ -10,6 +10,6 @@ describe("globals.css design tokens", () => {
   });
 
   it("never defines a --spacing-* token (would hijack p-*/max-w-* utilities)", () => {
-    expect(css).not.toMatch(/--spacing-[a-z0-9]+\s*:/);
+    expect(css).not.toMatch(/--spacing-[a-z0-9-]+\s*:/);
   });
 });

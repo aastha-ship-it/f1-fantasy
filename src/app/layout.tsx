@@ -31,6 +31,9 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // Hardcoded to mirror --bg (globals.css, oklch(16% 0.012 27)) — the
+  // browser theme-color meta tag can't consume a CSS custom property, so
+  // re-derive this by hand if --bg is ever retuned.
   themeColor: "#2b1013",
 };
 

@@ -43,6 +43,13 @@ describe("TopBar", () => {
     expect(label.className).toContain("lg:inline");
   });
 
+  it("keeps the scoring-help trigger reachable by accessible name at every viewport", () => {
+    render(<TopBar active="calendar" displayName="Aastha" email="a@b.test" />);
+    expect(
+      screen.getByRole("button", { name: /scoring/i }),
+    ).toBeInTheDocument();
+  });
+
   it("uses the initial of the display name for the avatar", () => {
     render(<TopBar active="profile" displayName="Aastha" email="a@b.test" />);
     const list = screen.getByRole("list");
