@@ -44,7 +44,7 @@ export function TopBar({
 
   return (
     <nav className="sticky top-0 z-30 border-b border-[color:var(--border)] bg-[color:var(--bg)]/85 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-[1600px] items-center gap-8 px-6 py-4 sm:px-8 lg:px-12 xl:px-16">
+      <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-6 py-4 sm:px-8 lg:gap-8 lg:px-12 xl:px-16">
         <Link
           href="/dashboard"
           aria-label="F1 Fantasy"
@@ -53,15 +53,15 @@ export function TopBar({
           <F1Mark height={22} />
         </Link>
 
-        <ul className="flex flex-1 items-center gap-1 text-xs uppercase tracking-[0.12em]">
+        <ul className="hidden flex-1 items-center gap-1 text-xs uppercase tracking-[0.06em] md:flex lg:tracking-[0.12em]">
           {TABS.map((t) => (
             <li key={t.id}>
               <Link
                 href={t.href}
                 className={
                   t.id === active
-                    ? "border-b-2 border-[color:var(--accent)] px-3 pb-3 -mb-4 pt-3 text-[color:var(--fg)]"
-                    : "border-b-2 border-transparent px-3 pb-3 -mb-4 pt-3 text-[color:var(--fg-subtle)] hover:text-[color:var(--fg-muted)]"
+                    ? "border-b-2 border-[color:var(--accent)] px-1.5 pb-3 -mb-4 pt-3 text-[color:var(--fg)] lg:px-3"
+                    : "border-b-2 border-transparent px-1.5 pb-3 -mb-4 pt-3 text-[color:var(--fg-subtle)] hover:text-[color:var(--fg-muted)] lg:px-3"
                 }
                 data-tabular
               >
@@ -71,7 +71,7 @@ export function TopBar({
           ))}
         </ul>
 
-        <div className="flex items-center gap-4">
+        <div className="ml-auto flex items-center gap-4">
           <ScoringHelp />
           <Link
             href="/profile"

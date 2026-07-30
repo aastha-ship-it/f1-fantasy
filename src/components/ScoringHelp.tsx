@@ -55,7 +55,7 @@ export function ScoringHelp() {
         >
           ?
         </span>
-        How Scoring Works
+        <span className="hidden lg:inline">How Scoring Works</span>
       </button>
 
       <dialog
