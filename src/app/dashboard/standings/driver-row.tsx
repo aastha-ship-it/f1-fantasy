@@ -150,7 +150,7 @@ export function DriverStandingsRowMobile(p: DriverRowProps) {
       >
         <span
           aria-hidden
-          className="absolute left-0 top-2 bottom-2 w-[3px]"
+          className="absolute left-0 top-2 bottom-0 w-[3px]"
           style={{ background: t?.hex ?? "var(--fg-subtle)" }}
         />
         <span
@@ -190,31 +190,43 @@ export function DriverStandingsRowMobile(p: DriverRowProps) {
         </span>
       </summary>
 
-      <dl
-        className="grid gap-x-4 gap-y-2 px-3 pb-4 pl-3"
-        style={{ gridTemplateColumns: "repeat(2, minmax(0,1fr))" }}
-      >
-        {[
-          ["GAP", p.gap],
-          ["WINS", String(p.wins)],
-          ["PODIUMS", String(p.podiums)],
-          ["TEAM", t?.name ?? p.team],
-          ["COUNTRY", p.country ? countryFlag(p.country) : "—"],
-        ].map(([label, value]) => (
-          <div key={label} className="flex items-baseline justify-between gap-2">
-            <dt
-              className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
-              style={{ letterSpacing: "0.1em" }}
-              data-tabular
-            >
-              {label}
-            </dt>
-            <dd className="text-sm" data-tabular>
-              {value}
-            </dd>
-          </div>
-        ))}
-      </dl>
+      <div className="relative">
+        {/* Second segment of the team-colour edge — <summary>'s stripe only
+            covers the always-visible slot, so the expanded <dl> panel (only
+            rendered into the disclosure-content region while open) needs its
+            own segment to keep the edge running down the full expanded row,
+            not just alongside the collapsed summary. */}
+        <span
+          aria-hidden
+          className="absolute left-0 top-0 bottom-2 w-[3px]"
+          style={{ background: t?.hex ?? "var(--fg-subtle)" }}
+        />
+        <dl
+          className="grid gap-x-4 gap-y-2 px-3 pb-4 pl-3"
+          style={{ gridTemplateColumns: "repeat(2, minmax(0,1fr))" }}
+        >
+          {[
+            ["GAP", p.gap],
+            ["WINS", String(p.wins)],
+            ["PODIUMS", String(p.podiums)],
+            ["TEAM", t?.name ?? p.team],
+            ["COUNTRY", p.country ? countryFlag(p.country) : "—"],
+          ].map(([label, value]) => (
+            <div key={label} className="flex items-baseline justify-between gap-2">
+              <dt
+                className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
+                style={{ letterSpacing: "0.1em" }}
+                data-tabular
+              >
+                {label}
+              </dt>
+              <dd className="text-sm" data-tabular>
+                {value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
     </details>
   );
 }
