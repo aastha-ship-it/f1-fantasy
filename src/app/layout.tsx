@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { Titillium_Web } from "next/font/google";
@@ -19,6 +19,19 @@ const display = Titillium_Web({
 export const metadata: Metadata = {
   title: "F1 Fantasy",
   description: "Private P1/P2/P3 prediction league",
+};
+
+/**
+ * `viewportFit: "cover"` is required for env(safe-area-inset-*) to report
+ * non-zero values on notched iPhones — the fixed bottom tab bar and the
+ * predict lock bar both depend on it. Next already emits
+ * width=device-width, initial-scale=1 by default.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#2b1013",
 };
 
 export default function RootLayout({

@@ -134,6 +134,23 @@
   --ease-quart: var(--ease-out-quart);
 }
 
+/*
+ * Mobile/desktop fork. 780px, not Tailwind's default 768px: the desktop
+ * TopBar needs ~1053px at full size and ~763px compacted, and the widest
+ * content grid (admin, ~636px + padding) needs ~700px. 780 clears both.
+ *
+ * `md:` is safe to redefine — it had zero call sites in this codebase when
+ * this was introduced (sm: 34, lg: 64, xl: 17, md: 0). Using a named
+ * breakpoint instead of `min-[780px]:` means a typo can't silently compile.
+ *
+ * The existing lg:/xl: utilities are NOT a second fork — they are
+ * refinements inside the desktop tree. 780–1024px renders desktop tables
+ * with single-column heroes, which is intended.
+ */
+@theme {
+  --breakpoint-md: 780px;
+}
+
 html {
   color-scheme: dark;
 }
