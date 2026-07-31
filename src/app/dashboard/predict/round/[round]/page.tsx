@@ -251,10 +251,7 @@ export default async function PredictRoundPage({
               <Link
                 key={s.id}
                 href={`/dashboard/predict/${s.id}`}
-                className="grid items-center gap-6 bg-[color:var(--surface)] px-6 py-5 transition-colors hover:bg-[color:var(--surface-2)]"
-                style={{
-                  gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1fr) auto",
-                }}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 bg-[color:var(--surface)] px-6 py-5 transition-colors hover:bg-[color:var(--surface-2)] md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] md:gap-6"
               >
                 <div className="min-w-0">
                   <p
