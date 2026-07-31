@@ -76,13 +76,22 @@ export function PracticeBanner({ sessions }: { sessions: FpSession[] }) {
         </span>
       </header>
 
+      {/*
+        Session count is data-driven (1 on a sprint weekend, else 3), so the
+        template cannot be a static Tailwind class. Keep the count in a CSS
+        custom property and consume it only at `md:` — below the 780px fork
+        the sessions stack one per row instead of being clipped by the
+        section's `overflow: hidden`.
+      */}
       <div
-        className="grid"
-        style={{
-          gridTemplateColumns: `repeat(${sessions.length}, 1fr)`,
-          gap: 1,
-          background: "var(--border)",
-        }}
+        className="grid grid-cols-1 md:[grid-template-columns:repeat(var(--fp-cols),1fr)]"
+        style={
+          {
+            gap: 1,
+            background: "var(--border)",
+            "--fp-cols": sessions.length,
+          } as React.CSSProperties
+        }
       >
         {sessions.map((s) => {
           const leader = s.top3[0]?.lapSeconds ?? null;
@@ -141,9 +150,13 @@ export function PracticeBanner({ sessions }: { sessions: FpSession[] }) {
                   return (
                     <li
                       key={p.pos}
-                      className="grid items-center"
+                      // Base uses minmax(0,1fr) for the code column so that
+                      // under width pressure the *flexible* track shrinks —
+                      // with a bare `1fr` the browser instead collapsed the
+                      // `auto` portrait track to 0px at 375px. `md:` restores
+                      // the original template verbatim.
+                      className="grid items-center grid-cols-[32px_auto_minmax(0,1fr)_auto] md:[grid-template-columns:32px_auto_1fr_auto]"
                       style={{
-                        gridTemplateColumns: "32px auto 1fr auto",
                         gap: "var(--space-md)",
                         padding: "6px 10px",
                         background: "var(--surface-2)",

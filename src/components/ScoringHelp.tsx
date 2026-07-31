@@ -84,9 +84,11 @@ export function ScoringHelp() {
           }}
         >
           <div
-            className="flex items-start justify-between"
+            // Padding moved off `style` so it can carry a breakpoint: 64px of
+            // horizontal chrome inside a 345px dialog left ~271px of content
+            // at 375px. `md:` restores the original 24px/32px verbatim.
+            className="flex items-start justify-between p-[var(--space-lg)] md:px-[var(--space-2xl)] md:py-[var(--space-xl)]"
             style={{
-              padding: "var(--space-xl) var(--space-2xl)",
               borderBottom: "1px solid var(--border)",
             }}
           >
@@ -128,7 +130,7 @@ export function ScoringHelp() {
               ESC ✕
             </button>
           </div>
-          <div style={{ padding: "var(--space-2xl)" }}>
+          <div className="p-[var(--space-lg)] md:p-[var(--space-2xl)]">
             <ScoringLegendBody />
           </div>
         </div>

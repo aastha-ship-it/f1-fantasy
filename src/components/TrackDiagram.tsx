@@ -40,6 +40,38 @@ export function TrackDiagram({
   const img = trackImg(circuit);
   const label = circuit ? `${circuit} circuit layout` : "track diagram";
 
+  /*
+   * Mobile width clamp (Task 11), released again at the 780px fork so the
+   * desktop tree computes identically (verified: getComputedStyle width /
+   * height / max-width byte-identical on all 44 diagrams rendered across
+   * /dashboard, /dashboard/{lobby,predict,standings}, /reveal and
+   * /dashboard/predict/round/13, at both 1024px and 1280px).
+   *
+   * `max-width` is a different property from the inline `width`, so a class
+   * *can* constrain it; the inline `height` is untouchable from CSS and is
+   * deliberately left alone — `mask-size: contain` and the SVG's default
+   * `preserveAspectRatio` letterbox the silhouette inside a narrower box
+   * rather than distorting it.
+   *
+   * Known limit, measured, not papered over: this is a safety net for
+   * properly-constrained containers, and on today's call sites it changes no
+   * geometry at 375px — every TrackDiagram's containing block is already at
+   * least as wide as the diagram. The one genuine mobile defect (the
+   * `/dashboard` hero asks for 420px and is cropped by the section's
+   * `overflow: hidden`) is NOT fixable from here: a box with a *definite*
+   * width contributes that width as its min-content size, so the ancestor
+   * grid track sizes to 484px and a percentage max-width then resolves
+   * against that oversized containing block. Making the width itself
+   * shrinkable (`min(100%, var(--td-w))`) does fix the hero but collapses
+   * every diagram whose parent is shrink-to-fit — measured: the four
+   * revealed-round tracks inside `<Link className="block">` went to 0px.
+   * The real fix belongs in the dashboard hero's grid, not in this component.
+   *
+   * `className` is caller-supplied and must be MERGED, not replaced — on both
+   * render branches.
+   */
+  const cls = ["max-w-full md:max-w-none", className].filter(Boolean).join(" ");
+
   if (img) {
     const ratio = trackRatio(circuit);
     const w = height != null ? height * ratio : size;
@@ -48,7 +80,7 @@ export function TrackDiagram({
       <div
         role="img"
         aria-label={label}
-        className={className}
+        className={cls}
         style={{
           width: w,
           height: h,
@@ -79,7 +111,7 @@ export function TrackDiagram({
       height={svgH}
       role="img"
       aria-label={label}
-      className={className}
+      className={cls}
       style={style}
       fill="none"
       stroke={stroke}
