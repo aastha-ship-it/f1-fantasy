@@ -663,7 +663,14 @@ export function DriverPicker({
           background: "color-mix(in oklch, var(--surface-2) 92%, transparent)",
         }}
       >
-        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-6 px-6 py-5 sm:px-8 lg:px-12 xl:px-16">
+        {/* Below md the status text stacks above the CTA (narrow phones
+            don't have room for both side by side without wrapping the CTA
+            label — measured 74-94px tall before this stack). `md:flex-row
+            md:justify-between md:gap-6 md:px-8 md:py-5` restores the
+            original desktop row byte-for-byte (`sm:px-8` already gave px-8
+            in the 780-1023px band, so `md:px-8` is a no-op there); `lg:`/
+            `xl:` padding is untouched. */}
+        <div className="mx-auto flex w-full max-w-[1600px] flex-col items-stretch gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-6 md:px-8 md:py-5 lg:px-12 xl:px-16">
           <p
             className="text-xs sm:text-sm text-[color:var(--fg-muted)]"
             style={{ letterSpacing: "0.04em" }}
@@ -698,7 +705,7 @@ export function DriverPicker({
           {justSaved ? (
             <Link
               href={`/dashboard/predict/round/${round}`}
-              className="px-8 py-4 text-sm uppercase text-black transition-colors"
+              className="min-h-[48px] w-full px-8 py-4 text-center text-sm uppercase text-black transition-colors md:w-auto"
               style={{
                 fontFamily: "var(--font-boldonse), ui-sans-serif",
                 letterSpacing: "0.04em",
@@ -712,7 +719,7 @@ export function DriverPicker({
             <button
               type="submit"
               disabled={!canSubmit}
-              className="px-8 py-4 text-sm uppercase text-black transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              className="min-h-[48px] w-full px-8 py-4 text-center text-sm uppercase text-black transition-colors disabled:cursor-not-allowed disabled:opacity-40 md:w-auto"
               style={{
                 fontFamily: "var(--font-boldonse), ui-sans-serif",
                 letterSpacing: "0.04em",
