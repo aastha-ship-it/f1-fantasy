@@ -302,16 +302,28 @@ function NextRaceHero({
   }
 
   return (
-    // `grid-cols-1` is load-bearing, not cosmetic. Without an explicit
-    // template this grid gets ONE implicit `auto` track, whose floor is the
-    // content's min-content width — and the hero's <TrackDiagram size={420}>
-    // has a definite 420px width, so the track sized to 484px inside a 327px
-    // section at 375px and `overflow: hidden` cropped it. `grid-cols-1` emits
-    // `repeat(1, minmax(0,1fr))`, whose 0 floor lets the track track the
-    // container instead, which in turn lets TrackDiagram's `max-w-full`
-    // finally bind. Above the fork the track was already the full available
-    // width, and from `lg:` the two-column template wins outright, so this is
-    // a no-op at every width that isn't cropping today (measured).
+    // `grid-cols-1` is load-bearing, not cosmetic — DO NOT DELETE.
+    //
+    // Without an explicit template this grid gets ONE implicit `auto` track,
+    // whose floor is the content's min-content width. The hero's
+    // <TrackDiagram size={420}> has a definite 420px width, so that floor was
+    // 484px (420 + the wrapper's p-8) — wider than the 327px section at
+    // 375px, and `overflow: hidden` below cropped the result rather than
+    // scrolling it. `grid-cols-1` emits `repeat(1, minmax(0,1fr))`, whose 0
+    // floor lets the track follow the container instead of the content.
+    //
+    // What then sizes the art is `flex-shrink` on the wrapper below (:391):
+    // the diagram is a flex item with a 420px basis, so once the track stopped
+    // being oversized it shrank to the 261px content box on its own.
+    // TrackDiagram itself contributes NO width classes — a `max-w-full` there
+    // was measured inert and removed; see TrackDiagram.tsx's doc comment.
+    //
+    // Above the fork the track was already the full available width, and from
+    // `lg:` the two-column template wins outright, so this is a no-op at every
+    // width that was not cropping (measured at 375/780/1023/1024/1280).
+    // Regression lock: the "dashboard hero art stays inside the viewport" test
+    // in tests/e2e/no-horizontal-overflow.spec.ts — the scrollWidth check
+    // cannot catch this, because the crop happens inside `overflow: hidden`.
     <section
       className="grid grid-cols-1 items-stretch overflow-hidden border border-[color:var(--border)] md:min-h-[360px] lg:grid-cols-[1.3fr_1fr]"
       style={{

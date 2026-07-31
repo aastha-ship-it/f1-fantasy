@@ -93,6 +93,60 @@ test.describe("no horizontal overflow", () => {
     }
   });
 
+  /**
+   * The /dashboard hero clips its own content with `overflow: hidden`, so a
+   * cropped hero is INVISIBLE to the scrollWidth assertion above — measured:
+   * `scrollWidth === clientWidth === 375` both before and after the crop was
+   * fixed. The signal is the art's own right edge (477 cropped vs 318 fixed
+   * at 375px), which is what this asserts.
+   *
+   * Guards `grid-cols-1` on the hero <section>: without it the grid falls back
+   * to one implicit `auto` track floored at the 420px TrackDiagram's
+   * min-content width (484px), which overflows any viewport narrower than
+   * ~550px and gets silently cropped.
+   */
+  test("dashboard hero art stays inside the viewport", async ({ page }) => {
+    await signIn(page);
+    await page.goto("/dashboard");
+    await page.waitForLoadState("networkidle");
+
+    const m = await page.evaluate(() => {
+      // "Track layout" is unique to the real hero — EmptyHero has no such
+      // label — so this can never latch onto a round-list diagram.
+      const label = Array.from(document.querySelectorAll("p")).find(
+        (p) => (p.textContent ?? "").trim().toLowerCase() === "track layout",
+      );
+      const wrap = label?.parentElement;
+      const diag = wrap?.querySelector<HTMLElement>('[role="img"]');
+      if (!diag) return null;
+      const r = diag.getBoundingClientRect();
+      return {
+        left: Math.round(r.left),
+        right: Math.round(r.right),
+        width: Math.round(r.width),
+        viewport: document.scrollingElement!.clientWidth,
+        scrollWidth: document.scrollingElement!.scrollWidth,
+      };
+    });
+
+    if (m === null) {
+      test.skip(true, "no upcoming event — dashboard renders EmptyHero");
+      return;
+    }
+
+    expect.soft(
+      m.right,
+      `hero art is cropped: right=${m.right} exceeds the ${m.viewport}px viewport ` +
+        `(art width=${m.width}). Note scrollWidth=${m.scrollWidth} — the hero's ` +
+        `own overflow:hidden hides this from the scrollWidth check.`,
+    ).toBeLessThanOrEqual(m.viewport + 1);
+
+    expect.soft(
+      m.left,
+      `hero art starts off-screen: left=${m.left}`,
+    ).toBeGreaterThanOrEqual(-1);
+  });
+
   test("dynamic routes reached by following real links", async ({ page }) => {
     await signIn(page);
     // Round detail — follow the first round link on /dashboard/predict.
