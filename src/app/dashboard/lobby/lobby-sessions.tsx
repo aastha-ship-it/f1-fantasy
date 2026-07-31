@@ -29,9 +29,10 @@ const TONE_COLOR: Record<PhaseTone, string> = {
 
 // Mobile base: 2-col fluid grid (title/time paired with phase line on row 1,
 // lock dots paired with lock count on row 2) — the four-column desktop
-// template is an inline pixel-free arbitrary value, but it's still
-// unconditional (applies below md too), which is what overflowed at 390/412.
-// Restored verbatim at md via the same [grid-template-columns:…] syntax.
+// template was a `className` arbitrary value (never an inline style), and
+// pixel-free, but it was still unconditional (applied below md too), which is
+// what overflowed at 390/412. Restored verbatim at md via that same
+// [grid-template-columns:…] arbitrary-value syntax.
 const PREVIEW_GRID =
   "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-[var(--space-md)] md:gap-[var(--space-lg)] md:[grid-template-columns:1.2fr_1.4fr_auto_auto]";
 

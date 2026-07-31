@@ -48,14 +48,22 @@ export function TrackDiagram({
    * a definite `width` contributes that width as its min-content size, so the
    * hero's ancestor grid track sized to 484px inside a 327px section and
    * `overflow: hidden` cropped the result. Two component-local fixes were
-   * built and measured, and both were rejected:
-   *   - `max-w-full md:max-w-none` — inert. Ablation at 375px with the class
-   *     removed: the hero still resolves to 261px with `max-width: none`,
-   *     because the diagram is a flex item and `flex-shrink` already does the
-   *     clamping. A dead class on 44 elements.
-   *   - `w-[min(100%,var(--td-w))]` — fixed the hero (420 -> 305.86px) but
-   *     collapsed every diagram whose parent is shrink-to-fit to 0px (the
-   *     four round tracks inside `<Link className="block">`). See
+   * built and measured, and both were rejected. Both are named in PROSE
+   * below, never spelled as utility class names: Tailwind scans every
+   * non-gitignored file under `src/` unconditionally — globals.css's
+   * `@source not` excludes only the doc tree — so a class name written in a
+   * comment ships that rule to users with no call site anywhere. This comment
+   * used to re-arm the exact leak globals.css warns about two lines above its
+   * own `@source not`; verified in the built CSS before the fix.
+   *   - a max-width:100% clamp with a max-width:none reset at the fork —
+   *     inert. Ablation at 375px with the class removed: the hero still
+   *     resolves to 261px with `max-width: none`, because the diagram is a
+   *     flex item and `flex-shrink` already does the clamping. A dead class
+   *     on 44 elements.
+   *   - a width of min(100%, <the component's own width custom property>) —
+   *     fixed the hero (420 -> 305.86px) but collapsed every diagram whose
+   *     parent is shrink-to-fit to 0px (the four round tracks inside a
+   *     display-block Link). See
    *     task-11-evidence/rejected-shrinkwidth-measurements.json.
    * The real fix was one class on the hero's own grid in
    * `src/app/dashboard/page.tsx`; with it the hero resolves to 261px at 375px

@@ -317,8 +317,11 @@ function NextRaceHero({
     // further down this component, the one holding the "Track layout" label.
     // The diagram is a flex item with a 420px basis, so once the track stopped
     // being oversized it shrank to the 261px content box on its own.
-    // TrackDiagram itself contributes NO width classes — a `max-w-full` there
-    // was measured inert and removed; see TrackDiagram.tsx's doc comment.
+    // TrackDiagram itself contributes NO width classes — a max-width:100%
+    // clamp there was measured inert and removed; see TrackDiagram.tsx's doc
+    // comment. (Named in prose, not as a utility: Tailwind scans all of src/
+    // unconditionally, so a class name in a comment ships a real rule with no
+    // call site — see globals.css's note above its `@source not`.)
     //
     // Above the fork the track was already the full available width, and from
     // `lg:` the two-column template wins outright, so this is a no-op at every
