@@ -312,8 +312,10 @@ function NextRaceHero({
     // scrolling it. `grid-cols-1` emits `repeat(1, minmax(0,1fr))`, whose 0
     // floor lets the track follow the container instead of the content.
     //
-    // What then sizes the art is `flex-shrink` on the wrapper below (:391):
-    // the diagram is a flex item with a 420px basis, so once the track stopped
+    // What then sizes the art is `flex-shrink` on the wrapper that hosts the
+    // diagram — the `relative flex items-center justify-center p-8` <div>
+    // further down this component, the one holding the "Track layout" label.
+    // The diagram is a flex item with a 420px basis, so once the track stopped
     // being oversized it shrank to the 261px content box on its own.
     // TrackDiagram itself contributes NO width classes — a `max-w-full` there
     // was measured inert and removed; see TrackDiagram.tsx's doc comment.

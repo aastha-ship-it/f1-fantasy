@@ -111,6 +111,13 @@ test.describe("no horizontal overflow", () => {
     await page.waitForLoadState("networkidle");
 
     const m = await page.evaluate(() => {
+      // Two distinct "no hero art" cases, never conflated: the dashboard
+      // legitimately renders EmptyHero when nothing is upcoming, versus the
+      // anchor having rotted out from under this test while a hero is right
+      // there on the page. The first is a skip, the second is a failure.
+      const emptyHero = Array.from(document.querySelectorAll("section")).some(
+        (s) => (s.textContent ?? "").includes("NO OPEN SESSIONS"),
+      );
       // "Track layout" is unique to the real hero — EmptyHero has no such
       // label — so this can never latch onto a round-list diagram.
       const label = Array.from(document.querySelectorAll("p")).find(
@@ -118,32 +125,58 @@ test.describe("no horizontal overflow", () => {
       );
       const wrap = label?.parentElement;
       const diag = wrap?.querySelector<HTMLElement>('[role="img"]');
-      if (!diag) return null;
-      const r = diag.getBoundingClientRect();
+      const r = diag?.getBoundingClientRect();
       return {
-        left: Math.round(r.left),
-        right: Math.round(r.right),
-        width: Math.round(r.width),
+        emptyHero,
+        hasLabel: !!label,
+        hasDiagram: !!diag,
+        // Debug breadcrumbs for the loud-failure path.
+        roleImgOnPage: document.querySelectorAll('[role="img"]').length,
+        rect: r
+          ? {
+              left: Math.round(r.left),
+              right: Math.round(r.right),
+              width: Math.round(r.width),
+            }
+          : null,
         viewport: document.scrollingElement!.clientWidth,
         scrollWidth: document.scrollingElement!.scrollWidth,
       };
     });
 
-    if (m === null) {
+    if (m.emptyHero) {
       test.skip(true, "no upcoming event — dashboard renders EmptyHero");
       return;
     }
 
+    // A hero IS on the page, so the anchor must resolve. Hard assertions:
+    // this guard must never quietly no-op because its locator drifted.
+    expect(
+      m.hasLabel,
+      `hero anchor rotted: no <p> reading "Track layout" on /dashboard, and ` +
+        `EmptyHero is not rendered either. Re-anchor this test — do not let it ` +
+        `skip. (${m.roleImgOnPage} [role="img"] elements on the page.)`,
+    ).toBe(true);
+
+    expect(
+      m.hasDiagram,
+      `hero anchor found but no [role="img"] beside it — TrackDiagram's ` +
+        `role/markup changed, or the label moved out of the flex wrapper. ` +
+        `Re-anchor this test. (${m.roleImgOnPage} [role="img"] on the page.)`,
+    ).toBe(true);
+
+    const rect = m.rect!;
+
     expect.soft(
-      m.right,
-      `hero art is cropped: right=${m.right} exceeds the ${m.viewport}px viewport ` +
-        `(art width=${m.width}). Note scrollWidth=${m.scrollWidth} — the hero's ` +
+      rect.right,
+      `hero art is cropped: right=${rect.right} exceeds the ${m.viewport}px viewport ` +
+        `(art width=${rect.width}). Note scrollWidth=${m.scrollWidth} — the hero's ` +
         `own overflow:hidden hides this from the scrollWidth check.`,
     ).toBeLessThanOrEqual(m.viewport + 1);
 
     expect.soft(
-      m.left,
-      `hero art starts off-screen: left=${m.left}`,
+      rect.left,
+      `hero art starts off-screen: left=${rect.left}`,
     ).toBeGreaterThanOrEqual(-1);
   });
 
