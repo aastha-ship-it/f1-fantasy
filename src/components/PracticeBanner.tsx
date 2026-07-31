@@ -150,12 +150,16 @@ export function PracticeBanner({ sessions }: { sessions: FpSession[] }) {
                   return (
                     <li
                       key={p.pos}
-                      // Base uses minmax(0,1fr) for the code column so that
-                      // under width pressure the *flexible* track shrinks —
-                      // with a bare `1fr` the browser instead collapsed the
-                      // `auto` portrait track to 0px at 375px. `md:` restores
-                      // the original template verbatim.
-                      className="grid items-center grid-cols-[32px_auto_minmax(0,1fr)_auto] md:[grid-template-columns:32px_auto_1fr_auto]"
+                      // minmax(0,1fr) for the code column so that under width
+                      // pressure the *flexible* track shrinks — with a bare
+                      // `1fr` the browser instead squeezes the `auto` portrait
+                      // track (measured: 28px -> 0px at 375px, 28px -> 22.72px
+                      // at 780px). Deliberately NOT restored at `md:`: the two
+                      // resolve identically whenever the flexible track has
+                      // slack, so the original template buys nothing at
+                      // desktop while reinstating the squeeze across the whole
+                      // 780-1023px band, which no e2e project covers.
+                      className="grid items-center grid-cols-[32px_auto_minmax(0,1fr)_auto]"
                       style={{
                         gap: "var(--space-md)",
                         padding: "6px 10px",

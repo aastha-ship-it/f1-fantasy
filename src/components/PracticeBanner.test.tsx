@@ -82,6 +82,29 @@ describe("PracticeBanner mobile fork (Task 11)", () => {
     }
   });
 
+  it("PB3: FP row grid is a class with a minmax(0,1fr) flexible track — no inline template, no bare 1fr at any breakpoint", () => {
+    const { container } = render(<PracticeBanner sessions={THREE} />);
+    const rows = Array.from(container.querySelectorAll("li"));
+    expect(rows.length).toBe(9);
+
+    for (const row of rows) {
+      // An inline template applies at every viewport and cannot carry a
+      // breakpoint — that is the defect this row had.
+      expect(row.style.gridTemplateColumns).toBe("");
+
+      expect(row.className).toMatch(
+        /(^|\s)grid-cols-\[32px_auto_minmax\(0,1fr\)_auto\](\s|$)/,
+      );
+
+      // A bare `1fr` flexible track lets the browser squeeze the `auto`
+      // portrait column instead (measured: 28px -> 0px at 375px, 28px ->
+      // 22.72px at 780px). `minmax(0,1fr)` reads as "minmax(0,1fr)" and
+      // never as "_1fr_", so this catches the bare form in a base class OR
+      // in any breakpoint restoration.
+      expect(row.className).not.toMatch(/_1fr_/);
+    }
+  });
+
   it("PB2: every FP row keeps the sanctioned 3px team-colour left edge", () => {
     const { container } = render(<PracticeBanner sessions={THREE} />);
     const rows = Array.from(container.querySelectorAll("li"));

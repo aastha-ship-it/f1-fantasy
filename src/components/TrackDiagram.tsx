@@ -41,36 +41,31 @@ export function TrackDiagram({
   const label = circuit ? `${circuit} circuit layout` : "track diagram";
 
   /*
-   * Mobile width clamp (Task 11), released again at the 780px fork so the
-   * desktop tree computes identically (verified: getComputedStyle width /
-   * height / max-width byte-identical on all 44 diagrams rendered across
-   * /dashboard, /dashboard/{lobby,predict,standings}, /reveal and
-   * /dashboard/predict/round/13, at both 1024px and 1280px).
+   * This component deliberately contributes NO responsive classes of its own
+   * (Task 11, fix round 1). That is a measured conclusion, not an oversight.
    *
-   * `max-width` is a different property from the inline `width`, so a class
-   * *can* constrain it; the inline `height` is untouchable from CSS and is
-   * deliberately left alone — `mask-size: contain` and the SVG's default
-   * `preserveAspectRatio` letterbox the silhouette inside a narrower box
-   * rather than distorting it.
+   * The cropped `/dashboard` hero was never this component's bug. A box with
+   * a definite `width` contributes that width as its min-content size, so the
+   * hero's ancestor grid track sized to 484px inside a 327px section and
+   * `overflow: hidden` cropped the result. Two component-local fixes were
+   * built and measured, and both were rejected:
+   *   - `max-w-full md:max-w-none` — inert. Ablation at 375px with the class
+   *     removed: the hero still resolves to 261px with `max-width: none`,
+   *     because the diagram is a flex item and `flex-shrink` already does the
+   *     clamping. A dead class on 44 elements.
+   *   - `w-[min(100%,var(--td-w))]` — fixed the hero (420 -> 305.86px) but
+   *     collapsed every diagram whose parent is shrink-to-fit to 0px (the
+   *     four round tracks inside `<Link className="block">`). See
+   *     task-11-evidence/rejected-shrinkwidth-measurements.json.
+   * The real fix was one class on the hero's own grid in
+   * `src/app/dashboard/page.tsx`; with it the hero resolves to 261px at 375px
+   * and nothing here is needed.
    *
-   * Known limit, measured, not papered over: this is a safety net for
-   * properly-constrained containers, and on today's call sites it changes no
-   * geometry at 375px — every TrackDiagram's containing block is already at
-   * least as wide as the diagram. The one genuine mobile defect (the
-   * `/dashboard` hero asks for 420px and is cropped by the section's
-   * `overflow: hidden`) is NOT fixable from here: a box with a *definite*
-   * width contributes that width as its min-content size, so the ancestor
-   * grid track sizes to 484px and a percentage max-width then resolves
-   * against that oversized containing block. Making the width itself
-   * shrinkable (`min(100%, var(--td-w))`) does fix the hero but collapses
-   * every diagram whose parent is shrink-to-fit — measured: the four
-   * revealed-round tracks inside `<Link className="block">` went to 0px.
-   * The real fix belongs in the dashboard hero's grid, not in this component.
-   *
-   * `className` is caller-supplied and must be MERGED, not replaced — on both
-   * render branches.
+   * `className` is therefore passed straight through — but it is caller-
+   * supplied and consumed on BOTH render branches, so anything added here in
+   * future must be MERGED with it, never substituted. TrackDiagram.test.tsx
+   * locks that on both branches.
    */
-  const cls = ["max-w-full md:max-w-none", className].filter(Boolean).join(" ");
 
   if (img) {
     const ratio = trackRatio(circuit);
@@ -80,7 +75,7 @@ export function TrackDiagram({
       <div
         role="img"
         aria-label={label}
-        className={cls}
+        className={className}
         style={{
           width: w,
           height: h,
@@ -111,7 +106,7 @@ export function TrackDiagram({
       height={svgH}
       role="img"
       aria-label={label}
-      className={cls}
+      className={className}
       style={style}
       fill="none"
       stroke={stroke}
