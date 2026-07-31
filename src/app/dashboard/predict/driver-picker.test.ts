@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { orderRecentForm } from "@/lib/nudges/recentForm";
 
 /**
@@ -31,5 +33,25 @@ describe("orderRecentForm", () => {
 
   it("RF4: single token → that token (latest === only)", () => {
     expect(orderRecentForm("P1")).toEqual(["P1"]);
+  });
+});
+
+describe("driver-picker mobile layout", () => {
+  const src = readFileSync(
+    resolve(__dirname, "driver-picker.tsx"),
+    "utf8",
+  );
+
+  it("does not force a three-column slot grid at every width", () => {
+    expect(src).not.toMatch(/gridTemplateColumns:\s*isSprint\s*\?\s*"1fr"\s*:\s*"1\.2fr 1fr 1fr"/);
+  });
+
+  it("guards the 320px slot-card floor behind md", () => {
+    expect(src).not.toMatch(/className="[^"]*\bmin-h-\[320px\]/);
+    expect(src).toMatch(/md:min-h-\[320px\]/);
+  });
+
+  it("gives the driver grid a 44px minimum tap target", () => {
+    expect(src).toMatch(/min-h-\[44px\]/);
   });
 });

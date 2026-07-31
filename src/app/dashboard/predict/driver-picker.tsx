@@ -195,12 +195,10 @@ export function DriverPicker({
     >
       {/* Slot cards — 1.2fr 1fr 1fr (P1 wider). Sprint shows just P1 full-width. */}
       <section
-        className="mt-10 grid border border-[color:var(--border)]"
-        style={{
-          gridTemplateColumns: isSprint ? "1fr" : "1.2fr 1fr 1fr",
-          gap: 1,
-          background: "var(--border)",
-        }}
+        className={`mt-10 grid border border-[color:var(--border)] ${
+          isSprint ? "grid-cols-1" : "grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr]"
+        }`}
+        style={{ gap: 1, background: "var(--border)" }}
       >
         {slots.map((slot, idx) => {
           const id = picks[slot];
@@ -212,7 +210,7 @@ export function DriverPicker({
           return (
             <div
               key={slot}
-              className="relative flex min-h-[320px] flex-col gap-5 overflow-hidden p-7"
+              className={`relative flex min-h-[96px] flex-col gap-2 overflow-hidden p-4 md:min-h-[320px] md:gap-5 md:p-7`}
               style={{
                 background: isP1 ? "var(--surface-2)" : "var(--surface)",
               }}
@@ -223,7 +221,7 @@ export function DriverPicker({
               {d && t && (
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute"
+                  className="pointer-events-none absolute hidden md:block"
                   style={{
                     right: -40,
                     top: 40,
@@ -256,7 +254,9 @@ export function DriverPicker({
                 <span
                   style={{
                     fontFamily: "var(--font-boldonse), ui-sans-serif",
-                    fontSize: isP1 ? 96 : 64,
+                    fontSize: isP1
+                      ? "clamp(40px, 12vw, 96px)"
+                      : "clamp(32px, 10vw, 64px)",
                     lineHeight: 0.85,
                   }}
                   data-tight
@@ -343,13 +343,12 @@ export function DriverPicker({
                 </p>
                 {d && n ? (
                   <dl
-                    className="flex flex-col text-[color:var(--fg-muted)]"
+                    className="flex flex-row flex-wrap gap-x-3 gap-y-1 text-[11px] text-[color:var(--fg-muted)] md:flex-col md:gap-3 md:text-sm"
                     style={{
-                      gap: "var(--space-md)",
                       fontFamily: "var(--font-mono), ui-monospace, monospace",
                     }}
                   >
-                    <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 md:justify-between">
                       <dt className="text-xs">Form L5</dt>
                       <dd className="flex items-center justify-end gap-1">
                         {(() => {
@@ -417,7 +416,7 @@ export function DriverPicker({
                       </dd>
                     </div>
 
-                    <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 md:justify-between">
                       <dt className="text-xs">
                         At {circuit ?? "track"}{" "}
                         <span className="text-[color:var(--fg-subtle)]">
@@ -439,11 +438,13 @@ export function DriverPicker({
                       </dd>
                     </div>
 
-                    <div
-                      className="flex items-center justify-between gap-4"
-                      title="Average difference between qualifying grid spot and race finish position so far this season. Positive = gains places on race day."
-                    >
-                      <dt className="text-xs">Quali Δ Race</dt>
+                    <div className="flex items-center gap-4 md:justify-between">
+                      <dt className="text-xs">
+                        Quali Δ Race{" "}
+                        <span className="text-[color:var(--fg-subtle)] md:hidden">
+                          (grid→finish)
+                        </span>
+                      </dt>
                       <dd
                         className="text-sm"
                         data-tabular
@@ -535,7 +536,7 @@ export function DriverPicker({
                   type="button"
                   onClick={() => fillNextEmpty(d.id)}
                   disabled={isClosed || pending}
-                  className="relative flex w-full flex-col items-center gap-1.5 px-2 py-3 text-center disabled:cursor-not-allowed"
+                  className="relative flex min-h-[44px] w-full flex-col items-center gap-1.5 px-2 py-3 text-center disabled:cursor-not-allowed"
                   style={{
                     background: "var(--surface)",
                     opacity: isClosed ? 0.45 : inPicks ? 0.4 : 1,
