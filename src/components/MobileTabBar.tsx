@@ -16,10 +16,19 @@ import type { TopBarTab } from "@/components/TopBar";
  * per-page with no nested layout, so that is simply an omission at that call
  * site.
  *
- * /dashboard/predict/[eventId] DOES render this bar and currently overlaps
- * that page's fixed lock bar — a known interim state, not a bug to "fix" by
- * removing the bar here. Task 13 resolves the overlap by offsetting the lock
- * bar above this one.
+ * /dashboard/predict/[eventId] renders this bar AND that page's own fixed
+ * lock bar. The overlap is resolved — not here, but at the lock bar, which
+ * offsets itself above this one by
+ * `bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom,0px))] md:bottom-0`
+ * (see `driver-picker.tsx`). Do not "fix" it by dropping the bar from that
+ * route: the tab bar is the only navigation below the fork.
+ *
+ * The bar's height is therefore load-bearing for another component. That is
+ * why the tap target's min-height reads `var(--tabbar-item-h)` (globals.css)
+ * instead of a literal — the lock bar's offset derives from the same pair of
+ * variables, so growing the target cannot silently re-cover the submit
+ * button. Guarded end-to-end by "the predict submit button is clickable, not
+ * covered by the tab bar" in tests/e2e/mobile-nav.spec.ts.
  */
 const TABS: { id: TopBarTab; label: string; href: string; glyph: string }[] = [
   { id: "league", label: "League", href: "/dashboard/league", glyph: "▲" },
@@ -45,7 +54,7 @@ export function MobileTabBar({ active }: { active: TopBarTab }) {
             key={t.id}
             href={t.href}
             aria-current={isActive ? "page" : undefined}
-            className="flex min-h-[52px] flex-col items-center justify-center gap-1 pt-2 pb-1"
+            className="flex min-h-[var(--tabbar-item-h)] flex-col items-center justify-center gap-1 pt-2 pb-1"
             style={{
               color: isActive ? "var(--fg)" : "var(--fg-subtle)",
               boxShadow: isActive

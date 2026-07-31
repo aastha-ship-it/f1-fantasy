@@ -81,6 +81,27 @@
   /* Motion */
   --ease-out-quart: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out-cubic: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /*
+   * Height of the fixed bottom tab bar (MobileTabBar), below the 780px fork
+   * only. Deliberately a variable rather than a literal at each call site:
+   * anything else that pins itself to the bottom of a phone viewport — today
+   * the predict lock bar, tomorrow whatever else — has to clear this bar, and
+   * a literal would silently rot the moment the tab target grows.
+   *
+   * `--tabbar-item-h` is the tap target itself (WCAG 2.5.8 wants >=24px; 52px
+   * is the thumb-comfortable size Task 12 shipped) and is consumed by
+   * MobileTabBar's own min-height, so the two cannot drift. `--tabbar-h` adds
+   * the 1px `border-top` the <nav> draws, giving the real occluded band.
+   * The safe-area inset is NOT folded in here: it is `env()`, which resolves
+   * per-device, so consumers add
+   * `env(safe-area-inset-bottom, 0px)` themselves.
+   *
+   * NOT in the --spacing-* namespace on purpose — see the @theme note below;
+   * defining --spacing-<name> hijacks every Tailwind utility of that name.
+   */
+  --tabbar-item-h: 52px;
+  --tabbar-h: calc(var(--tabbar-item-h) + 1px);
 }
 
 /*

@@ -70,4 +70,102 @@ test.describe("mobile navigation", () => {
     await expect(tabBar).toBeHidden();
     await expect(topTabs).toBeVisible();
   });
+
+  /**
+   * C1 regression lock (final merge review).
+   *
+   * `MobileTabBar` is `fixed bottom-0 z-30`; the predict lock bar was
+   * `fixed bottom-0 z-20`. Same anchor, tab bar wins — so on a phone the
+   * submit button of the app's core action sat *underneath* the tab bar and
+   * a tap navigated to Standings instead of locking in picks.
+   *
+   * Geometry alone could not catch it: the branch's four-project overflow net
+   * only measures horizontal scrollWidth, and no jsdom test can model
+   * `position: fixed` stacking. What catches it is Playwright's actionability
+   * chain — `click()` refuses to fire when another element would receive the
+   * pointer, failing with "intercepts pointer events". So this test must do a
+   * real `click()`, not a geometry assertion.
+   *
+   * The click point matters. Headless Chromium reports
+   * `env(safe-area-inset-bottom)` as 0, and the button's label wraps on a
+   * phone, so before the fix it rendered 74px tall (390px viewport) with only
+   * its bottom 33px under the 53px tab bar — its *centre* was still clear by
+   * 4px and a default `click()` passed. On a real iPhone 14 the 34px inset
+   * makes the bar 87px and swallows the centre too. So this test clicks the
+   * button's bottom edge, where the overlap is unconditional: every point of
+   * the primary CTA must receive its own pointer events, not just the middle.
+   *
+   * Revert `driver-picker.tsx`'s lock-bar container back to plain `bottom-0`
+   * and the trial click fails with
+   * `<nav aria-label="Primary"> … intercepts pointer events`.
+   */
+  test("the predict submit button is clickable, not covered by the tab bar", async ({
+    page,
+  }) => {
+    await signIn(page);
+    // Force a phone viewport on every project so all four run the same check
+    // (the Desktop Chrome project's 1280px default is above the 780px fork).
+    await page.setViewportSize({ width: 390, height: 664 });
+
+    await page.goto("/dashboard/predict");
+    const cta = page.getByRole("link", { name: /continue picks/i });
+    if (!(await cta.count())) {
+      test.skip(true, "no open session seeded — run scripts/seed-calendar.ts");
+    }
+    await cta.click();
+    await page.waitForURL(/\/dashboard\/predict\/round\//);
+
+    const hrefs = await page
+      .locator('a[href^="/dashboard/predict/"]')
+      .evaluateAll((els) =>
+        els
+          .map((e) => e.getAttribute("href") ?? "")
+          .filter((h) => h && !h.includes("/round/")),
+      );
+    expect(hrefs.length, "round page listed no session links").toBeGreaterThan(0);
+
+    let open = false;
+    for (const href of hrefs) {
+      await page.goto(href);
+      const status = await page.getByTestId("lock-bar-status").innerText();
+      if (!/predictions closed/i.test(status)) {
+        open = true;
+        break;
+      }
+    }
+    expect(open, "no unlocked session in the round the hero CTA points at").toBe(
+      true,
+    );
+
+    // Fill every slot so the submit button leaves its disabled state — a
+    // disabled button would fail the actionability chain on "enabled" and
+    // mask the interception this test exists to catch.
+    const submit = page.getByTestId("submit-picks");
+    const gridButtons = page.locator(
+      '[data-testid="driver-picker"] ul li button',
+    );
+    for (let i = 0; i < 3 && (await submit.isDisabled()); i++) {
+      await gridButtons.nth(i).click();
+    }
+    await expect(submit).toBeEnabled();
+
+    // The assertion. Not `toBeVisible()` — visibility is satisfied by a fully
+    // covered element. Only a click exercises hit-testing. `trial` runs the
+    // whole actionability chain (visible / stable / receives-events / enabled)
+    // at the given point without firing, so the bottom-edge probe cannot
+    // double-submit.
+    const box = (await submit.boundingBox())!;
+    expect(box.height, "submit button has no box").toBeGreaterThan(0);
+    await submit.click({
+      trial: true,
+      position: { x: box.width / 2, y: box.height - 4 },
+    });
+
+    // …and then the real thing, at the default centre point, end to end.
+    await submit.click();
+    await expect(page.getByTestId("picks-locked-banner")).toBeVisible({
+      timeout: 15_000,
+    });
+  });
+
 });

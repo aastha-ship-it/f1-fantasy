@@ -184,7 +184,13 @@ export function DriverPicker({
   return (
     <form
       onSubmit={onSubmit}
-      className="pb-32"
+      /* The form's bottom padding is what keeps the last row of THE GRID
+         above the fixed lock bar. Below the fork the lock bar now sits one
+         tab-bar height higher, so the padding has to grow by exactly that
+         much or the offset would trade a covered button for a covered last
+         driver row. `md:pb-32` is the original value, byte-for-byte, at and
+         above the fork where MobileTabBar is hidden. */
+      className="pb-[calc(8rem+var(--tabbar-h)+env(safe-area-inset-bottom,0px))] md:pb-32"
       data-testid="driver-picker"
     >
       {/* Slot cards — 1.2fr 1fr 1fr (P1 wider). Sprint shows just P1 full-width. */}
@@ -634,9 +640,20 @@ export function DriverPicker({
       </AnimatePresence>
 
 
-      {/* Sticky lock bar */}
+      {/* Sticky lock bar.
+          Below the 780px fork this sits ON TOP of MobileTabBar, which is
+          `fixed bottom-0 z-30` — same anchor, higher stacking context, so at
+          plain `bottom-0` the tab bar covered the bottom third of the submit
+          button and taps there navigated away instead of locking in picks.
+          Offset by the tab bar's own height variable (globals.css
+          `--tabbar-h`, which tracks MobileTabBar's min-height) plus the
+          device safe-area inset, which on an iPhone 14 is another 34px.
+          `md:bottom-0` restores the original desktop anchor verbatim — the
+          tab bar is `md:hidden`, so there is nothing to clear at/above the
+          fork. Guarded by "the predict submit button is clickable, not
+          covered by the tab bar" in tests/e2e/mobile-nav.spec.ts. */}
       <div
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-[color:var(--border)] backdrop-blur"
+        className="fixed inset-x-0 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom,0px))] z-20 border-t border-[color:var(--border)] backdrop-blur md:bottom-0"
         style={{
           background: "color-mix(in oklch, var(--surface-2) 92%, transparent)",
         }}
