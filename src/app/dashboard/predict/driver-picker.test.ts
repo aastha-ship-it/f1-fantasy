@@ -47,7 +47,11 @@ describe("driver-picker mobile layout", () => {
   });
 
   it("guards the 320px slot-card floor behind md", () => {
-    expect(src).not.toMatch(/className="[^"]*\bmin-h-\[320px\]/);
+    // Lookbehind excludes a `md:` (or any word/`:`/`-`) prefix immediately
+    // before `min-h-[320px]` — a plain `\b` boundary check is fooled by the
+    // `:` in `md:min-h-[320px]`, since `\b` only inspects the character
+    // immediately to its left, not whether that's an `md:` prefix.
+    expect(src).not.toMatch(/(?<![\w:-])min-h-\[320px\]/);
     expect(src).toMatch(/md:min-h-\[320px\]/);
   });
 

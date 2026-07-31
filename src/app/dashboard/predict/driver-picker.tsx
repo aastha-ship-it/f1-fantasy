@@ -193,10 +193,14 @@ export function DriverPicker({
       className="pb-[calc(8rem+var(--tabbar-h)+env(safe-area-inset-bottom,0px))] md:pb-32"
       data-testid="driver-picker"
     >
-      {/* Slot cards — 1.2fr 1fr 1fr (P1 wider). Sprint shows just P1 full-width. */}
+      {/* Slot cards — single full-width column below md; 1.2fr 1fr 1fr
+          (P1 wider) at md and up. Sprint shows just P1 full-width at every
+          width. */}
       <section
         className={`mt-10 grid border border-[color:var(--border)] ${
-          isSprint ? "grid-cols-1" : "grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr]"
+          isSprint
+            ? "grid-cols-[1fr]"
+            : "grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr]"
         }`}
         style={{ gap: 1, background: "var(--border)" }}
       >
@@ -210,7 +214,7 @@ export function DriverPicker({
           return (
             <div
               key={slot}
-              className={`relative flex min-h-[96px] flex-col gap-2 overflow-hidden p-4 md:min-h-[320px] md:gap-5 md:p-7`}
+              className="relative flex min-h-[96px] flex-col gap-2 overflow-hidden p-4 md:min-h-[320px] md:gap-5 md:p-7"
               style={{
                 background: isP1 ? "var(--surface-2)" : "var(--surface)",
               }}
@@ -343,7 +347,7 @@ export function DriverPicker({
                 </p>
                 {d && n ? (
                   <dl
-                    className="flex flex-row flex-wrap gap-x-3 gap-y-1 text-[11px] text-[color:var(--fg-muted)] md:flex-col md:gap-3 md:text-sm"
+                    className="flex flex-row flex-wrap gap-x-3 gap-y-1 text-[11px] text-[color:var(--fg-muted)] md:flex-col md:gap-3 md:text-base"
                     style={{
                       fontFamily: "var(--font-mono), ui-monospace, monospace",
                     }}
