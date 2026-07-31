@@ -141,12 +141,12 @@ export function DriverStandingsRowMobile(p: DriverRowProps) {
   const t = teamMeta(p.team);
   return (
     <details
-      className="border-b border-[color:var(--border)]"
+      className="group border-b border-[color:var(--border)]"
       style={{ background: p.isLeader ? "var(--surface-2)" : "transparent" }}
     >
       <summary
         className="relative grid cursor-pointer list-none items-center gap-3 py-3 pl-3 pr-4 [&::-webkit-details-marker]:hidden"
-        style={{ gridTemplateColumns: "28px 40px minmax(0,1fr) auto" }}
+        style={{ gridTemplateColumns: "28px 40px minmax(0,1fr) auto auto" }}
       >
         <span
           aria-hidden
@@ -188,6 +188,23 @@ export function DriverStandingsRowMobile(p: DriverRowProps) {
         >
           {p.points}
         </span>
+        {/* Expand affordance. `list-none` + the -webkit-details-marker reset
+            above strip the native triangle, which on touch left ~20 rows with
+            no signal that gap/wins/podiums/team/country are one tap away —
+            `cursor-pointer` says nothing to a finger. Earned motion: it turns
+            only on a real open/close, and the global
+            `prefers-reduced-motion` block in globals.css collapses the
+            transition. Must live INSIDE <summary>: only the first <summary>
+            lands in <details>'s always-visible slot, so a marker placed
+            outside it would be hidden while collapsed — exactly the trap the
+            team-colour stripe hit in Task 7. */}
+        <span
+          aria-hidden
+          className="inline-block leading-none text-[color:var(--fg-subtle)] transition-transform group-open:rotate-90"
+          style={{ fontSize: 16 }}
+        >
+          ›
+        </span>
       </summary>
 
       <div className="relative">
@@ -205,22 +222,32 @@ export function DriverStandingsRowMobile(p: DriverRowProps) {
           className="grid gap-x-4 gap-y-2 px-3 pb-4 pl-3"
           style={{ gridTemplateColumns: "repeat(2, minmax(0,1fr))" }}
         >
-          {[
-            ["GAP", p.gap],
-            ["WINS", String(p.wins)],
-            ["PODIUMS", String(p.podiums)],
-            ["TEAM", t?.name ?? p.team],
-            ["COUNTRY", p.country ? countryFlag(p.country) : "—"],
-          ].map(([label, value]) => (
+          {/* `data-tabular` (Geist Mono) is mandatory for NUMERICS only —
+              CLAUDE.md's design system, not for labels. The third tuple slot
+              is that gate, mirroring `Stat`'s `tabularValue` in
+              `../league/league-row.tsx`: the two mobile disclosure rows share
+              a screen family and must not implement the same rule in opposite
+              directions. Deliberately NOT importing league's `Stat` — that
+              would make a standings route file depend on a league route file
+              for a five-line presentational div. TEAM is a name and COUNTRY
+              is a flag emoji; neither is a numeric. */}
+          {(
+            [
+              ["GAP", p.gap, true],
+              ["WINS", String(p.wins), true],
+              ["PODIUMS", String(p.podiums), true],
+              ["TEAM", t?.name ?? p.team, false],
+              ["COUNTRY", p.country ? countryFlag(p.country) : "—", false],
+            ] as const
+          ).map(([label, value, numeric]) => (
             <div key={label} className="flex items-baseline justify-between gap-2">
               <dt
                 className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
                 style={{ letterSpacing: "0.1em" }}
-                data-tabular
               >
                 {label}
               </dt>
-              <dd className="text-sm" data-tabular>
+              <dd className="text-sm" data-tabular={numeric || undefined}>
                 {value}
               </dd>
             </div>

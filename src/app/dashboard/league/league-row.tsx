@@ -186,12 +186,12 @@ export function LeagueRowMobile(p: LeagueRowProps) {
   const fav = p.favTeam ? teamMeta(p.favTeam) : null;
   return (
     <details
-      className="border-b border-[color:var(--border)] last:border-b-0"
+      className="group border-b border-[color:var(--border)] last:border-b-0"
       style={{ background: p.isMe ? "var(--surface-2)" : "transparent" }}
     >
       <summary
         className="grid cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden"
-        style={{ gridTemplateColumns: "28px 36px minmax(0,1fr) auto" }}
+        style={{ gridTemplateColumns: "28px 36px minmax(0,1fr) auto auto" }}
       >
         <span
           className="leading-none"
@@ -225,6 +225,22 @@ export function LeagueRowMobile(p: LeagueRowProps) {
           data-tabular
         >
           {p.points}
+        </span>
+        {/* Expand affordance — identical to the standings sibling in
+            `../standings/driver-row.tsx` on purpose; the two mobile
+            disclosure rows must read the same. `list-none` + the
+            -webkit-details-marker reset strip the native triangle, leaving a
+            touch user no signal that team/driver/perfects/streak are one tap
+            away. Earned motion (real open/close only); the global
+            `prefers-reduced-motion` block collapses the transition. Must live
+            INSIDE <summary> — only the first <summary> lands in <details>'s
+            always-visible slot. */}
+        <span
+          aria-hidden
+          className="inline-block leading-none text-[color:var(--fg-subtle)] transition-transform group-open:rotate-90"
+          style={{ fontSize: 16 }}
+        >
+          ›
         </span>
       </summary>
 

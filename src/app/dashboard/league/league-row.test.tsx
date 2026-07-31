@@ -48,6 +48,21 @@ describe("LeagueRowMobile", () => {
     render(<LeagueRowMobile {...ME} />);
     expect(screen.getByRole("group").tagName).toBe("DETAILS");
   });
+
+  // Same guard, same wording as the standings sibling in
+  // `../standings/driver-row.test.tsx`. `list-none` + the
+  // -webkit-details-marker reset strip the native triangle, leaving a touch
+  // user no signal that anything expands. Delete the marker span (or the
+  // `group` class it hangs off) and this fails.
+  it("keeps an expand affordance inside the summary after stripping the native marker", () => {
+    const { container } = render(<LeagueRowMobile {...ME} />);
+    const summary = container.querySelector("summary")!;
+    expect(summary.className).toContain("list-none");
+    const marker = summary.querySelector('[aria-hidden][class*="group-open"]');
+    expect(marker, "no expand marker inside <summary>").not.toBeNull();
+    expect(marker!.className).toContain("group-open:rotate-90");
+    expect(container.querySelector("details")!.className).toContain("group");
+  });
 });
 
 describe("LeagueRowDesktop", () => {
