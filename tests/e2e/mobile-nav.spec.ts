@@ -168,4 +168,42 @@ test.describe("mobile navigation", () => {
     });
   });
 
+  /**
+   * I5 regression lock. The desktop driver-standings fork is an <ol> of <li>;
+   * the mobile fork shipped as a bare <div> of <details>, so a screen-reader
+   * user on the branch's *primary target device* lost "list, N items" and
+   * per-row position. That is a regression this fork introduced.
+   *
+   * Revert `standings/page.tsx`'s mobile fork to
+   * `<div className="md:hidden">` (or drop the <li> wrappers) and this fails
+   * on the tag-name assertion.
+   *
+   * Note the league page is deliberately NOT covered here: its desktop
+   * "rest of the field" fork was already a <div> of <div>s before this
+   * branch, so there is no list semantic there to have lost.
+   */
+  test("the mobile driver-standings fork keeps list semantics", async ({
+    page,
+  }) => {
+    await signIn(page);
+    await page.setViewportSize({ width: 390, height: 664 });
+    await page.goto("/dashboard/standings");
+
+    const rows = page.locator("details");
+    if ((await rows.count()) === 0) {
+      test.skip(true, "no driver standings yet — nothing to assert");
+    }
+    const chain = await rows.first().evaluate((el) => ({
+      parent: el.parentElement?.tagName ?? null,
+      grandparent: el.parentElement?.parentElement?.tagName ?? null,
+      strayChildren: Array.from(
+        el.parentElement?.parentElement?.children ?? [],
+      ).filter((c) => c.tagName !== "LI").length,
+    }));
+    expect(chain.parent, "each mobile standings row must sit in an <li>").toBe(
+      "LI",
+    );
+    expect(chain.grandparent, "…and those <li> in an <ol>").toBe("OL");
+    expect(chain.strayChildren, "the <ol> must contain only <li>").toBe(0);
+  });
 });

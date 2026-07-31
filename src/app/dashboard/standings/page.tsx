@@ -635,14 +635,25 @@ export default async function StandingsPage() {
                 );
                 return (
                   <>
-                    <div className="md:hidden">
+                    {/* <ol>, not <div>: the desktop fork below is a list, and
+                        dropping to a bare <div> of <details> on the primary
+                        target device would cost screen-reader users the
+                        "list, N items" summary and per-row position — a
+                        regression this fork would have introduced, not an
+                        inherited one. <details> inside <li> is valid HTML.
+                        Keys are `r.id` (the driver's DB row id), never
+                        `r.code`: a display string is not an identity, the
+                        same mistake league was made to fix. */}
+                    <ol className="md:hidden">
                       {rows.map((r) => (
-                        <DriverStandingsRowMobile key={r.code} {...r} />
+                        <li key={r.id ?? r.pos}>
+                          <DriverStandingsRowMobile {...r} />
+                        </li>
                       ))}
-                    </div>
+                    </ol>
                     <ol className="hidden md:block">
                       {rows.map((r) => (
-                        <DriverStandingsRowDesktop key={r.code} {...r} />
+                        <DriverStandingsRowDesktop key={r.id ?? r.pos} {...r} />
                       ))}
                     </ol>
                   </>
