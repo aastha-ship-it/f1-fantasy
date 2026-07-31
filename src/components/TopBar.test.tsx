@@ -43,11 +43,29 @@ describe("TopBar", () => {
     expect(label.className).toContain("lg:inline");
   });
 
-  it("keeps the scoring-help trigger reachable by accessible name at every viewport", () => {
-    render(<TopBar active="calendar" displayName="Aastha" email="a@b.test" />);
-    expect(
-      screen.getByRole("button", { name: /scoring/i }),
-    ).toBeInTheDocument();
+  // WCAG 4.1.2 regression lock. Slice 1 hid ScoringHelp's visible label below
+  // `lg:`, leaving the button with an empty accessible name on every phone;
+  // the fix was an explicit `aria-label` on the trigger.
+  //
+  // The original guard matched `getByRole("button", { name: /scoring/i })` —
+  // which the visible <span> satisfies on its own, so deleting the aria-label
+  // left it green. That is worse than no guard. Assert the attribute itself,
+  // against the exact string in ScoringHelp.tsx: delete `aria-label` there and
+  // this fails on a null attribute.
+  it("labels the scoring-help trigger explicitly, so it survives the lg-only visible label", () => {
+    const { container } = render(
+      <TopBar active="calendar" displayName="Aastha" email="a@b.test" />,
+    );
+    // Found by a selector that does NOT depend on the thing under test, so
+    // the failure lands on the assertion rather than on the query.
+    const btn = container.querySelector('button[aria-haspopup="dialog"]')!;
+    expect(btn, "no scoring-help trigger rendered").not.toBeNull();
+    expect(btn).toHaveAttribute("aria-label", "How scoring works");
+    // …and the name must not be leaning on the label `lg:` takes away: that
+    // span is the button's own descendant and is lg-gated.
+    const visible = screen.getByText("How Scoring Works");
+    expect(btn.contains(visible)).toBe(true);
+    expect(visible.className).toContain("lg:inline");
   });
 
   it("uses the initial of the display name for the avatar", () => {
