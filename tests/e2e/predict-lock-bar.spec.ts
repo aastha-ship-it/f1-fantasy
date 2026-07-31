@@ -67,11 +67,20 @@ test.describe("predict lock bar", () => {
     // fixed-container > inner-row > <p data-testid="lock-bar-status">, so
     // `ancestor::div[1]` from the status paragraph resolves to the inner
     // row and silently ignores the container's own offset/padding.
-    // `ancestor::div[2]` walks two levels up to the actual fixed element.
+    // `ancestor::div[2]` walks two levels up to the actual fixed element —
+    // but that is positional, not structural: wrap the <p> in one more
+    // <div> and this would silently re-resolve to the inner row again,
+    // which is the exact silent-pass R4 exists to prevent. Make it
+    // self-checking rather than trusting the index: the fixed container is
+    // the only ancestor with `position: fixed`, so assert that directly.
     const bar = page
       .getByTestId("lock-bar-status")
       .locator("xpath=ancestor::div[2]");
     await expect(bar).toBeVisible();
+    expect(
+      await bar.evaluate((el) => getComputedStyle(el).position),
+      "ancestor::div[2] must resolve to the fixed lock-bar container, not the inner row — if this fails, the DOM nesting has changed and the xpath index needs updating",
+    ).toBe("fixed");
     const row = page
       .getByTestId("lock-bar-status")
       .locator("xpath=ancestor::div[1]");
@@ -102,10 +111,25 @@ test.describe("predict lock bar", () => {
       "column",
     );
 
-    // --- RED (genuinely unshipped — R3b): neither CTA has a width or
-    // height floor, so the submit label wraps (measured 74px @390 / 94px
-    // @375 before this task). Production revert: drop `min-h-[48px] w-full
-    // … md:w-auto` from the CTA back to `px-8 py-4 text-sm uppercase …`.
+    // --- RED (genuinely unshipped — R3b): before this task neither CTA had
+    // a width floor, so the submit label wrapped (measured 74px @390 /
+    // 94px @375). The two assertions below are red when the row does NOT
+    // stack (`flex-col` + the default/explicit `align-items: stretch`
+    // widens the CTA to the row's content width as a side effect of the
+    // row becoming a column) — they are green with or without the CTA's
+    // OWN `min-h-[48px] w-full … md:w-auto` classes, confirmed by reverting
+    // just those classes with the row fix left in place (see
+    // task-13-evidence/revert2-cta-sizing.txt: both assertions stayed
+    // green). So: the true production revert that turns these two red is
+    // the row's `flex-col`/`items-stretch` (see the flexDirection
+    // assertion above); do not cite `min-h-[48px] w-full … md:w-auto` as
+    // what these two assertions guard — they don't, discriminately.
+    // `min-h-[48px]` in particular has no assertion here and cannot get a
+    // discriminating one while natural CTA height is 54px — asserting the
+    // class string itself would be the tautological-guard anti-pattern
+    // this branch has already been burned by. It stays in production as a
+    // WCAG touch-target floor and an `items-start`-regression insurance
+    // policy, not because a test here exercises it.
     const cta = page.getByTestId("submit-picks");
     await expect(cta).toBeVisible();
     const ctaBox = (await cta.boundingBox())!;
@@ -163,14 +187,21 @@ test.describe("predict lock bar", () => {
     ).toBeLessThanOrEqual(60);
   });
 
-  test("desktop parity (1024px and 1440px): row layout is byte-identical to the pre-task value", async ({
+  test("desktop parity (800px, 1024px, 1440px): row layout is byte-identical to the pre-task value", async ({
     page,
   }) => {
     await signIn(page);
     const ok = await openFirstUnlockedEvent(page);
     test.skip(!ok, "no open session seeded — run scripts/seed-calendar.ts");
 
-    for (const width of [1024, 1440] as const) {
+    // 800px covers the 780-1023px band, which has zero other automated
+    // coverage on this branch: `sm:px-8` (default sm=640px) used to be the
+    // sole source of 32px horizontal padding there, and this task's row
+    // rewrite dropped `sm:px-8` from the class list — `md:px-8` is now the
+    // ONLY thing carrying that value in this band. A regression here (e.g.
+    // someone "cleaning up" `md:px-8` as a believed duplicate) would
+    // silently halve this band's padding to 16px with nothing to catch it.
+    for (const width of [800, 1024, 1440] as const) {
       await page.setViewportSize({ width, height: 900 });
       const row = page
         .getByTestId("lock-bar-status")
@@ -197,8 +228,8 @@ test.describe("predict lock bar", () => {
         columnGap: "24px",
         paddingTop: "20px",
         paddingBottom: "20px",
-        paddingLeft: width >= 1280 ? "64px" : "48px",
-        paddingRight: width >= 1280 ? "64px" : "48px",
+        paddingLeft: width >= 1280 ? "64px" : width >= 1024 ? "48px" : "32px",
+        paddingRight: width >= 1280 ? "64px" : width >= 1024 ? "48px" : "32px",
       });
 
       const cta = page.getByTestId("submit-picks");

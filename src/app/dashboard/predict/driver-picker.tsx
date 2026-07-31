@@ -667,9 +667,13 @@ export function DriverPicker({
             don't have room for both side by side without wrapping the CTA
             label — measured 74-94px tall before this stack). `md:flex-row
             md:justify-between md:gap-6 md:px-8 md:py-5` restores the
-            original desktop row byte-for-byte (`sm:px-8` already gave px-8
-            in the 780-1023px band, so `md:px-8` is a no-op there); `lg:`/
-            `xl:` padding is untouched. */}
+            original desktop row byte-for-byte — but note this row DROPPED
+            `sm:px-8`, which used to be the sole source of 32px horizontal
+            padding across 640-1023px. `md:px-8` is now the ONLY thing
+            carrying that value in the 780-1023px band; it is load-bearing,
+            not a no-op, and must not be "cleaned up" as a duplicate of a
+            class that no longer exists on this element. `lg:`/`xl:`
+            padding is untouched. */}
         <div className="mx-auto flex w-full max-w-[1600px] flex-col items-stretch gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-6 md:px-8 md:py-5 lg:px-12 xl:px-16">
           <p
             className="text-xs sm:text-sm text-[color:var(--fg-muted)]"
