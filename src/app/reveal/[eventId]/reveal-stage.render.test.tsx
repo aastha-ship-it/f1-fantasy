@@ -9,14 +9,28 @@ import { RevealStage } from "./reveal-stage";
  * "isPhoneUA" and "headers()" appear in the source text — not that a value
  * actually reaches a rendered component.
  *
- * Task 14 threads the `variant` prop through `RevealStage` (and forwards it
- * to `StaticHero` / `PodiumCard`) but *changes no rendering* — that's Task
- * 15's job. So the correct behavioural assertion for THIS task is the
- * inverse of "the variant changes what's rendered": mounting the same props
- * with variant="wide" vs variant="portrait" must produce byte-identical
- * output. That proves (a) RevealStage genuinely accepts and forwards the
- * prop without crashing or branching prematurely, and (b) desktop rendering
- * is provably unchanged — the branch's top constraint.
+ * Task 14 threaded the `variant` prop through `RevealStage` (and forwarded it
+ * to `StaticHero` / `PodiumCard`) but changed no rendering — at that point
+ * the correct assertion was the inverse of "the variant changes what's
+ * rendered": wide and portrait output had to be byte-identical.
+ *
+ * Task 15 is the one that makes the variant actually change rendering (the
+ * stacked-podium geometry + type scale), so that old assertion is now
+ * EXPECTED to fail — and inverted below rather than reverted or deleted:
+ * wide and portrait must now differ, but wide's own rendering must still
+ * carry the exact pre-Task-15 desktop values (R5 — desktop parity is this
+ * branch's top constraint), and both renders must still carry real content
+ * (not e.g. both vacuously returning null).
+ *
+ * Note: jsdom's CSSOM does not parse CSS `clamp()` as a valid property value
+ * and silently drops it, so the portrait-only `fontSize: "clamp(...)"`
+ * declarations (P-numeral, StaticHero headline) never make it into
+ * `container.innerHTML` here at all — real browsers do render them (see the
+ * `tests/e2e/reveal-portrait.spec.ts` R6 test, which pins the exact computed
+ * clamp() value in a real Chromium page). The assertions below instead use
+ * the plain-number properties (grid-template-columns, min-height, band
+ * height, footer font-size, watermark max-width) that both branches set
+ * unconditionally — real, jsdom-visible, and unambiguous per variant.
  */
 
 // jsdom does not implement matchMedia; framer-motion's useReducedMotion()
@@ -96,7 +110,34 @@ describe("RevealStage variant prop (behavioural)", () => {
     }
   });
 
-  it("renders identically for wide vs portrait — Task 14 threads the prop but changes no rendering yet", () => {
+  it("wide keeps the exact pre-Task-15 desktop CSS (R5 — desktop parity)", () => {
+    const wide = render(<RevealStage {...baseProps} variant="wide" />);
+    const html = wide.container.innerHTML;
+    wide.unmount();
+
+    // Non-vacuity guard — same anchor the old test used.
+    expect(html).toContain("THE GROUP");
+
+    // Three-across desktop grid, never the portrait single column.
+    expect(html).toContain("grid-template-columns: 1fr 1fr 1fr;");
+    // Original fixed-pixel card/band sizing, untouched by isPortrait.
+    expect(html).toContain("min-height: 380px"); // P1 card
+    expect(html).toContain("min-height: 360px"); // P2/P3 cards
+    expect(html).toContain("height: 160px;"); // P1 top band
+    expect(html).toContain("height: 140px;"); // P2/P3 top band
+    // Original fixed-pixel P-numeral and footer driver-code sizes.
+    expect(html).toContain("font-size: 144px"); // P1 numeral
+    expect(html).toContain("font-size: 120px"); // P2/P3 numeral
+    expect(html).toContain("font-size: 32px"); // P1 footer code
+    // Car watermark stays unclamped and un-contained on desktop. (The
+    // livery-sweep width fork lives in CinematicHero, which never mounts in
+    // this file — window.matchMedia is stubbed to force reduced motion, so
+    // StaticHero mounts instead; see tests/e2e/reveal-portrait.spec.ts for
+    // CinematicHero/livery-sweep coverage in a real browser.)
+    expect(html).toContain("max-width: none;");
+  });
+
+  it("portrait differs from wide — single-column stacked podium with portrait-scaled geometry", () => {
     const wide = render(<RevealStage {...baseProps} variant="wide" />);
     const wideHtml = wide.container.innerHTML;
     wide.unmount();
@@ -107,13 +148,27 @@ describe("RevealStage variant prop (behavioural)", () => {
     const portraitHtml = portrait.container.innerHTML;
     portrait.unmount();
 
-    // Guard against both renders vacuously agreeing on empty/near-empty
-    // output (e.g. a regression that returns null for every variant would
-    // satisfy `"" === ""` and slip through undetected). "THE GROUP" is the
-    // friend-cascade section heading, present in every non-degenerate
-    // render of RevealStage regardless of variant.
+    // Guard against both renders vacuously agreeing (e.g. a regression that
+    // returns null for every variant would trivially satisfy "differs" via
+    // some other accidental mismatch while both are actually empty).
+    // "THE GROUP" is the friend-cascade section heading, present in every
+    // non-degenerate render of RevealStage regardless of variant.
     expect(wideHtml).toContain("THE GROUP");
-    expect(portraitHtml).toBe(wideHtml);
+    expect(portraitHtml).toContain("THE GROUP");
+
+    // The actual assertion this task's rendering change makes true: wide
+    // and portrait output is no longer byte-identical.
+    expect(portraitHtml).not.toBe(wideHtml);
+
+    // Concrete portrait-only signatures — not just "some string changed".
+    expect(portraitHtml).toContain("grid-template-columns: 1fr;");
+    expect(portraitHtml).not.toContain("grid-template-columns: 1fr 1fr 1fr");
+    expect(portraitHtml).toContain("min-height: 260px"); // P1 card
+    expect(portraitHtml).toContain("min-height: 230px"); // P2/P3 cards
+    expect(portraitHtml).toContain("height: 104px;"); // P1 top band
+    expect(portraitHtml).toContain("height: 92px;"); // P2/P3 top band
+    expect(portraitHtml).toContain("font-size: 22px"); // P2/P3 footer code
+    expect(portraitHtml).toContain("max-width: 100%;"); // contained watermark
   });
 
   it("defaults to 'wide' rendering when variant is omitted", () => {

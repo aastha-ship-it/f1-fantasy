@@ -107,7 +107,6 @@ export function RevealStage({
   variant?: RevealVariant;
 }) {
   const reduce = useReducedMotion() ?? false;
-  // Task 15 consumes this; unused here is expected (see R2 in the task brief).
   const isPortrait = variant === "portrait";
   // playKey re-mounts every motion node so the whole intro replays.
   const [playKey, setPlayKey] = useState(0);
@@ -165,6 +164,7 @@ export function RevealStage({
           key={`hero-${playKey}`}
           hero={hero}
           sweepTeam={sweepTeam}
+          variant={variant}
           onReplay={() => setPlayKey((k) => k + 1)}
         />
       )}
@@ -183,12 +183,16 @@ export function RevealStage({
           Race Result
         </motion.p>
         <div
+          data-podium
           className="grid w-full border border-[color:var(--border)]"
           style={{
             // Three full-width podium cards spanning the hero width. Layout
             // matches `design/design-screenshots/Reveal screen.png`: top band
             // with team-tinted P{n} block, large driver portrait below.
-            gridTemplateColumns: isSprint ? "1fr" : "1fr 1fr 1fr",
+            // Portrait stacks to a single full-bleed column — same reason
+            // sprints do (isSprint): one card per row instead of a squeezed
+            // 1-of-3 column.
+            gridTemplateColumns: isSprint || isPortrait ? "1fr" : "1fr 1fr 1fr",
             gap: 1,
             background: "var(--border)",
           }}
@@ -284,12 +288,15 @@ export function RevealStage({
 function CinematicHero({
   hero,
   sweepTeam,
+  variant = "wide",
   onReplay,
 }: {
   hero: RevealHero;
   sweepTeam: TeamMeta | null;
+  variant?: RevealVariant;
   onReplay: () => void;
 }) {
+  const isPortrait = variant === "portrait";
   return (
     <section
       className="relative overflow-hidden border-b border-[color:var(--border)]"
@@ -343,7 +350,7 @@ function CinematicHero({
             unoptimized
             className="select-none"
             style={{
-              width: "min(1100px, 70vw)",
+              width: isPortrait ? "min(1100px, 150vw)" : "min(1100px, 70vw)",
               height: "auto",
               filter: "drop-shadow(0 20px 40px rgba(0,0,0,0.6))",
             }}
@@ -527,11 +534,12 @@ function CinematicHero({
 
 function StaticHero({
   hero,
+  variant = "wide",
 }: {
   hero: RevealHero;
-  // Threaded for Task 15; StaticHero's rendering does not branch on it yet.
   variant?: RevealVariant;
 }) {
+  const isPortrait = variant === "portrait";
   return (
     <section className="grid items-end gap-8 border-b border-[color:var(--border)] pb-8 lg:grid-cols-[1.4fr_1fr]">
       <div>
@@ -550,7 +558,9 @@ function StaticHero({
           className="m-0"
           style={{
             fontFamily: "var(--font-boldonse), ui-sans-serif",
-            fontSize: "clamp(48px, 7vw, 96px)",
+            fontSize: isPortrait
+              ? "clamp(40px, 13vw, 96px)"
+              : "clamp(48px, 7vw, 96px)",
             lineHeight: 0.9,
             letterSpacing: "-0.02em",
           }}
@@ -615,12 +625,13 @@ function FlipCard({
 function PodiumCard({
   pos,
   driver,
+  variant = "wide",
 }: {
   pos: number;
   driver: Driver | null | undefined;
-  // Threaded for Task 15; PodiumCard's rendering does not branch on it yet.
   variant?: RevealVariant;
 }) {
+  const isPortrait = variant === "portrait";
   const isP1 = pos === 1;
   const t = driver ? teamMeta(driver.team) : null;
   const portraitSrc = driver ? driverPortraitSrc(driver.code) : null;
@@ -631,14 +642,15 @@ function PodiumCard({
   // with the team color (livery silhouette behind), bottom hero shows the
   // driver portrait. Footer line: driver code + team + #num.
   const cardMinH = isP1 ? 380 : 360;
-  const topBandH = isP1 ? 160 : 140;
+  const topBandH = isPortrait ? (isP1 ? 104 : 92) : isP1 ? 160 : 140;
 
   return (
     <div
+      data-podium-card
       className="relative flex h-full flex-col overflow-hidden"
       style={{
         background: "var(--surface)",
-        minHeight: cardMinH,
+        minHeight: isPortrait ? (isP1 ? 260 : 230) : cardMinH,
       }}
     >
       {/* TOP BAND — team-tinted slab carrying the P{n} block. Livery car
@@ -667,7 +679,12 @@ function PodiumCard({
               opacity: 0.32,
               width: 460,
               height: "auto",
-              maxWidth: "none",
+              // Wide: unchanged — the ghost car partially clips against the
+              // narrower ~1/3-width band by design (R5 byte-parity). Portrait
+              // is a single full-bleed column where 460px would overflow the
+              // band's own bounds more aggressively than the clip look
+              // intends, so it's contained to the band's width instead.
+              maxWidth: isPortrait ? "100%" : "none",
             }}
           />
         )}
@@ -677,7 +694,13 @@ function PodiumCard({
             left: "var(--space-lg)",
             bottom: -8,
             fontFamily: "var(--font-boldonse), ui-sans-serif",
-            fontSize: isP1 ? 144 : 120,
+            fontSize: isPortrait
+              ? isP1
+                ? "clamp(72px, 22vw, 144px)"
+                : "clamp(60px, 18vw, 120px)"
+              : isP1
+                ? 144
+                : 120,
             lineHeight: 0.85,
             color: isP1 ? "var(--accent)" : "var(--fg)",
           }}
@@ -738,7 +761,7 @@ function PodiumCard({
               className="leading-none"
               style={{
                 fontFamily: "var(--font-boldonse), ui-sans-serif",
-                fontSize: isP1 ? 32 : 26,
+                fontSize: isPortrait ? (isP1 ? 26 : 22) : isP1 ? 32 : 26,
                 letterSpacing: "0.005em",
               }}
             >
