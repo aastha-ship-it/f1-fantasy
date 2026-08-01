@@ -81,12 +81,19 @@ const baseProps = {
 
 describe("RevealStage variant prop (behavioural)", () => {
   it("accepts variant='portrait' and variant='wide' without crashing", () => {
-    expect(() =>
-      render(<RevealStage {...baseProps} variant="wide" />),
-    ).not.toThrow();
-    expect(() =>
-      render(<RevealStage {...baseProps} variant="portrait" />),
-    ).not.toThrow();
+    let wide: ReturnType<typeof render> | undefined;
+    let portrait: ReturnType<typeof render> | undefined;
+    try {
+      expect(() => {
+        wide = render(<RevealStage {...baseProps} variant="wide" />);
+      }).not.toThrow();
+      expect(() => {
+        portrait = render(<RevealStage {...baseProps} variant="portrait" />);
+      }).not.toThrow();
+    } finally {
+      wide?.unmount();
+      portrait?.unmount();
+    }
   });
 
   it("renders identically for wide vs portrait — Task 14 threads the prop but changes no rendering yet", () => {
@@ -100,6 +107,12 @@ describe("RevealStage variant prop (behavioural)", () => {
     const portraitHtml = portrait.container.innerHTML;
     portrait.unmount();
 
+    // Guard against both renders vacuously agreeing on empty/near-empty
+    // output (e.g. a regression that returns null for every variant would
+    // satisfy `"" === ""` and slip through undetected). "THE GROUP" is the
+    // friend-cascade section heading, present in every non-degenerate
+    // render of RevealStage regardless of variant.
+    expect(wideHtml).toContain("THE GROUP");
     expect(portraitHtml).toBe(wideHtml);
   });
 
