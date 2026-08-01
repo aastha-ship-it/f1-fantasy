@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { slotBadge } from "@/lib/computeScores";
 
 /**
@@ -31,5 +33,26 @@ describe("slotBadge", () => {
     expect(b.text).toBe("✓ Exact +5");
     expect(b.color).toBe("var(--success)");
     expect(b.weight).toBe(600);
+  });
+});
+
+describe("reveal variant plumbing", () => {
+  const stage = readFileSync(resolve(__dirname, "reveal-stage.tsx"), "utf8");
+  const page = readFileSync(resolve(__dirname, "page.tsx"), "utf8");
+
+  it("accepts a variant prop", () => {
+    expect(stage).toMatch(/variant\s*[:?]/);
+    expect(stage).toMatch(/"portrait"\s*\|\s*"wide"/);
+  });
+
+  it("derives the variant from the UA on the server", () => {
+    expect(page).toMatch(/isPhoneUA/);
+    expect(page).toMatch(/headers\(\)/);
+  });
+
+  it("keeps exactly one set of timing constants", () => {
+    // A second PODIUM_STAGGER means the two timelines can drift apart.
+    const matches = stage.match(/const PODIUM_STAGGER/g) ?? [];
+    expect(matches).toHaveLength(1);
   });
 });

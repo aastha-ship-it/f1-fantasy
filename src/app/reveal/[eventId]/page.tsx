@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sessionLabel, formatLocal } from "@/lib/sessionLabel";
@@ -7,6 +8,7 @@ import { shortEventName } from "@/lib/design/eventName";
 import { circuitMeta } from "@/lib/design/circuits";
 import { teamMeta, type TeamMeta } from "@/lib/design/teams";
 import { trackPath } from "@/lib/design/tracks";
+import { isPhoneUA } from "@/lib/design/device";
 import { RevealStage } from "./reveal-stage";
 
 type EventRow = {
@@ -27,6 +29,14 @@ export default async function RevealPage({
 }) {
   const { eventId } = await params;
   const supabase = await createSupabaseServerClient();
+
+  // Decided once, server-side, before either render path below: both
+  // cinematic choreographies mounting at once would double the Framer
+  // Motion work on the tightest frame budget in the app. The route is
+  // already auth-gated and dynamic, so reading the UA header is free.
+  const variant = isPhoneUA((await headers()).get("user-agent"))
+    ? "portrait"
+    : "wide";
 
   const { data: userData } = await supabase.auth.getUser();
   const me = userData.user?.id ?? null;
@@ -205,6 +215,7 @@ export default async function RevealPage({
           drivers={drivers ?? []}
           currentUserId={me}
           isSprint={sprint}
+          variant={variant}
         />
       </main>
     </>

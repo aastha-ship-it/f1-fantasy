@@ -34,6 +34,8 @@ type Score = {
   perfect_bonus: boolean;
 };
 
+export type RevealVariant = "portrait" | "wide";
+
 export type RevealHero = {
   short: string;
   sessionType: string;
@@ -86,6 +88,7 @@ export function RevealStage({
   drivers,
   currentUserId,
   isSprint,
+  variant = "wide",
 }: {
   event: {
     id: string;
@@ -101,8 +104,11 @@ export function RevealStage({
   drivers: Driver[];
   currentUserId: string | null;
   isSprint: boolean;
+  variant?: RevealVariant;
 }) {
   const reduce = useReducedMotion() ?? false;
+  // Task 15 consumes this; unused here is expected (see R2 in the task brief).
+  const isPortrait = variant === "portrait";
   // playKey re-mounts every motion node so the whole intro replays.
   const [playKey, setPlayKey] = useState(0);
 
@@ -153,7 +159,7 @@ export function RevealStage({
   return (
     <div className="flex flex-col gap-12">
       {reduce ? (
-        <StaticHero hero={hero} />
+        <StaticHero hero={hero} variant={variant} />
       ) : (
         <CinematicHero
           key={`hero-${playKey}`}
@@ -198,7 +204,7 @@ export function RevealStage({
                 delay={podiumBaseDelay + flipDelayFor(slot.pos)}
                 duration={PODIUM_DUR}
               >
-                <PodiumCard pos={slot.pos} driver={d} />
+                <PodiumCard pos={slot.pos} driver={d} variant={variant} />
               </FlipCard>
             );
           })}
@@ -519,7 +525,13 @@ function CinematicHero({
   );
 }
 
-function StaticHero({ hero }: { hero: RevealHero }) {
+function StaticHero({
+  hero,
+}: {
+  hero: RevealHero;
+  // Threaded for Task 15; StaticHero's rendering does not branch on it yet.
+  variant?: RevealVariant;
+}) {
   return (
     <section className="grid items-end gap-8 border-b border-[color:var(--border)] pb-8 lg:grid-cols-[1.4fr_1fr]">
       <div>
@@ -606,6 +618,8 @@ function PodiumCard({
 }: {
   pos: number;
   driver: Driver | null | undefined;
+  // Threaded for Task 15; PodiumCard's rendering does not branch on it yet.
+  variant?: RevealVariant;
 }) {
   const isP1 = pos === 1;
   const t = driver ? teamMeta(driver.team) : null;
