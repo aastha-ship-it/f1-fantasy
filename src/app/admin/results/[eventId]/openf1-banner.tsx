@@ -251,6 +251,7 @@ export function OpenF1FetchBanner({
               type="button"
               disabled={pending}
               onClick={() => run(() => fetchFromOpenF1(eventId))}
+              className="min-h-[44px] w-full md:min-h-0 md:w-auto"
               style={{ ...ctaStyle(true), opacity: pending ? 0.6 : 1 }}
             >
               {pending ? "Working…" : "Fetch from OpenF1 →"}
@@ -262,6 +263,7 @@ export function OpenF1FetchBanner({
                 type="button"
                 disabled={pending}
                 onClick={() => run(() => fetchFromOpenF1(eventId))}
+                className="min-h-[44px] w-full md:min-h-0 md:w-auto"
                 style={{ ...ctaStyle(false), opacity: pending ? 0.6 : 1 }}
               >
                 {pending ? "Working…" : "Refetch from OpenF1"}
@@ -270,6 +272,7 @@ export function OpenF1FetchBanner({
                 type="button"
                 disabled={pending}
                 onClick={() => run(() => acceptAsOfficial(eventId))}
+                className="min-h-[44px] w-full md:min-h-0 md:w-auto"
                 style={{ ...ctaStyle(false), opacity: pending ? 0.6 : 1 }}
               >
                 Accept as official →
@@ -278,13 +281,18 @@ export function OpenF1FetchBanner({
           )}
           {state === "official" && (
             <>
-              <a href={formAnchor} style={ctaStyle(false)}>
+              <a
+                href={formAnchor}
+                className="min-h-[44px] w-full md:min-h-0 md:w-auto"
+                style={ctaStyle(false)}
+              >
                 Edit manually
               </a>
               <button
                 type="button"
                 disabled={pending}
                 onClick={confirmReveal}
+                className="min-h-[44px] w-full md:min-h-0 md:w-auto"
                 style={{ ...ctaStyle(true), opacity: pending ? 0.6 : 1 }}
               >
                 {pending ? "Revealing…" : "Reveal to group →"}

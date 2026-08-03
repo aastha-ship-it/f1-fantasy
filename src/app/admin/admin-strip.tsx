@@ -27,7 +27,7 @@ export function AdminStrip({
 }) {
   return (
     <nav className="border-b border-[color:var(--accent)]">
-      <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-6 px-6 py-4 text-xs uppercase sm:px-8 lg:px-12 xl:px-16">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-3 px-6 py-4 text-xs uppercase sm:px-8 md:flex-nowrap md:gap-6 lg:px-12 xl:px-16">
         <Link
           href="/admin"
           className="flex items-center gap-2 text-[color:var(--accent)]"

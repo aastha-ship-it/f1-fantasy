@@ -37,12 +37,12 @@ export function RevealButton({
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex w-full flex-col items-end gap-1 md:w-auto">
       <button
         type="button"
         onClick={onClick}
         disabled={pending}
-        className="rounded bg-[color:var(--accent)] px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-[color:var(--accent-hover)] disabled:opacity-40"
+        className="min-h-[44px] w-full rounded bg-[color:var(--accent)] px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-[color:var(--accent-hover)] disabled:opacity-40 md:min-h-0 md:w-auto"
       >
         {pending ? "Revealing…" : "Reveal to group"}
       </button>

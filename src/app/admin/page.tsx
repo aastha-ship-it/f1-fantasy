@@ -244,7 +244,7 @@ export default async function AdminHomePage() {
   return (
     <>
       <AdminStrip current="events" displayName={guard.displayName ?? null} />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
+      <main className="mx-auto w-full max-w-[1600px] px-6 pt-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
         <p
           className="mb-3 flex items-center gap-2 text-xs uppercase text-[color:var(--accent)]"
           style={{ letterSpacing: "0.18em" }}
@@ -275,12 +275,7 @@ export default async function AdminHomePage() {
             schedule from vercel.json plus the latest reveal as a soft signal
             that the chain has been running. */}
         <section
-          className="mt-10 grid border border-[color:var(--border)]"
-          style={{
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 1,
-            background: "var(--border)",
-          }}
+          className="mt-10 grid grid-cols-1 gap-px border border-[color:var(--border)] bg-[color:var(--border)] md:grid-cols-[1fr_1fr_1fr_1fr]"
         >
           {CRON_SCHEDULE.map((c) => {
             const last = latestByPath.get(c.path);
@@ -344,12 +339,13 @@ export default async function AdminHomePage() {
           EVENTS · {rounds.length}
         </h2>
 
-        {/* Header row */}
+        {/* Header row — a column legend for the desktop table. Below `md`
+            each row renders as a stacked card instead of a table row, so
+            the legend has nothing to label and is hidden rather than
+            stacked into a meaningless list of single-word lines. */}
         <div
-          className="grid items-center gap-3 border-b border-[color:var(--border)] px-3 py-2 text-[10px] uppercase text-[color:var(--fg-subtle)]"
+          className="hidden border-b border-[color:var(--border)] px-3 py-2 text-[10px] uppercase text-[color:var(--fg-subtle)] md:grid md:grid-cols-[32px_80px_32px_minmax(0,1fr)_100px_96px_140px_minmax(0,1fr)_200px] md:items-center md:gap-3"
           style={{
-            gridTemplateColumns:
-              "32px 80px 32px minmax(0,1fr) 100px 96px 140px minmax(0,1fr) 200px",
             letterSpacing: "0.12em",
           }}
           data-tabular
@@ -390,10 +386,8 @@ export default async function AdminHomePage() {
             return (
               <li
                 key={r.round}
-                className="grid items-center gap-3 border-b border-[color:var(--border)] px-3 py-3.5"
+                className="grid grid-cols-1 items-start gap-2 border-b border-[color:var(--border)] px-3 py-3.5 md:grid-cols-[32px_80px_32px_minmax(0,1fr)_100px_96px_140px_minmax(0,1fr)_200px] md:items-center md:gap-3"
                 style={{
-                  gridTemplateColumns:
-                    "32px 80px 32px minmax(0,1fr) 100px 96px 140px minmax(0,1fr) 200px",
                   background: stateMeta.bg,
                 }}
               >
@@ -434,30 +428,60 @@ export default async function AdminHomePage() {
                     {r.circuit}
                   </p>
                 </div>
-                <span
-                  className="text-xs text-[color:var(--fg-muted)]"
-                  style={{ letterSpacing: "0.04em" }}
-                  data-tabular
-                >
-                  {date}
-                </span>
-                <span
-                  className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
-                  style={{ letterSpacing: "0.06em" }}
-                  data-tabular
-                >
-                  {sessionsLabel}
-                </span>
-                <span
-                  className="text-[10px] uppercase font-semibold"
-                  style={{
-                    color: stateMeta.color,
-                    letterSpacing: "0.08em",
-                  }}
-                  data-tabular
-                >
-                  ● {stateMeta.label}
-                </span>
+                {/* Below `md` these three cells only make sense with a
+                    table header for context, which is now hidden — so each
+                    gets its own mobile-only label. `md:contents` keeps the
+                    wrapper transparent to the desktop grid, so at `md` and
+                    up the label disappears and the value span becomes a
+                    direct grid child again, unchanged from before. */}
+                <div className="flex flex-col gap-0.5 md:contents">
+                  <span
+                    className="text-[10px] uppercase text-[color:var(--fg-subtle)] md:hidden"
+                    style={{ letterSpacing: "0.06em" }}
+                  >
+                    Date
+                  </span>
+                  <span
+                    className="text-xs text-[color:var(--fg-muted)]"
+                    style={{ letterSpacing: "0.04em" }}
+                    data-tabular
+                  >
+                    {date}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-0.5 md:contents">
+                  <span
+                    className="text-[10px] uppercase text-[color:var(--fg-subtle)] md:hidden"
+                    style={{ letterSpacing: "0.06em" }}
+                  >
+                    Sessions
+                  </span>
+                  <span
+                    className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
+                    style={{ letterSpacing: "0.06em" }}
+                    data-tabular
+                  >
+                    {sessionsLabel}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-0.5 md:contents">
+                  <span
+                    className="text-[10px] uppercase text-[color:var(--fg-subtle)] md:hidden"
+                    style={{ letterSpacing: "0.06em" }}
+                  >
+                    Status
+                  </span>
+                  <span
+                    className="text-[10px] uppercase font-semibold"
+                    style={{
+                      color: stateMeta.color,
+                      letterSpacing: "0.08em",
+                    }}
+                    data-tabular
+                  >
+                    ● {stateMeta.label}
+                  </span>
+                </div>
                 <span
                   className="text-[11px] text-[color:var(--fg-muted)]"
                   data-tabular
@@ -486,7 +510,7 @@ export default async function AdminHomePage() {
                   ) : (
                     <Link
                       href={actionHref}
-                      className="px-4 py-2 text-[11px] uppercase transition-colors"
+                      className="w-full px-4 py-2 text-center text-[11px] uppercase transition-colors md:w-auto"
                       style={{
                         background:
                           r.state === "pending" || r.state === "mixed"
