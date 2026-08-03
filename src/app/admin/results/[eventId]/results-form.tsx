@@ -239,6 +239,13 @@ export function ResultsForm({
 
   return (
     <div className="mt-10 grid gap-12 lg:grid-cols-[1.3fr_1fr]">
+      <p
+        className="mb-4 border border-[color:var(--border)] p-3 text-xs text-[color:var(--fg-muted)] md:hidden"
+        style={{ background: "var(--surface)" }}
+      >
+        Manual entry is laid out for a larger screen. Tables below scroll
+        sideways. Fetching from OpenF1 and revealing work fine here.
+      </p>
       {/* LEFT — Classified podium */}
       <section>
         <h2
@@ -268,6 +275,7 @@ export function ResultsForm({
                     : "inset 0 -3px 0 var(--border)",
                 }}
               >
+                <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
                 <div
                   className="grid items-center gap-4 p-5"
                   style={{
@@ -359,8 +367,10 @@ export function ResultsForm({
                     {isEditing ? "Cancel" : "Change"}
                   </button>
                 </div>
+                </div>
 
                 {isEditing && (
+                  <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
                   <ul
                     className="grid gap-px border-t border-[color:var(--border)] bg-[color:var(--border)]"
                     style={{
@@ -411,6 +421,7 @@ export function ResultsForm({
                       );
                     })}
                   </ul>
+                  </div>
                 )}
               </div>
             );
@@ -466,7 +477,11 @@ export function ResultsForm({
               return (
                 <li
                   key={row.prediction.user_id}
-                  className="grid items-center gap-3 border-b border-[color:var(--border)] py-3"
+                  className="border-b border-[color:var(--border)] py-3"
+                >
+                <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+                <div
+                  className="grid items-center gap-3"
                   style={{
                     gridTemplateColumns: "minmax(0,1fr) 56px",
                   }}
@@ -526,6 +541,8 @@ export function ResultsForm({
                   >
                     {row.score == null ? "—" : `+${row.score.points}`}
                   </span>
+                </div>
+                </div>
                 </li>
               );
             })}

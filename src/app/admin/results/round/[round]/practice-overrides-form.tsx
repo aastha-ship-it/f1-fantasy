@@ -91,6 +91,7 @@ export function PracticeOverridesForm({
         </div>
       </header>
 
+      <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
       <div
         className="grid items-center uppercase text-[color:var(--fg-subtle)]"
         style={{
@@ -111,6 +112,7 @@ export function PracticeOverridesForm({
         <span>P3</span>
         <span className="text-right">Status</span>
         <span className="text-right">Actions</span>
+      </div>
       </div>
 
       {FP_SLOTS.map((fp, i) => (
@@ -236,6 +238,7 @@ function FpRow({
   }
 
   return (
+    <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
     <div
       className="grid items-center"
       style={{
@@ -321,6 +324,7 @@ function FpRow({
           {pending ? "…" : "Save"}
         </button>
       </div>
+    </div>
     </div>
   );
 }

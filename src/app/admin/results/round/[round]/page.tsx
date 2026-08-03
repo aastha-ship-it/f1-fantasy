@@ -179,7 +179,7 @@ export default async function AdminResultsRoundPage({
   return (
     <>
       <AdminStrip current="events" displayName={guard.displayName ?? null} />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
+      <main className="mx-auto w-full max-w-[1600px] px-6 pt-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
         <p
           className="mb-3 text-xs uppercase text-[color:var(--fg-muted)]"
           style={{ letterSpacing: "0.12em" }}
@@ -256,10 +256,7 @@ export default async function AdminResultsRoundPage({
               <Link
                 key={s.id}
                 href={`/admin/results/${s.id}`}
-                className="grid items-center gap-6 bg-[color:var(--surface)] px-6 py-5 transition-colors hover:bg-[color:var(--surface-2)]"
-                style={{
-                  gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1fr) auto",
-                }}
+                className="grid grid-cols-1 items-start gap-2 bg-[color:var(--surface)] px-6 py-5 transition-colors hover:bg-[color:var(--surface-2)] md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] md:items-center md:gap-6"
               >
                 <div className="min-w-0">
                   <p

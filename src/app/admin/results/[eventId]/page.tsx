@@ -167,7 +167,7 @@ export default async function AdminResultsPage({
   return (
     <>
       <AdminStrip current="events" displayName={guard.displayName ?? null} />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
+      <main className="mx-auto w-full max-w-[1600px] px-6 pt-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
         <p
           className="mb-3 text-xs uppercase text-[color:var(--fg-muted)]"
           style={{ letterSpacing: "0.12em" }}

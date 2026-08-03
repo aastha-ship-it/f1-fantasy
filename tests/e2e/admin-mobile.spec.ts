@@ -132,4 +132,107 @@ test.describe("admin on mobile", () => {
     const box = (await reveal.boundingBox())!;
     expect(box.height, "reveal control must be a comfortable tap target").toBeGreaterThanOrEqual(44);
   });
+
+  test("results entry is contained, not clipped", async ({ page }) => {
+    test.skip(!ADMIN_EMAIL, "ADMIN_EMAIL not set");
+    // Same forced-viewport idiom as the test above — the containment
+    // assertions below are semantically mobile-only (the page must not
+    // scroll sideways on a phone; a wide grid scrolling inside its own
+    // card is fine and expected). Force it regardless of which project
+    // runs this file.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/join");
+    await page.getByLabel("Invite code").fill(INVITE_CODE);
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.waitForURL(/\/login/);
+    const signInResp = await page.request.post("/api/test/sign-in-password", {
+      data: { email: ADMIN_EMAIL, password: "test-password-12345" },
+    });
+    expect(signInResp.ok(), `admin sign-in: ${signInResp.status()}`).toBeTruthy();
+
+    await page.goto("/admin");
+
+    // Two genuinely different page types host results grids: the
+    // round-summary page (`/admin/results/round/{round}`, hosts the
+    // practice-overrides grids) and the single-session page
+    // (`/admin/results/{eventId}`, hosts the results-form grids). A naive
+    // `a[href*="/admin/results/"]`.first() on /admin is not just
+    // DOM-order-incidental, it is flatly wrong here: admin/page.tsx renders
+    // an anchor to `/admin/results/{eventId}` ONLY via its round-summary
+    // fallback links, never directly — a round in the "Entered · Not
+    // revealed" state gets a `<RevealButton>` (a real `<button>`, no
+    // `href`) instead of a link, so `/admin` itself never exposes a
+    // single-session link at all. The only real, reachable path to a
+    // single-session page is: /admin -> round summary -> one of its
+    // per-session links (round/[round]/page.tsx renders one unconditionally
+    // for every session). So this test follows that actual path rather
+    // than assuming a link that does not exist.
+    const roundHrefs = (
+      await page
+        .locator('a[href^="/admin/results/round/"]')
+        .evaluateAll((els) => els.map((el) => el.getAttribute("href")))
+    ).filter((h): h is string => !!h);
+    test.skip(roundHrefs.length === 0, "no round-summary link on /admin");
+    // Sort numerically by round so the pick is reproducible run to run
+    // rather than dependent on DOM insertion order (every match is the same
+    // page type, so this only decides *which* round, never *which* page).
+    const roundHref = [...roundHrefs].sort(
+      (a, b) => Number(a.split("/").pop()) - Number(b.split("/").pop()),
+    )[0]!;
+
+    async function assertContained(href: string, label: string) {
+      await page.goto(href);
+
+      // The PAGE must not scroll sideways…
+      const { sw, cw } = await page.evaluate(() => {
+        const el = document.scrollingElement as HTMLElement;
+        return { sw: el.scrollWidth, cw: el.clientWidth };
+      });
+      expect(
+        sw,
+        `${label}: page must not scroll horizontally`,
+      ).toBeLessThanOrEqual(cw + 1);
+
+      // …but a wide grid inside its own scroller is fine and expected.
+      // Scoped (not just "some .overflow-x-auto exists somewhere"): every
+      // matched scroller must itself be an ancestor of one of the actual
+      // fixed-column results grids (identified by their inline
+      // `grid-template-columns` style — the thing this task wraps), so the
+      // assertion still means something once some unrelated component
+      // gains an `overflow-x-auto` of its own.
+      const scrollers = page.locator(".overflow-x-auto");
+      const scrollerCount = await scrollers.count();
+      expect(
+        scrollerCount,
+        `${label}: expected at least one results-grid scroller`,
+      ).toBeGreaterThan(0);
+      for (let i = 0; i < scrollerCount; i++) {
+        const wrapsAGrid = await scrollers
+          .nth(i)
+          .locator('[style*="grid-template-columns"]')
+          .count();
+        expect(
+          wrapsAGrid,
+          `${label}: scroller #${i} must be an ancestor of a results grid`,
+        ).toBeGreaterThan(0);
+      }
+    }
+
+    await assertContained(roundHref, "round page (practice overrides)");
+
+    // Now follow one of THIS round's own per-session links to reach the
+    // single-session page — the only real path to it, per the comment
+    // above. Sorted deterministically for the same reason as roundHref.
+    const eventHrefs = (
+      await page
+        .locator('a[href^="/admin/results/"]')
+        .evaluateAll((els) => els.map((el) => el.getAttribute("href")))
+    )
+      .filter((h): h is string => !!h)
+      .filter((h) => !h.includes("/round/"));
+    test.skip(eventHrefs.length === 0, "no session link on the round page");
+    const eventHref = [...eventHrefs].sort()[0]!;
+
+    await assertContained(eventHref, "event page (results form)");
+  });
 });
