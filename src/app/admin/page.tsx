@@ -510,7 +510,7 @@ export default async function AdminHomePage() {
                   ) : (
                     <Link
                       href={actionHref}
-                      className="w-full px-4 py-2 text-center text-[11px] uppercase transition-colors md:w-auto"
+                      className="w-full px-4 py-2 text-center text-[11px] uppercase transition-colors md:w-auto md:text-left"
                       style={{
                         background:
                           r.state === "pending" || r.state === "mixed"

@@ -42,7 +42,7 @@ export function RevealButton({
         type="button"
         onClick={onClick}
         disabled={pending}
-        className="min-h-[44px] w-full rounded bg-[color:var(--accent)] px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-[color:var(--accent-hover)] disabled:opacity-40 md:min-h-0 md:w-auto"
+        className="min-h-[44px] w-full rounded bg-[color:var(--accent)] px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-[color:var(--accent-hover)] disabled:opacity-40 md:min-h-auto md:w-auto"
       >
         {pending ? "Revealing…" : "Reveal to group"}
       </button>
