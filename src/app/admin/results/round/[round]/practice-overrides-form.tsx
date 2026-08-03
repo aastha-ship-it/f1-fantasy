@@ -91,7 +91,7 @@ export function PracticeOverridesForm({
         </div>
       </header>
 
-      <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+      <div className="overflow-x-auto">
       <div
         className="grid items-center uppercase text-[color:var(--fg-subtle)]"
         style={{
@@ -238,7 +238,7 @@ function FpRow({
   }
 
   return (
-    <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+    <div className="overflow-x-auto">
     <div
       className="grid items-center"
       style={{

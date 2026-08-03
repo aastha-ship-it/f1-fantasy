@@ -477,11 +477,7 @@ export function ResultsForm({
               return (
                 <li
                   key={row.prediction.user_id}
-                  className="border-b border-[color:var(--border)] py-3"
-                >
-                <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-                <div
-                  className="grid items-center gap-3"
+                  className="grid items-center gap-3 border-b border-[color:var(--border)] py-3 -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0"
                   style={{
                     gridTemplateColumns: "minmax(0,1fr) 56px",
                   }}
@@ -541,8 +537,6 @@ export function ResultsForm({
                   >
                     {row.score == null ? "—" : `+${row.score.points}`}
                   </span>
-                </div>
-                </div>
                 </li>
               );
             })}

@@ -195,11 +195,16 @@ test.describe("admin on mobile", () => {
 
       // …but a wide grid inside its own scroller is fine and expected.
       // Scoped (not just "some .overflow-x-auto exists somewhere"): every
-      // matched scroller must itself be an ancestor of one of the actual
-      // fixed-column results grids (identified by their inline
+      // matched scroller must itself BE, or be an ancestor of, one of the
+      // actual fixed-column results grids (identified by their inline
       // `grid-template-columns` style — the thing this task wraps), so the
       // assertion still means something once some unrelated component
-      // gains an `overflow-x-auto` of its own.
+      // gains an `overflow-x-auto` of its own. "Or be" matters here: the
+      // score-preview row puts the scroller class directly on the same
+      // element that carries `gridTemplateColumns` (a grid container is a
+      // perfectly good scroll container on its own — no wrapping div
+      // needed there), so a descendant-only check would wrongly fail on
+      // that row.
       const scrollers = page.locator(".overflow-x-auto");
       const scrollerCount = await scrollers.count();
       expect(
@@ -207,14 +212,15 @@ test.describe("admin on mobile", () => {
         `${label}: expected at least one results-grid scroller`,
       ).toBeGreaterThan(0);
       for (let i = 0; i < scrollerCount; i++) {
-        const wrapsAGrid = await scrollers
-          .nth(i)
-          .locator('[style*="grid-template-columns"]')
-          .count();
+        const isOrWrapsAGrid = await scrollers.nth(i).evaluate((el) => {
+          const isGrid = (e: Element) =>
+            (e.getAttribute("style") ?? "").includes("grid-template-columns");
+          return isGrid(el) || !!el.querySelector('[style*="grid-template-columns"]');
+        });
         expect(
-          wrapsAGrid,
-          `${label}: scroller #${i} must be an ancestor of a results grid`,
-        ).toBeGreaterThan(0);
+          isOrWrapsAGrid,
+          `${label}: scroller #${i} must be, or be an ancestor of, a results grid`,
+        ).toBe(true);
       }
     }
 
