@@ -13,7 +13,17 @@ import path from "node:path";
  * bare module-level `test.skip(callback, ...)` has no `testInfo` yet at
  * collection time and throws — `testInfo` is only available once a test is
  * actually running, e.g. inside `beforeEach`).
+ *
+ * Evidence capture: the R1(c) screenshots (and the two extra non-sprint
+ * ones) are one-time artifacts for the task-15 review, not a permanent part
+ * of every e2e run. They — and the friend-cascade settle wait that exists
+ * solely to make them look nice — are gated behind `CAPTURE_EVIDENCE=1` so
+ * routine runs don't write into the (git-ignored) `.superpowers/` scratch
+ * tree or pay the extra wait. The evidence already captured under
+ * `task-15-evidence/` stays where it is regardless of this flag.
  */
+
+const CAPTURE_EVIDENCE = process.env.CAPTURE_EVIDENCE === "1";
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -74,7 +84,8 @@ async function waitForPodiumSettled(page: Page): Promise<void> {
 /** Waits for the friend-card cascade (the section below the podium) to have
  * finished flipping in too — purely so the R1(c) evidence screenshots show
  * the fully-settled page rather than an empty "THE GROUP" grid mid-cascade.
- * Not required by any assertion; only used before the screenshot calls. */
+ * Not required by any assertion; only called when `CAPTURE_EVIDENCE=1`,
+ * immediately before a screenshot call. */
 async function waitForFriendCascadeSettled(page: Page): Promise<void> {
   await page.waitForFunction(
     () => {
@@ -105,15 +116,25 @@ async function measureNoOverflow(page: Page): Promise<{ sw: number; cw: number }
  * both non-sprint session types (the 3-card visualOrder), and neither name
  * is a substring of a sprint label, but `exact: true` is still required —
  * without it, a loose matcher could accidentally match "Watch Sprint
- * Qualifying reveal" against a "Qualifying" query. `.first()` is safe here
- * ONLY because every element the locator can match is already guaranteed
- * non-sprint by the exact accessible name — unlike the naive
- * `a[href^="/reveal/"]`.first() in the task's illustrative Step 1 snippet,
- * which could resolve to a sprint session and fail the 3-card assertion for
- * a reason that has nothing to do with the portrait code under test.
+ * Qualifying reveal" against a "Qualifying" query.
+ *
+ * Fix round 2 (R1a): this used to return a `.first()`-narrowed locator, and
+ * every call site asserted `toHaveCount(1)` on that already-narrowed-to-1
+ * locator — which can only ever observe 0 or 1 and so can never fail no
+ * matter how many "Race" links actually exist. A controller DB check found
+ * the local fixture has 4 revealed "Race" events, not 1, so that assertion
+ * read like a determinism proof while being unfalsifiable. This now returns
+ * ALL matching links unnarrowed; callers assert `count() > 0` (an honest
+ * existence check — it says only "at least one exists", not "exactly one")
+ * and take `.first()` separately at the point of use. `.first()` there is
+ * still safe for what R1(a) actually requires: every element this locator
+ * can match is already guaranteed non-sprint by the exact accessible name,
+ * so `.first()` can never accidentally land on a sprint session and
+ * spuriously fail the 3-card assertion — it is order-dependent-but-always-
+ * non-sprint, not a claim that the fixture has exactly one such row.
  */
-function nonSprintRaceLink(page: Page) {
-  return page.getByRole("link", { name: "Watch Race reveal", exact: true }).first();
+function nonSprintRaceLinks(page: Page) {
+  return page.getByRole("link", { name: "Watch Race reveal", exact: true });
 }
 
 function sprintQualiLink(page: Page) {
@@ -149,11 +170,12 @@ test.describe("reveal portrait choreography", () => {
     const page = await phoneCtx.newPage();
     await signIn(page, "portrait-race");
     await page.goto("/reveal");
-    const link = nonSprintRaceLink(page);
-    await expect(link, "no non-sprint 'Race' reveal found in fixture data").toHaveCount(
-      1,
-    );
-    await link.click();
+    const links = nonSprintRaceLinks(page);
+    expect(
+      await links.count(),
+      "no non-sprint 'Race' reveal found in fixture data",
+    ).toBeGreaterThan(0);
+    await links.first().click();
     await page.waitForURL(/\/reveal\/[^/]+$/);
     await page.waitForLoadState("networkidle");
 
@@ -173,14 +195,51 @@ test.describe("reveal portrait choreography", () => {
     const { sw, cw } = await measureNoOverflow(page);
     expect(sw).toBeLessThanOrEqual(cw + 1);
 
-    // Not required by any R1–R6 resolution — extra evidence beyond the two
-    // mandatory sprint screenshots, showing the 3-card stacked shape too.
-    await waitForPodiumSettled(page);
-    await waitForFriendCascadeSettled(page);
-    await page.screenshot({
-      path: path.join(EVIDENCE_DIR, "non-sprint-race-portrait.png"),
-      fullPage: true,
-    });
+    // MINOR 2 (fix round 2): the livery-sweep width fork inside
+    // `CinematicHero` (`isPortrait ? "min(1100px, 150vw)" : "min(1100px,
+    // 70vw)"`, reveal-stage.tsx:353) had zero coverage — it never mounts in
+    // the jsdom unit tests (reduced motion is forced there) and wasn't
+    // asserted in this spec either. This test doesn't force reduced motion,
+    // so `CinematicHero` is guaranteed to have mounted here.
+    //
+    // Scoping: `page.locator("section").first()` is NOT `CinematicHero` —
+    // TopBar's "How scoring works" popover (`ScoringLegend.tsx`) renders
+    // its own (hidden but DOM-present) `<section>` elements earlier in the
+    // document, so `.first()` silently matched the wrong section and found
+    // 0 images. `CinematicHero`'s root section is uniquely identified by
+    // its literal className combination instead.
+    //
+    // Assertion target: the *specified* CSS text, not the rendered/used
+    // pixel width. The used width of this particular `<img>` (absolutely
+    // positioned, filtered, no explicit parent width) is subject to a
+    // pre-existing browser layout quirk under mobile viewport emulation —
+    // verified by hand that even a hardcoded `width: 585px` (no viewport
+    // units at all) on this element measures short of 585px via
+    // `getBoundingClientRect()`, so a used-value pixel assertion would be
+    // testing that quirk, not this task's isPortrait fork. Pinning the
+    // specified style text is deterministic and directly proves which
+    // branch of the ternary React applied — the same approach
+    // reveal-stage.render.test.tsx already uses for the other forks.
+    const sweepImg = page
+      .locator("section.relative.overflow-hidden.border-b")
+      .locator('img[alt=""]')
+      .first();
+    await expect(sweepImg).toHaveCount(1);
+    const sweepStyleWidth = await sweepImg.evaluate(
+      (el) => (el as HTMLElement).style.width,
+    );
+    expect(sweepStyleWidth).toBe("min(1100px, 150vw)");
+
+    if (CAPTURE_EVIDENCE) {
+      // Not required by any R1–R6 resolution — extra evidence beyond the
+      // two mandatory sprint screenshots, showing the 3-card stacked shape.
+      await waitForPodiumSettled(page);
+      await waitForFriendCascadeSettled(page);
+      await page.screenshot({
+        path: path.join(EVIDENCE_DIR, "non-sprint-race-portrait.png"),
+        fullPage: true,
+      });
+    }
   });
 
   test("wide UA keeps the three-across podium (non-sprint, R1a)", async ({
@@ -190,11 +249,12 @@ test.describe("reveal portrait choreography", () => {
     const page = await wideCtx.newPage();
     await signIn(page, "wide-race");
     await page.goto("/reveal");
-    const link = nonSprintRaceLink(page);
-    await expect(link, "no non-sprint 'Race' reveal found in fixture data").toHaveCount(
-      1,
-    );
-    await link.click();
+    const links = nonSprintRaceLinks(page);
+    expect(
+      await links.count(),
+      "no non-sprint 'Race' reveal found in fixture data",
+    ).toBeGreaterThan(0);
+    await links.first().click();
     await page.waitForURL(/\/reveal\/[^/]+$/);
     await page.waitForLoadState("networkidle");
 
@@ -208,14 +268,17 @@ test.describe("reveal portrait choreography", () => {
     );
     expect(new Set(lefts).size, "wide cards must sit side by side").toBe(3);
 
-    // Extra evidence (not required by any R1–R6 resolution): the desktop
-    // 3-across shape, for visual comparison against the portrait screenshots.
-    await waitForPodiumSettled(page);
-    await waitForFriendCascadeSettled(page);
-    await page.screenshot({
-      path: path.join(EVIDENCE_DIR, "non-sprint-race-wide.png"),
-      fullPage: true,
-    });
+    if (CAPTURE_EVIDENCE) {
+      // Extra evidence (not required by any R1–R6 resolution): the desktop
+      // 3-across shape, for visual comparison against the portrait
+      // screenshots.
+      await waitForPodiumSettled(page);
+      await waitForFriendCascadeSettled(page);
+      await page.screenshot({
+        path: path.join(EVIDENCE_DIR, "non-sprint-race-wide.png"),
+        fullPage: true,
+      });
+    }
   });
 
   /**
@@ -266,11 +329,16 @@ test.describe("reveal portrait choreography", () => {
       const { sw, cw } = await measureNoOverflow(page);
       expect(sw).toBeLessThanOrEqual(cw + 1);
 
-      await waitForFriendCascadeSettled(page);
-      await page.screenshot({
-        path: path.join(EVIDENCE_DIR, shotName),
-        fullPage: true,
-      });
+      if (CAPTURE_EVIDENCE) {
+        // R1(c) — the human directive requiring both sprint session types
+        // be screenshotted. Already captured under task-15-evidence/; this
+        // stays gated so routine runs don't re-touch that scratch tree.
+        await waitForFriendCascadeSettled(page);
+        await page.screenshot({
+          path: path.join(EVIDENCE_DIR, shotName),
+          fullPage: true,
+        });
+      }
     });
   }
 
@@ -288,9 +356,9 @@ test.describe("reveal portrait choreography", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await signIn(page, "reduced-motion");
     await page.goto("/reveal");
-    const link = nonSprintRaceLink(page);
-    await expect(link).toHaveCount(1);
-    await link.click();
+    const links = nonSprintRaceLinks(page);
+    expect(await links.count()).toBeGreaterThan(0);
+    await links.first().click();
     await page.waitForURL(/\/reveal\/[^/]+$/);
     await page.waitForLoadState("networkidle");
 
@@ -347,10 +415,10 @@ test.describe("reveal portrait choreography", () => {
       const page = await ctx.newPage();
       await signIn(page, tag);
       await page.goto("/reveal");
-      const link = nonSprintRaceLink(page);
-      await expect(link).toHaveCount(1);
+      const links = nonSprintRaceLinks(page);
+      expect(await links.count()).toBeGreaterThan(0);
       const t0 = Date.now();
-      await link.click();
+      await links.first().click();
       await page.waitForURL(/\/reveal\/[^/]+$/);
       // The moment every card settles is PODIUM_BASE_DELAY + 2*PODIUM_STAGGER
       // + PODIUM_DUR after mount (P1 lands last) — identical in both variants
