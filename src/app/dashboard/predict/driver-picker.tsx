@@ -442,7 +442,10 @@ export function DriverPicker({
                       </dd>
                     </div>
 
-                    <div className="flex items-center gap-4 md:justify-between">
+                    <div
+                      className="flex items-center gap-4 md:justify-between"
+                      title="Average difference between qualifying grid spot and race finish position so far this season. Positive = gains places on race day."
+                    >
                       <dt className="text-xs">
                         Quali Δ Race{" "}
                         <span className="text-[color:var(--fg-subtle)] md:hidden">

@@ -300,7 +300,7 @@ function CinematicHero({
   return (
     <section
       className="relative overflow-hidden border-b border-[color:var(--border)]"
-      style={{ minHeight: 480 }}
+      style={{ minHeight: isPortrait ? 320 : 480 }}
     >
       {/* Stripe bg */}
       <motion.div
@@ -406,7 +406,9 @@ function CinematicHero({
           data-tight
           style={{
             fontFamily: "var(--font-boldonse), ui-sans-serif",
-            fontSize: "clamp(56px, 11vw, 168px)",
+            fontSize: isPortrait
+              ? "clamp(40px, 13vw, 168px)"
+              : "clamp(56px, 11vw, 168px)",
             lineHeight: 0.95,
             letterSpacing: "-0.02em",
             textTransform: "uppercase",

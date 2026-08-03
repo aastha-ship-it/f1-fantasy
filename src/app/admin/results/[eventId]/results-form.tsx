@@ -569,7 +569,7 @@ export function ResultsForm({
             type="button"
             onClick={onFetchFromOpenF1}
             disabled={pending}
-            className="mt-3 w-full px-5 py-3 text-xs uppercase transition-colors disabled:opacity-40"
+            className="mt-3 min-h-[44px] w-full px-5 py-3 text-xs uppercase transition-colors disabled:opacity-40 md:min-h-auto"
             style={{
               background: "var(--surface-2)",
               color: "var(--fg)",
@@ -586,7 +586,7 @@ export function ResultsForm({
               type="button"
               onClick={onSubmitOnly}
               disabled={!canSubmit}
-              className="flex-1 px-5 py-3 text-xs uppercase transition-colors disabled:opacity-40"
+              className="flex-1 min-h-[44px] px-5 py-3 text-xs uppercase transition-colors disabled:opacity-40 md:min-h-auto"
               style={{
                 background: "transparent",
                 color: "var(--fg)",
@@ -601,7 +601,7 @@ export function ResultsForm({
               type="button"
               onClick={onSubmitAndReveal}
               disabled={!canSubmit || alreadyRevealed}
-              className="flex-[2] px-5 py-3 text-xs uppercase transition-colors disabled:opacity-40"
+              className="flex-[2] min-h-[44px] px-5 py-3 text-xs uppercase transition-colors disabled:opacity-40 md:min-h-auto"
               style={{
                 background: "var(--accent)",
                 color: "#000",

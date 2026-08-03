@@ -37,6 +37,17 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
  *     the same row — it never double-files or corrupts scores
  */
 async function seedOneEnteredRound(): Promise<void> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(supabaseUrl)) {
+    throw new Error(
+      "seedOneEnteredRound: refusing to run — NEXT_PUBLIC_SUPABASE_URL=" +
+        `"${supabaseUrl}" does not point at 127.0.0.1 or localhost. This ` +
+        "function files real 'admin'-sourced results (which always win, " +
+        "no freeze check) and recomputes scores; it must only ever run " +
+        "against the local Supabase fixture.",
+    );
+  }
+
   const svc = createSupabaseServiceClient();
   const nowIso = new Date().toISOString();
 
