@@ -94,7 +94,15 @@ export async function GET(
       perfect: s.perfect_bonus as boolean,
     }))
     .filter((r) => r.user)
-    .sort((a, b) => b.points - a.points)
+    // Tiebreak on user id — this image is cached by URL and shared out, so a
+    // tie that resolves differently on two renders publishes two different
+    // podiums for the same event. Keyed on id, never display_name: that
+    // column is nullable and non-unique (the same trap PR-4 hit on the lobby
+    // roster).
+    .sort(
+      (a, b) =>
+        b.points - a.points || (a.user?.id ?? "").localeCompare(b.user?.id ?? ""),
+    )
     .slice(0, 3);
 
   return new ImageResponse(

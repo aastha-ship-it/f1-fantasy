@@ -202,7 +202,11 @@ export default async function DashboardPage() {
   const driverStandings = [...driverPoints.entries()]
     .map(([id, points]) => ({ driver: driversById.get(id), points }))
     .filter((r): r is { driver: DriverRow; points: number } => Boolean(r.driver))
-    .sort((a, b) => b.points - a.points)
+    // Tiebreak on driver id, matching computeStandings.ts:82. Without it a
+    // points tie falls through to `driverPoints` insertion order, which is
+    // the row order of an unordered Supabase select — Postgres is free to
+    // vary that between runs, so two tied drivers swap places at random.
+    .sort((a, b) => b.points - a.points || a.driver.id - b.driver.id)
     .slice(0, 6);
 
   const teamPoints = new Map<string, number>();
@@ -216,7 +220,8 @@ export default async function DashboardPage() {
     .filter((r): r is { team: string; points: number; meta: NonNullable<ReturnType<typeof teamMeta>> } =>
       Boolean(r.meta),
     )
-    .sort((a, b) => b.points - a.points)
+    // Same tiebreak the canonical module uses (computeStandings.ts:204/227).
+    .sort((a, b) => b.points - a.points || a.team.localeCompare(b.team))
     .slice(0, 6);
 
   // Calendar status helpers
