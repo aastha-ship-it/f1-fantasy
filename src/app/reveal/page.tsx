@@ -6,8 +6,14 @@ import { MobileTabBar } from "@/components/MobileTabBar";
 import { TrackDiagram } from "@/components/TrackDiagram";
 import { shortEventName, eventCountry } from "@/lib/design/eventName";
 import { countryFlag } from "@/lib/design/drivers";
+import { teamHex } from "@/lib/design/teams";
 import { sessionLabel } from "@/lib/sessionLabel";
 import { pillFill } from "@/lib/reveal/pillFill";
+import {
+  ShowReelMobile,
+  type ShowReelChip,
+  type ShowReelRound,
+} from "./show-reel-mobile";
 
 /**
  * /reveal — index of every revealed cinematic in the current season.
@@ -37,6 +43,19 @@ type ScoreRow = {
   perfect_bonus: boolean;
 };
 
+type ResultRow = {
+  event_id: string;
+  p1_driver_id: number;
+  p2_driver_id: number | null;
+  p3_driver_id: number | null;
+};
+
+type DriverRow = {
+  id: number;
+  code: string | null;
+  team: string | null;
+};
+
 const SESSION_PILL_LABEL: Record<SessionType, string> = {
   sprint_quali: "SQ",
   sprint_race: "S",
@@ -62,6 +81,25 @@ function formatRevealedAgo(iso: string): string {
   return `${days}d ago`;
 }
 
+/**
+ * "APR 19" — the round's headline date.
+ *
+ * Read in UTC on purpose. `session_start_at` is a `timestamptz`, and pairing a
+ * locale month with a UTC day is exactly the defect commit 961a600 fixed in
+ * `dateRange.ts`: in IST a late-evening session resolves to the next local day
+ * and the label lies by one. Server-computed like every other date string on
+ * this page, so SSR and hydration agree.
+ */
+function formatRoundDate(iso: string): string {
+  return new Date(iso)
+    .toLocaleDateString("en-US", {
+      timeZone: "UTC",
+      month: "short",
+      day: "numeric",
+    })
+    .toUpperCase();
+}
+
 type RoundEntry = {
   round: number;
   name: string;
@@ -73,11 +111,51 @@ type RoundEntry = {
   sessions: EventRow[];
   /** User's total points across all sessions of this round. */
   totalPoints: number;
+  /** True when any session of the round scored the perfect-podium bonus. */
+  perfect: boolean;
+  /** Headline date of the round — the latest session's, i.e. race day. */
+  date: string;
+  /**
+   * The finishing top-3 the round's cinematic reveals, team-coloured.
+   *
+   * Taken from the highest-ranked session that actually has a `results` row
+   * (race > quali > sprint > sprint quali) — a round is usually revealed race
+   * last, but a weekend where only quali has landed still has a podium worth
+   * drawing. Empty when no session has results, which the card renders as no
+   * chips rather than three dashes.
+   */
+  podium: ShowReelChip[];
 };
+
+function buildPodium(
+  sessions: EventRow[],
+  resultByEvent: Map<string, ResultRow>,
+  driverById: Map<number, DriverRow>,
+): ShowReelChip[] {
+  // `sessions` is already sorted SQ → S → Q → R, so the last one carrying a
+  // result is the highest-ranked one.
+  let chosen: ResultRow | undefined;
+  for (const s of sessions) {
+    const r = resultByEvent.get(s.id);
+    if (r) chosen = r;
+  }
+  if (!chosen) return [];
+  const ids = [chosen.p1_driver_id, chosen.p2_driver_id, chosen.p3_driver_id];
+  const chips: ShowReelChip[] = [];
+  ids.forEach((id, i) => {
+    if (id == null) return;
+    const d = driverById.get(id);
+    if (!d?.code) return;
+    chips.push({ pos: i + 1, code: d.code, hex: teamHex(d.team) });
+  });
+  return chips;
+}
 
 function groupByRound(
   events: EventRow[],
   scoreByEvent: Map<string, ScoreRow>,
+  resultByEvent: Map<string, ResultRow>,
+  driverById: Map<number, DriverRow>,
 ): RoundEntry[] {
   const byRound = new Map<number, EventRow[]>();
   for (const e of events) {
@@ -98,6 +176,15 @@ function groupByRound(
       (sum, s) => sum + (Number(scoreByEvent.get(s.id)?.points) || 0),
       0,
     );
+    const perfect = list.some(
+      (s) => scoreByEvent.get(s.id)?.perfect_bonus ?? false,
+    );
+    // Race day, not the weekend's first session: `list` is in session order,
+    // so the last entry is the latest-running session of the round.
+    const headlineIso = list.reduce(
+      (acc, s) => (s.session_start_at > acc ? s.session_start_at : acc),
+      list[0]!.session_start_at,
+    );
     entries.push({
       round,
       name: list[0]!.name,
@@ -106,6 +193,9 @@ function groupByRound(
       latestRevealedAt: latest,
       sessions: list,
       totalPoints,
+      perfect,
+      date: formatRoundDate(headlineIso),
+      podium: buildPodium(list, resultByEvent, driverById),
     });
   }
   // Most recently revealed round first.
@@ -158,6 +248,33 @@ export default async function RevealIndexPage() {
     scoreByEvent.set(s.event_id, s);
   }
 
+  /*
+   * Finishing podium per revealed round (design_handoff_mobile §5.1). This
+   * page previously loaded only the viewer's own scores — it could say what
+   * a round was worth to you, never who actually finished on the box. Two
+   * extra reads, both cheap and both already world-readable: `results` is
+   * `results_select_all` under RLS, and it only ever holds rows for sessions
+   * that have run. Scoped to the revealed events already fetched above, so
+   * nothing unrevealed can leak through this path.
+   */
+  const [{ data: podiumRows }, { data: driverRows }] = await Promise.all([
+    eventIds.length > 0
+      ? supabase
+          .from("results")
+          .select("event_id, p1_driver_id, p2_driver_id, p3_driver_id")
+          .in("event_id", eventIds)
+      : Promise.resolve({ data: null }),
+    supabase.from("drivers").select("id, code, team"),
+  ]);
+  const resultByEvent = new Map<string, ResultRow>();
+  for (const r of (podiumRows ?? []) as ResultRow[]) {
+    resultByEvent.set(r.event_id, r);
+  }
+  const driverById = new Map<number, DriverRow>();
+  for (const d of (driverRows ?? []) as DriverRow[]) {
+    driverById.set(d.id, d);
+  }
+
   const totalScore = [...scoreByEvent.values()].reduce(
     (sum, s) => sum + Number(s.points),
     0,
@@ -166,7 +283,32 @@ export default async function RevealIndexPage() {
     (s) => s.perfect_bonus,
   ).length;
 
-  const rounds = groupByRound(events, scoreByEvent);
+  const rounds = groupByRound(
+    events,
+    scoreByEvent,
+    resultByEvent,
+    driverById,
+  );
+
+  const mobileRounds: ShowReelRound[] = rounds.map((r) => ({
+    round: r.round,
+    title: shortEventName(r.name).toUpperCase(),
+    circuit: r.ergast_circuit_id ?? r.circuit,
+    date: r.date,
+    totalPoints: r.totalPoints,
+    perfect: r.perfect,
+    podium: r.podium,
+    sessions: r.sessions.map((s) => {
+      const sc = scoreByEvent.get(s.id);
+      return {
+        id: s.id,
+        sessionType: s.session_type,
+        pillLabel: SESSION_PILL_LABEL[s.session_type],
+        points: sc ? Number(sc.points) : null,
+        perfect: sc?.perfect_bonus ?? false,
+      };
+    }),
+  }));
 
   return (
     <>
@@ -176,7 +318,28 @@ export default async function RevealIndexPage() {
         email={userData.user?.email ?? null}
       />
       <MobileTabBar active="reveal" />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
+      {/*
+        Gutters fork at md (pattern A, same longhands as the predict list): the
+        base values are the phone's 20px gutter and the tab-bar-clearing bottom
+        pad; `md:` restores the pre-fork px-8 / py-10 / pb-10 that `px-6 py-10
+        pb-24 sm:px-8 md:pb-10` resolved to at every width ≥ md.
+      */}
+      <main className="mx-auto w-full max-w-[1600px] px-5 py-5 pb-[calc(var(--tabbar-h)+env(safe-area-inset-bottom,0px)+24px)] md:px-8 md:py-10 md:pb-10 lg:px-12 xl:px-16">
+        <ShowReelMobile
+          season={currentSeason}
+          rounds={mobileRounds}
+          sessionCount={events.length}
+          perfectCount={perfectCount}
+          totalScore={totalScore}
+        />
+
+        {/*
+          Desktop tree, unchanged except for the podium column added below.
+          `hidden md:contents` erases this wrapper's box at md so every child
+          stays a direct child of <main> — pattern B′, the same idiom
+          lobby-view.tsx uses, and what keeps the 1440 box tree intact.
+        */}
+        <div className="hidden md:contents">
         <section className="grid items-end gap-8 border-b border-[color:var(--border)] pb-6 lg:grid-cols-[1.5fr_1fr]">
           <div>
             <p
@@ -287,7 +450,7 @@ export default async function RevealIndexPage() {
               return (
                 <li
                   key={r.round}
-                  className="flex flex-col gap-2 bg-[color:var(--surface)] md:grid md:items-center md:gap-[var(--space-xl)] md:[grid-template-columns:60px_80px_36px_1fr_auto_auto_auto]"
+                  className="flex flex-col gap-2 bg-[color:var(--surface)] md:grid md:items-center md:gap-[var(--space-xl)] md:[grid-template-columns:60px_80px_36px_1fr_auto_auto_auto] lg:[grid-template-columns:60px_80px_36px_1fr_auto_auto_auto_auto]"
                   style={{
                     padding: "var(--space-lg) var(--space-xl)",
                   }}
@@ -352,6 +515,35 @@ export default async function RevealIndexPage() {
                     >
                       Latest {formatRevealedAgo(r.latestRevealedAt)}
                     </span>
+
+                    {/* Finishing podium, team-coloured — the same three chips
+                        the mobile card draws (design_handoff_mobile §5.1),
+                        brought to the desktop row at the owner's request so
+                        both widths say who actually won, not only what the
+                        round was worth to you.
+
+                        `hidden lg:flex` and a matching lg-only 8th column: at
+                        780–1024 the 7-column template is already tight, and a
+                        display:none child is not a grid item at all, so the
+                        md template stays exactly as it was. */}
+                    <div className="hidden gap-1.5 lg:flex">
+                      {r.podium.map((c) => (
+                        <span
+                          key={c.pos}
+                          className="uppercase"
+                          data-tabular
+                          style={{
+                            fontSize: 10,
+                            letterSpacing: "0.06em",
+                            padding: "4px 7px",
+                            border: `1px solid ${c.hex}`,
+                            color: c.hex,
+                          }}
+                        >
+                          P{c.pos} {c.code}
+                        </span>
+                      ))}
+                    </div>
 
                     {/* Session pills — one per revealed session. Each is the
                         click target for its own cinematic. Uniformly accent-red
@@ -426,6 +618,7 @@ export default async function RevealIndexPage() {
             })}
           </ul>
         )}
+        </div>
       </main>
     </>
   );
