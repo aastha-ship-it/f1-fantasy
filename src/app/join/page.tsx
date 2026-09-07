@@ -65,7 +65,7 @@ export default async function JoinPage({
             OUT.
           </h1>
           <p className="mt-8 max-w-md text-base leading-relaxed text-[color:var(--fg-muted)]">
-            A predict-the-podium league for the group. 24 races, 8 friends, one
+            A predict-the-podium league for the group. 24 races, one
             season-long argument. Got the code?
           </p>
         </div>
@@ -127,7 +127,7 @@ export default async function JoinPage({
           <br />A CODE.
         </h1>
         <p className="relative mt-4 text-sm leading-[1.55] text-[color:var(--fg-muted)] md:hidden">
-          A predict-the-podium league for the group. 24 races, 8 friends, one
+          A predict-the-podium league for the group. 24 races, one
           season-long argument. Got the code?
         </p>
 
