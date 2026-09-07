@@ -1,5 +1,6 @@
 import { test, expect, devices, type Page, type BrowserContext } from "@playwright/test";
 import path from "node:path";
+import { deleteMintedUsers, trackMintedUser } from "./cleanup";
 
 /**
  * Task 15 — portrait podium: three full-bleed stacked bands.
@@ -45,7 +46,9 @@ async function signIn(page: Page, tag: string): Promise<void> {
   await page.getByLabel("Invite code").fill(INVITE_CODE);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/login/);
-  const email = `test+portrait-${tag}-${Date.now()}-${Math.random().toString(36).slice(2)}@f1fantasy.test`;
+  const email = trackMintedUser(
+    `test+portrait-${tag}-${Date.now()}-${Math.random().toString(36).slice(2)}@f1fantasy.test`,
+  );
   const resp = await page.request.post("/api/test/sign-in-password", {
     data: { email, password: "test-password-12345" },
   });
@@ -146,6 +149,15 @@ function sprintQualiLink(page: Page) {
 function sprintRaceLink(page: Page) {
   return page.getByRole("link", { name: "Watch Sprint reveal", exact: true }).first();
 }
+
+/**
+ * Every test in this file mints a throwaway user to reach an authenticated
+ * route. Delete them again — left behind, they accumulate in the `public.users`
+ * roster that /dashboard/lobby, /dashboard/league and /dashboard/standings
+ * render, which makes the pixel harness diff on routes nothing touched.
+ * See tests/e2e/cleanup.ts.
+ */
+test.afterAll(deleteMintedUsers);
 
 test.describe("reveal portrait choreography", () => {
   test.beforeEach(({}, testInfo) => {

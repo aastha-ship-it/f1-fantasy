@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { deleteMintedUsers, trackMintedUser } from "./cleanup";
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -29,7 +30,9 @@ async function signIn(page: Page) {
   // millisecond, producing identical emails — the second worker's
   // admin.createUser then collides with the first and the test-only
   // sign-in endpoint 500s.
-  const email = `test+ovf-${Date.now()}-${Math.random().toString(36).slice(2)}@f1fantasy.test`;
+  const email = trackMintedUser(
+    `test+ovf-${Date.now()}-${Math.random().toString(36).slice(2)}@f1fantasy.test`,
+  );
   const resp = await page.request.post("/api/test/sign-in-password", {
     data: { email, password: "test-password-12345" },
   });
@@ -76,6 +79,15 @@ async function expectNoHorizontalOverflow(page: Page, label: string) {
     `${label} scrolls horizontally (${scrollWidth} > ${clientWidth}). Widest offenders:\n  ${culprits.join("\n  ")}`,
   ).toBeLessThanOrEqual(clientWidth + 1);
 }
+
+/**
+ * Every test in this file mints a throwaway user to reach an authenticated
+ * route. Delete them again — left behind, they accumulate in the `public.users`
+ * roster that /dashboard/lobby, /dashboard/league and /dashboard/standings
+ * render, which makes the pixel harness diff on routes nothing touched.
+ * See tests/e2e/cleanup.ts.
+ */
+test.afterAll(deleteMintedUsers);
 
 test.describe("no horizontal overflow", () => {
   test("unauthenticated routes", async ({ page }) => {

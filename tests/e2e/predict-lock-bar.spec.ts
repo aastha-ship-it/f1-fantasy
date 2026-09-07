@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { deleteMintedUsers, trackMintedUser } from "./cleanup";
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -14,7 +15,9 @@ async function signIn(page: Page) {
   await page.waitForURL(/\/login/);
   // Random suffix: fullyParallel + multiple workers/projects can call this
   // within the same millisecond, colliding admin.createUser emails.
-  const email = `test+lockbar-${Date.now()}-${Math.random().toString(36).slice(2)}@f1fantasy.test`;
+  const email = trackMintedUser(
+    `test+lockbar-${Date.now()}-${Math.random().toString(36).slice(2)}@f1fantasy.test`,
+  );
   const resp = await page.request.post("/api/test/sign-in-password", {
     data: { email, password: "test-password-12345" },
   });
@@ -60,6 +63,15 @@ async function openFirstUnlockedEvent(page: Page): Promise<boolean> {
   }
   return false;
 }
+
+/**
+ * Every test in this file mints a throwaway user to reach an authenticated
+ * route. Delete them again — left behind, they accumulate in the `public.users`
+ * roster that /dashboard/lobby, /dashboard/league and /dashboard/standings
+ * render, which makes the pixel harness diff on routes nothing touched.
+ * See tests/e2e/cleanup.ts.
+ */
+test.afterAll(deleteMintedUsers);
 
 test.describe("predict lock bar", () => {
   test("phone width (390px): row stacks and the CTA meets the touch-target floor", async ({
