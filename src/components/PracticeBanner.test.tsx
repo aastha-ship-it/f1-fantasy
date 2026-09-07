@@ -82,7 +82,7 @@ describe("PracticeBanner mobile fork (Task 11)", () => {
     }
   });
 
-  it("PB3: FP row grid is a class with a minmax(0,1fr) flexible track — no inline template, no bare 1fr at any breakpoint", () => {
+  it("PB3: both FP row templates are classes with a minmax(0,1fr) flexible track — no inline template, no bare 1fr at any breakpoint", () => {
     const { container } = render(<PracticeBanner sessions={THREE} />);
     const rows = Array.from(container.querySelectorAll("li"));
     expect(rows.length).toBe(9);
@@ -92,8 +92,13 @@ describe("PracticeBanner mobile fork (Task 11)", () => {
       // breakpoint — that is the defect this row had.
       expect(row.style.gridTemplateColumns).toBe("");
 
+      // The P-number track narrows 32 -> 26 below the fork (addendum §B.3);
+      // both templates must be classes so each can carry its breakpoint.
       expect(row.className).toMatch(
-        /(^|\s)grid-cols-\[32px_auto_minmax\(0,1fr\)_auto\](\s|$)/,
+        /(^|\s)grid-cols-\[26px_auto_minmax\(0,1fr\)_auto\](\s|$)/,
+      );
+      expect(row.className).toMatch(
+        /(^|\s)md:grid-cols-\[32px_auto_minmax\(0,1fr\)_auto\](\s|$)/,
       );
 
       // A bare `1fr` flexible track lets the browser squeeze the `auto`
@@ -120,5 +125,73 @@ describe("PracticeBanner mobile fork (Task 11)", () => {
       expect(s.borderRight).toBe("");
       expect(s.borderBottom).toBe("");
     });
+  });
+
+  it("PB4: the mobile fork is expressed in classes, not inline style — header stacks and the bottom margin drops to 0 below 780px", () => {
+    const { container } = render(<PracticeBanner sessions={THREE} />);
+    const section = container.querySelector("section")!;
+    const header = container.querySelector("header")!;
+
+    // The banner's own 48px bottom margin double-counts against the round
+    // page's "Sessions" section head (its `mt-6` is the 24px the artboard
+    // draws), so below the fork it is 0 — and that can only be expressed
+    // in classes, since an inline margin applies at every viewport.
+    expect(section.style.marginBottom).toBe("");
+    expect(section.className).toMatch(/(^|\s)mb-0(\s|$)/);
+    expect(section.className).toMatch(
+      /(^|\s)md:mb-\[var\(--space-3xl\)\](\s|$)/,
+    );
+
+    // Header: a single `justify-between` row only at `md:`. At 390 the
+    // chip and the context line collide in one row, so the base is a
+    // plain block with the context line stacked underneath.
+    expect(header.className).not.toMatch(/(^|\s)flex(\s|$)/);
+    expect(header.className).toMatch(/(^|\s)md:flex(\s|$)/);
+    expect(header.className).toMatch(/(^|\s)md:justify-between(\s|$)/);
+
+    // Padding forks per side with the SAME utility on both sides —
+    // Tailwind sorts `py` before `pt`, so a base `pt-*` would outlive an
+    // `md:py-*` and silently survive above the fork.
+    expect(header.style.padding).toBe("");
+    for (const side of ["t", "r", "b", "l"]) {
+      expect(header.className).toMatch(
+        new RegExp(`(^|\\s)p${side}-\\[[^\\]]+\\](\\s|$)`),
+      );
+      expect(header.className).toMatch(
+        new RegExp(`(^|\\s)md:p${side}-\\[[^\\]]+\\](\\s|$)`),
+      );
+    }
+
+    // The context line is the stacked second row below the fork.
+    const context = header.lastElementChild as HTMLElement;
+    expect(context.textContent).toBe(
+      "Top-3 fastest · use to gauge form before locking",
+    );
+    expect(context.className).toMatch(/(^|\s)block(\s|$)/);
+    expect(context.className).toMatch(/(^|\s)mt-\[6px\](\s|$)/);
+    expect(context.className).toMatch(/(^|\s)md:mt-0(\s|$)/);
+  });
+
+  it("PB5: the 26px portrait is the mobile-only sibling of today's 28px one — both trees present, exactly one visible per width", () => {
+    const { container } = render(<PracticeBanner sessions={SPRINT} />);
+    const rows = Array.from(container.querySelectorAll("li"));
+    expect(rows.length).toBe(3);
+
+    for (const row of rows) {
+      // `size` lands in inline width/height, which no breakpoint can reach,
+      // so the two sizes are two elements (pattern B'). `md:contents`
+      // erases the desktop wrapper's box so the portrait stays a direct
+      // grid child at 1440 exactly as before.
+      const desktop = row.querySelector(".md\\:contents") as HTMLElement;
+      const mobile = row.querySelector(".md\\:hidden") as HTMLElement;
+      expect(desktop).not.toBeNull();
+      expect(mobile).not.toBeNull();
+      expect(desktop.className).toMatch(/(^|\s)hidden(\s|$)/);
+
+      const px = (el: HTMLElement) =>
+        (el.firstElementChild as HTMLElement).style.width;
+      expect(px(desktop)).toBe("28px");
+      expect(px(mobile)).toBe("26px");
+    }
   });
 });
