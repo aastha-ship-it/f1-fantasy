@@ -34,7 +34,14 @@ async function signIn(page: Page) {
  */
 async function openFirstUnlockedEvent(page: Page): Promise<boolean> {
   await page.goto("/dashboard/predict");
-  const round = page.locator('a[href*="/dashboard/predict/round/"]').first();
+  // `:visible` is load-bearing since PR-3 forked this page at 780px: the
+  // round links now exist in BOTH a `md:hidden` mobile tree and a
+  // `hidden md:grid` desktop one, so whichever DOM order we pick, a plain
+  // `.first()` resolves to a `display:none` link at one of the two widths
+  // and `click()` times out. Scope to what the viewport actually shows.
+  const round = page
+    .locator('a[href*="/dashboard/predict/round/"]:visible')
+    .first();
   if (!(await round.count())) return false;
   await round.click();
   await page.waitForURL(/\/dashboard\/predict\/round\//);

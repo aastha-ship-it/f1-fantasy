@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState, useTransition } from "react";
 import type { SubmitPredictionResult } from "@/lib/submitPrediction";
 import { DriverPortrait } from "@/components/DriverPortrait";
+import { MobSectionHead } from "@/components/MobilePrimitives";
 import { teamMeta } from "@/lib/design/teams";
 import { formatAtTrack } from "@/lib/nudges/format";
 import { formPillColor } from "@/lib/nudges/formColor";
@@ -196,13 +197,16 @@ export function DriverPicker({
       {/* Slot cards — single full-width column below md; 1.2fr 1fr 1fr
           (P1 wider) at md and up. Sprint shows just P1 full-width at every
           width. */}
+      {/* Below the fork the canvas draws three separately-bordered cards
+          stacked with a 10px gap; at md this is the original 1px-hairline
+          grid (gap-px over a --border ground, cards borderless). Gap and
+          ground moved out of the inline style so they can fork at all. */}
       <section
-        className={`mt-10 grid border border-[color:var(--border)] ${
+        className={`mt-10 grid gap-2.5 border-0 border-[color:var(--border)] bg-transparent md:gap-px md:border md:bg-[color:var(--border)] ${
           isSprint
             ? "grid-cols-[1fr]"
             : "grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr]"
         }`}
-        style={{ gap: 1, background: "var(--border)" }}
       >
         {slots.map((slot, idx) => {
           const id = picks[slot];
@@ -214,7 +218,7 @@ export function DriverPicker({
           return (
             <div
               key={slot}
-              className="relative flex min-h-[96px] flex-col gap-2 overflow-hidden p-4 md:min-h-[320px] md:gap-5 md:p-7"
+              className="relative flex min-h-[96px] flex-col gap-2 overflow-hidden border border-[color:var(--border)] p-4 md:min-h-[320px] md:gap-5 md:border-0 md:p-7"
               style={{
                 background: isP1 ? "var(--surface-2)" : "var(--surface)",
               }}
@@ -254,21 +258,64 @@ export function DriverPicker({
                 </div>
               )}
 
-              <div className="relative flex items-baseline justify-between">
+              {/* Phone watermark (canvas §3.2: `F1Car` at opacity .26,
+                  right -70, bottom -14). A separate element, not a class fork
+                  on the one above: the desktop version is masked and top-
+                  anchored, this one is bottom-anchored and unmasked, so they
+                  share no geometry. Both live inside the card's
+                  `overflow-hidden`, so the negative right offset clips rather
+                  than adding document width — the offsets the README bans are
+                  the ones on track art, which must stay inset. */}
+              {d && t && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute md:hidden"
+                  style={{ right: -70, bottom: -14 }}
+                >
+                  <Image
+                    src={t.carSrc}
+                    alt=""
+                    width={300}
+                    height={118}
+                    unoptimized
+                    className="select-none"
+                    style={{
+                      opacity: 0.26,
+                      width: 300,
+                      height: "auto",
+                      maxWidth: "none",
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Pattern B' — contents-wrapped fork. The canvas puts `P{n}`
+                  and the driver block on ONE row; the desktop stacks them.
+                  `md:contents` removes this wrapper's box entirely above the
+                  fork, so both children become direct flex-column children of
+                  the card again and the 1440 render is byte-identical. */}
+              <div className="relative flex items-center gap-3.5 md:contents">
+              <div className="relative flex shrink-0 items-baseline justify-between md:shrink">
                 <span
                   style={{
                     fontFamily: "var(--font-boldonse), ui-sans-serif",
+                    // Minimums are the canvas's mobile sizes (52 / 40).
+                    // At >=780 `12vw`/`10vw` are already 93.6/78, so the
+                    // clamp resolves exactly as before above the fork — the
+                    // minimum only bites below ~433px.
                     fontSize: isP1
-                      ? "clamp(40px, 12vw, 96px)"
-                      : "clamp(32px, 10vw, 64px)",
+                      ? "clamp(52px, 12vw, 96px)"
+                      : "clamp(40px, 10vw, 64px)",
                     lineHeight: 0.85,
                   }}
                   data-tight
                 >
                   P{idx + 1}
                 </span>
+                {/* The canvas drops this label on mobile — the slot's
+                    filled/empty state is already unambiguous at 390. */}
                 <span
-                  className="text-[10px] uppercase"
+                  className="hidden text-[10px] uppercase md:inline"
                   style={{
                     letterSpacing: "0.1em",
                     color: d ? "var(--fg-muted)" : "var(--fg-subtle)",
@@ -281,27 +328,29 @@ export function DriverPicker({
 
               {d && t ? (
                 <div className="relative flex items-center gap-4">
-                  <DriverPortrait
-                    code={d.code}
-                    team={d.team}
-                    size={72}
-                  />
+                  {/* B' again: DriverPortrait writes `size` to inline
+                      width/height, which no class can override. */}
+                  <div className="hidden md:contents">
+                    <DriverPortrait code={d.code} team={d.team} size={72} />
+                  </div>
+                  <div className="shrink-0 md:hidden">
+                    <DriverPortrait code={d.code} team={d.team} size={52} />
+                  </div>
                   <div className="flex flex-col gap-1">
                     <span
-                      className="leading-none"
+                      className="text-[20px] leading-none md:text-[28px]"
                       style={{
                         fontFamily: "var(--font-boldonse), ui-sans-serif",
-                        fontSize: 28,
                         letterSpacing: "0.02em",
                       }}
                     >
                       {d.code}
                     </span>
-                    <span className="text-sm text-[color:var(--fg-muted)]">
+                    <span className="text-xs text-[color:var(--fg-muted)] md:text-sm">
                       {d.full_name}
                     </span>
                     <span
-                      className="mt-1 inline-block self-start px-2 py-0.5 text-[10px] uppercase"
+                      className="mt-1 inline-block self-start px-2 py-0.5 text-[9px] uppercase md:text-[10px]"
                       style={{
                         letterSpacing: "0.1em",
                         border: `1px solid ${t.hex}`,
@@ -314,32 +363,53 @@ export function DriverPicker({
                   </div>
                 </div>
               ) : (
-                <p
-                  className="relative italic text-[color:var(--fg-muted)]"
-                  style={{ fontWeight: 500, fontSize: 16 }}
-                >
-                  Who&rsquo;s on the podium?
-                </p>
+                // `md:contents` so the <p> stays the card's own direct
+                // child above the fork — the wrapper exists only to hang the
+                // canvas's accent prompt underneath at phone width.
+                <div className="relative md:contents">
+                  <p
+                    className="relative italic text-[color:var(--fg-muted)]"
+                    style={{ fontWeight: 500, fontSize: 16 }}
+                  >
+                    Who&rsquo;s on the podium?
+                  </p>
+                  <p
+                    className="mt-1.5 uppercase text-[color:var(--accent)] md:hidden"
+                    data-tabular
+                    style={{ fontSize: 9, letterSpacing: "0.12em" }}
+                  >
+                    Tap to pick →
+                  </p>
+                </div>
               )}
+              </div>
 
               {/* Telemetry panel — lifted onto a tinted contrast surface so
                   the data row reads cleanly on top of the masked livery car.
                   Team-color top border ties the strip visually to the slot's
                   driver. */}
+              {/* The tinted ground + team-hex top border are the desktop
+                  treatment; the canvas draws a plain hairline on the card
+                  ground at 390. Both computed colours are inline-only values,
+                  so they move to custom properties and the CLASSES fork.
+                  Padding is written per side on both sides of the fork:
+                  Tailwind sorts the `p-*` shorthand BEFORE `pt-*`/`pb-*`, so
+                  a base longhand would outlive an `md:` shorthand. */}
               <div
-                className="relative mt-auto"
+                className="relative mt-1.5 border-t border-[color:var(--border)] bg-transparent px-0 pt-3 pb-0 md:mt-auto md:border-t-[color:var(--tele-edge)] md:bg-[var(--tele-tint)] md:px-[var(--space-lg)] md:pt-[var(--space-lg)] md:pb-[var(--space-lg)]"
                 aria-label={`Telemetry for ${d?.code ?? `slot P${idx + 1}`}`}
-                style={{
-                  zIndex: 1,
-                  background: t?.hex
-                    ? `color-mix(in oklch, ${t.hex} 8%, var(--surface))`
-                    : "var(--surface-2)",
-                  borderTop: `1px solid ${t?.hex ?? "var(--border)"}`,
-                  padding: "var(--space-lg)",
-                }}
+                style={
+                  {
+                    zIndex: 1,
+                    "--tele-tint": t?.hex
+                      ? `color-mix(in oklch, ${t.hex} 8%, var(--surface))`
+                      : "var(--surface-2)",
+                    "--tele-edge": t?.hex ?? "var(--border)",
+                  } as React.CSSProperties
+                }
               >
                 <p
-                  className="mb-3 text-[10px] uppercase text-[color:var(--fg-subtle)]"
+                  className="mb-2 text-[9px] uppercase text-[color:var(--fg-subtle)] md:mb-3 md:text-[10px]"
                   style={{ letterSpacing: "0.14em" }}
                   data-tabular
                 >
@@ -347,13 +417,13 @@ export function DriverPicker({
                 </p>
                 {d && n ? (
                   <dl
-                    className="flex flex-row flex-wrap gap-x-3 gap-y-1 text-[11px] text-[color:var(--fg-muted)] md:flex-col md:gap-3 md:text-base"
+                    className="flex flex-col gap-[7px] text-[10px] text-[color:var(--fg-muted)] md:flex-col md:gap-3 md:text-base"
                     style={{
                       fontFamily: "var(--font-mono), ui-monospace, monospace",
                     }}
                   >
-                    <div className="flex items-center gap-4 md:justify-between">
-                      <dt className="text-xs">Form L5</dt>
+                    <div className="flex items-center justify-between gap-4">
+                      <dt className="text-[9px] uppercase tracking-[0.06em] text-[color:var(--fg-subtle)] md:text-xs md:normal-case md:tracking-normal md:text-[color:var(--fg-muted)]">Form L5</dt>
                       <dd className="flex items-center justify-end gap-1">
                         {(() => {
                           // Oldest-left → latest-right (sports convention —
@@ -377,15 +447,14 @@ export function DriverPicker({
                                 return (
                                   <span
                                     key={i}
+                                    className="min-w-[22px] text-[9px] md:min-w-6 md:text-[11px]"
                                     data-tabular
                                     style={{
                                       display: "inline-flex",
                                       justifyContent: "center",
-                                      minWidth: 24,
                                       padding: "2px 5px",
                                       fontFamily:
                                         "var(--font-mono), ui-monospace, monospace",
-                                      fontSize: 11,
                                       fontWeight: 600,
                                       letterSpacing: "0.04em",
                                       color: formPillColor(tok),
@@ -420,15 +489,15 @@ export function DriverPicker({
                       </dd>
                     </div>
 
-                    <div className="flex items-center gap-4 md:justify-between">
-                      <dt className="text-xs">
+                    <div className="flex items-center justify-between gap-4">
+                      <dt className="text-[9px] uppercase tracking-[0.06em] text-[color:var(--fg-subtle)] md:text-xs md:normal-case md:tracking-normal md:text-[color:var(--fg-muted)]">
                         At {circuit ?? "track"}{" "}
                         <span className="text-[color:var(--fg-subtle)]">
                           (10y)
                         </span>
                       </dt>
                       <dd
-                        className="text-sm"
+                        className="text-[10px] md:text-sm"
                         style={{
                           fontWeight: 600,
                           color:
@@ -443,17 +512,17 @@ export function DriverPicker({
                     </div>
 
                     <div
-                      className="flex items-center gap-4 md:justify-between"
+                      className="flex items-center justify-between gap-4"
                       title="Average difference between qualifying grid spot and race finish position so far this season. Positive = gains places on race day."
                     >
-                      <dt className="text-xs">
+                      <dt className="text-[9px] uppercase tracking-[0.06em] text-[color:var(--fg-subtle)] md:text-xs md:normal-case md:tracking-normal md:text-[color:var(--fg-muted)]">
                         Quali Δ Race{" "}
                         <span className="text-[color:var(--fg-subtle)] md:hidden">
                           (grid→finish)
                         </span>
                       </dt>
                       <dd
-                        className="text-sm"
+                        className="text-[10px] md:text-sm"
                         data-tabular
                         style={{
                           fontWeight: 600,
@@ -494,7 +563,11 @@ export function DriverPicker({
                   type="button"
                   onClick={() => clearSlot(slot)}
                   disabled={isClosed || pending}
-                  className="relative self-start text-[11px] uppercase text-[color:var(--fg-muted)] underline underline-offset-[3px] disabled:opacity-50"
+                  /* The canvas omits this control; we keep it because
+                     `clearSlot` is the only non-toggle way to empty a slot.
+                     It is an 11px text button, so it gets the 44px tap floor
+                     below the fork and its original box back at `md:`. */
+                  className="relative flex min-h-[44px] items-center self-start text-[11px] uppercase text-[color:var(--fg-muted)] underline underline-offset-[3px] disabled:opacity-50 md:block md:min-h-0"
                   style={{ letterSpacing: "0.04em", zIndex: 1 }}
                   data-tabular
                 >
@@ -508,7 +581,13 @@ export function DriverPicker({
 
       {/* The Grid — 10 (or 5 on smaller breakpoints) col driver picker */}
       <section className="mt-10">
-        <div className="mb-4 flex items-baseline justify-between">
+        <div className="md:hidden">
+          <MobSectionHead
+            title="The Grid"
+            meta={`2026 · ${drivers.length} drivers`}
+          />
+        </div>
+        <div className="mb-4 hidden items-baseline justify-between md:flex">
           <p
             className="text-2xl"
             style={{
@@ -526,13 +605,13 @@ export function DriverPicker({
             2026 · {drivers.length} drivers
           </span>
         </div>
+        {/* 4-across and full-bleed at 390 (README §3.2); the desktop
+            auto-fill template is restored at `md:`. Both are the same
+            `grid-cols-*` utility, so the variant wins cleanly. Side borders
+            drop below the fork so the bled list reads as hairline rules. */}
         <ul
-          className="grid border border-[color:var(--border)]"
-          style={{
-            gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))",
-            gap: 1,
-            background: "var(--border)",
-          }}
+          className="-mx-5 grid grid-cols-[repeat(4,minmax(0,1fr))] border-x-0 border-y border-[color:var(--border)] md:mx-0 md:grid-cols-[repeat(auto-fill,minmax(96px,1fr))] md:border-x"
+          style={{ gap: 1, background: "var(--border)" }}
         >
           {drivers.map((d) => {
             const t = teamMeta(d.team);
@@ -543,7 +622,7 @@ export function DriverPicker({
                   type="button"
                   onClick={() => fillNextEmpty(d.id)}
                   disabled={isClosed || pending}
-                  className="relative flex min-h-[44px] w-full flex-col items-center gap-1.5 px-2 py-3 text-center disabled:cursor-not-allowed"
+                  className="relative flex min-h-[92px] w-full flex-col items-center gap-[5px] px-1 pt-2.5 pb-3 text-center disabled:cursor-not-allowed md:min-h-[44px] md:gap-1.5 md:px-2 md:pt-3 md:pb-3"
                   style={{
                     background: "var(--surface)",
                     opacity: isClosed ? 0.45 : inPicks ? 0.4 : 1,
@@ -552,18 +631,26 @@ export function DriverPicker({
                   aria-pressed={inPicks}
                   aria-label={`${d.code} ${d.full_name}`}
                 >
-                  <DriverPortrait code={d.code} team={d.team} size={48} />
+                  {/* B' — see the slot card. One <button> (it carries the
+                      aria-label three e2e specs click); only the portrait
+                      forks, because `size` lands in inline width/height. */}
+                  <div className="hidden md:contents">
+                    <DriverPortrait code={d.code} team={d.team} size={48} />
+                  </div>
+                  <div className="md:hidden">
+                    <DriverPortrait code={d.code} team={d.team} size={40} />
+                  </div>
                   <span
+                    className="text-[13px] md:text-[14px]"
                     style={{
                       fontFamily: "var(--font-boldonse), ui-sans-serif",
-                      fontSize: 14,
                       letterSpacing: "0.02em",
                     }}
                   >
                     {d.code}
                   </span>
                   <span
-                    className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
+                    className="text-[8px] uppercase text-[color:var(--fg-subtle)] md:text-[10px]"
                     style={{ letterSpacing: "0.1em" }}
                     data-tabular
                   >
@@ -613,16 +700,18 @@ export function DriverPicker({
             transition={{ duration: 0.45, ease: EASE_OUT_QUART }}
             data-testid="picks-locked-banner"
           >
-            <div className="flex items-center gap-6 px-6 py-4 text-black sm:px-8">
+            {/* Stacks below the fork so the 22px display string + the
+                mono timestamp cannot overflow 390. `md:px-8` carries the 32px
+                the old `sm:px-8` gave from 640 up. */}
+            <div className="flex flex-col items-start gap-2 px-5 py-3.5 text-black md:flex-row md:items-center md:gap-6 md:px-8 md:py-4">
               <span
                 aria-hidden
                 className="inline-block size-2.5 bg-black"
               />
               <span
-                className="leading-none"
+                className="text-[18px] leading-none md:text-[22px]"
                 style={{
                   fontFamily: "var(--font-boldonse), ui-sans-serif",
-                  fontSize: 22,
                   letterSpacing: "0.02em",
                 }}
               >
@@ -677,9 +766,9 @@ export function DriverPicker({
             not a no-op, and must not be "cleaned up" as a duplicate of a
             class that no longer exists on this element. `lg:`/`xl:`
             padding is untouched. */}
-        <div className="mx-auto flex w-full max-w-[1600px] flex-col items-stretch gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-6 md:px-8 md:py-5 lg:px-12 xl:px-16">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-col items-stretch gap-2.5 px-5 pt-3 pb-3.5 md:flex-row md:items-center md:justify-between md:gap-6 md:px-8 md:pt-5 md:pb-5 lg:px-12 xl:px-16">
           <p
-            className="text-xs sm:text-sm text-[color:var(--fg-muted)]"
+            className="font-mono text-[10px] text-[color:var(--fg-muted)] md:[font-family:inherit] md:text-sm"
             style={{ letterSpacing: "0.04em" }}
             data-testid="lock-bar-status"
           >
@@ -712,7 +801,7 @@ export function DriverPicker({
           {justSaved ? (
             <Link
               href={`/dashboard/predict/round/${round}`}
-              className="min-h-[48px] w-full px-8 py-4 text-center text-sm uppercase text-black transition-colors md:w-auto"
+              className="flex h-[52px] w-full items-center justify-center px-5 text-[13px] uppercase text-[color:var(--fg)] transition-colors md:block md:h-auto md:min-h-[48px] md:w-auto md:px-8 md:py-4 md:text-center md:text-sm md:text-black"
               style={{
                 fontFamily: "var(--font-boldonse), ui-sans-serif",
                 letterSpacing: "0.04em",
@@ -726,12 +815,15 @@ export function DriverPicker({
             <button
               type="submit"
               disabled={!canSubmit}
-              className="min-h-[48px] w-full px-8 py-4 text-center text-sm uppercase text-black transition-colors disabled:cursor-not-allowed disabled:opacity-40 md:w-auto"
+              className={`flex h-[52px] w-full items-center justify-center px-5 text-[13px] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-40 md:block md:h-auto md:min-h-[48px] md:w-auto md:px-8 md:py-4 md:text-center md:text-sm ${
+                canSubmit
+                  ? "text-[color:var(--fg)] md:text-black"
+                  : "text-[color:var(--fg-muted)]"
+              }`}
               style={{
                 fontFamily: "var(--font-boldonse), ui-sans-serif",
                 letterSpacing: "0.04em",
                 background: canSubmit ? "var(--accent)" : "var(--surface)",
-                color: canSubmit ? "#000" : "var(--fg-muted)",
                 border: canSubmit ? "none" : "1px solid var(--border)",
               }}
               data-testid="submit-picks"

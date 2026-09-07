@@ -173,7 +173,13 @@ test.describe("no horizontal overflow", () => {
     await signIn(page);
     // Round detail — follow the first round link on /dashboard/predict.
     await page.goto("/dashboard/predict");
-    const round = page.locator('a[href*="/dashboard/predict/round/"]').first();
+    // `:visible` — /dashboard/predict is forked at 780px since PR-3, so the
+    // round links exist twice and a plain `.first()` can land on the hidden
+    // tree. This spec runs across four device projects, i.e. both sides of
+    // the fork.
+    const round = page
+      .locator('a[href*="/dashboard/predict/round/"]:visible')
+      .first();
     if (await round.count()) {
       await round.click();
       await page.waitForURL(/\/dashboard\/predict\/round\//);

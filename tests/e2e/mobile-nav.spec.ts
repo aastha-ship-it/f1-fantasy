@@ -148,9 +148,26 @@ test.describe("mobile navigation", () => {
     await page.setViewportSize({ width: 390, height: 664 });
 
     await page.goto("/dashboard/predict");
-    const cta = page.getByRole("link", { name: /continue picks/i });
+    // The hero CTA reads "Continue picks →" above the 780px fork and
+    // "Finish picks →" below it (PR-3, canvas §3.1), and `getByRole` ignores
+    // the `display:none` tree — so at 390 only the mobile one resolves.
+    const cta = page.getByRole("link", { name: /(continue|finish) picks/i });
     if (!(await cta.count())) {
-      test.skip(true, "no open session seeded — run scripts/seed-calendar.ts");
+      // Do NOT let a rotted locator masquerade as an unseeded database. The
+      // old form skipped unconditionally here, so renaming the CTA would
+      // have turned this whole test into a silent no-op.
+      const rounds = await page
+        .locator('a[href*="/dashboard/predict/round/"]')
+        .count();
+      test.skip(
+        rounds === 0,
+        "no open session seeded — run scripts/seed-calendar.ts",
+      );
+      throw new Error(
+        "the predict list rendered rounds but exposed no hero CTA — the " +
+          "mobile hero's accessible name has changed. Update this locator; " +
+          "do not let the test skip.",
+      );
     }
     await cta.click();
     await page.waitForURL(/\/dashboard\/predict\/round\//);

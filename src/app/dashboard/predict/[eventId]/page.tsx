@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/TopBar";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { TrackDiagram } from "@/components/TrackDiagram";
+import { MobEyebrow } from "@/components/MobilePrimitives";
 import { DriverPicker } from "../driver-picker";
 import { submitPrediction } from "../actions";
 import { shortEventName } from "@/lib/design/eventName";
@@ -40,6 +41,28 @@ function formatDelta(msUntil: number): string {
       .padStart(2, "0")}m`;
   if (hours > 0) return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
   return `${minutes}m`;
+}
+
+/**
+ * The mobile hero's countdown card puts the session date over the session
+ * time on two lines (canvas `MobPredictScreen`, "Sun 04 May / 20:00 IST"),
+ * where the desktop runs one string. Two call sites in this file only — the
+ * shared-helper rule (extract on the third use) does not apply yet.
+ */
+function formatLocalParts(iso: string): { day: string; time: string } {
+  const d = new Date(iso);
+  return {
+    day: d
+      .toLocaleDateString(undefined, {
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+      })
+      .toUpperCase(),
+    time: d
+      .toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+      .toUpperCase(),
+  };
 }
 
 function formatLocal(iso: string): string {
@@ -148,6 +171,7 @@ export default async function PredictEventPage({
 
   const short = shortEventName(event.name);
   const meta = circuitMeta(event.ergast_circuit_id ?? event.circuit);
+  const startParts = formatLocalParts(event.session_start_at);
 
   // Group hot picks per slot — top 3 driver codes friends have chosen.
   // Used in empty-slot telemetry on the picker. Sprint sessions only have P1.
@@ -189,9 +213,77 @@ export default async function PredictEventPage({
         email={userData.user?.email ?? null}
       />
       <MobileTabBar active="predict" />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
+      {/* `<main>` forks by classes (pattern A) — same string as the predict
+          list and the dashboard. Every value the old class list resolved to at
+          >=780 is restored at `md:`. */}
+      <main className="mx-auto w-full max-w-[1600px] px-5 py-5 pb-[calc(var(--tabbar-h)+env(safe-area-inset-bottom,0px)+24px)] md:px-8 md:py-10 md:pb-10 lg:px-12 xl:px-16">
+        {/*
+          MOBILE HERO (pattern B — fork the subtree).
+          Canvas: screens-mobile.jsx `MobPredictScreen`, README §3.2 — a
+          compact hero where the countdown, not the track, is the headline.
+          The desktop 3-column hero below is `display:none` here.
+          `uppercase` is explicit: the global `[style*="Boldonse"]` selector
+          is case-sensitive and matches nothing (MobilePrimitives.tsx).
+        */}
+        <div className="md:hidden">
+          <MobEyebrow>
+            Round {String(event.round).padStart(2, "0")} ·{" "}
+            {SESSION_LABEL[event.session_type]} · Picks needed
+          </MobEyebrow>
+          <div className="mt-2.5 flex items-end justify-between gap-2">
+            <h1
+              className="m-0 uppercase"
+              style={{
+                fontFamily: "var(--font-boldonse), ui-sans-serif",
+                fontSize: 36,
+                lineHeight: 0.9,
+              }}
+            >
+              {short}
+              <br />
+              <span className="text-[color:var(--fg-muted)]">Grand Prix</span>
+            </h1>
+            <div className="shrink-0" aria-hidden>
+              <TrackDiagram
+                circuit={event.ergast_circuit_id ?? event.circuit}
+                height={54}
+                stroke="var(--fg-muted)"
+              />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center justify-between gap-3 border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3.5">
+            <div>
+              <MobEyebrow>Locks in</MobEyebrow>
+              <p
+                className="mt-1"
+                data-tabular
+                style={{
+                  fontFamily: "var(--font-mono), ui-monospace, monospace",
+                  fontSize: 26,
+                  lineHeight: 1.1,
+                }}
+              >
+                {lockCountdown}
+              </p>
+            </div>
+            <p
+              className="shrink-0 text-right uppercase text-[color:var(--fg-subtle)]"
+              data-tabular
+              style={{
+                fontSize: 9,
+                letterSpacing: "0.08em",
+                lineHeight: 1.6,
+              }}
+            >
+              {startParts.day}
+              <br />
+              {startParts.time}
+            </p>
+          </div>
+        </div>
+
         {/* Hero — 3 cols: round info + name | track diagram | countdown */}
-        <section className="grid items-end gap-8 border-b border-[color:var(--border)] pb-8 lg:grid-cols-[1.4fr_1fr_1fr]">
+        <section className="hidden items-end gap-8 border-b border-[color:var(--border)] pb-8 md:grid lg:grid-cols-[1.4fr_1fr_1fr]">
           <div>
             <p
               className="mb-3 text-xs uppercase text-[color:var(--fg-subtle)]"
