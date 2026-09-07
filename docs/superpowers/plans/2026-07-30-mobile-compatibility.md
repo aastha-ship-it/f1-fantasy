@@ -2370,10 +2370,10 @@ git commit -m "feat(mobile): contain admin results forms in horizontal scrollers
 
 ## Final verification
 
-- [ ] `bun run lint && bun run typecheck && bun run test` — all green.
-- [ ] `bun --env-file=.env.local run e2e` — all four device projects green, including `no-horizontal-overflow`, `fork-audit`, `mobile-nav`, `predict-lock-bar`, `reveal-portrait`, `admin-mobile`, and the pre-existing `auth.spec.ts`.
-- [ ] **Fork audit by hand:** at 779px and 781px exactly one nav is visible and one content tree renders. At 744px (iPad Mini) the compact desktop nav does not overflow and all 7 tabs are reachable.
-- [ ] **Desktop unchanged:** load `/dashboard`, `/dashboard/standings`, `/dashboard/league`, `/dashboard/predict/[eventId]` and `/reveal/[eventId]` at 1440px and compare against `main`. Any visual difference at ≥1024px is a bug in this plan's execution.
+- [x] `bun run lint && bun run typecheck && bun run test` — all green. *(2026-09-07: lint 0 errors / 3 warnings in an evidence script; typecheck clean; vitest 284/285 — the one failure, `rls.test.ts` I6, is an unscoped `select("user_id")` that also sees legitimately-revealed rows from other events and fails identically on `main`.)*
+- [x] `bun --env-file=.env.local run e2e` — all four device projects green, including `no-horizontal-overflow`, `fork-audit`, `mobile-nav`, `predict-lock-bar`, `reveal-portrait`, `admin-mobile`, and the pre-existing `auth.spec.ts`. *(2026-09-07: 70 passed / 18 skipped / 0 failed, `--workers=1`; the 18 skips are `reveal-portrait` on the three mobile projects, Desktop-Chrome-only by design.)*
+- [x] **Fork audit by hand:** at 779px and 781px exactly one nav is visible and one content tree renders. At 744px (iPad Mini) the compact desktop nav does not overflow and all 7 tabs are reachable. *(2026-09-07: 779 → tab bar only, 0/13 `hidden md:*` visible; 781 → top nav only, 13/13 visible, 0/1 `md:hidden` visible. The real iPad Mini is 768 (< 780 fork) so it correctly gets the tab bar; the compact nav was verified in its actual 780–1024 band instead: `ul` scrollWidth == clientWidth and all 7 tabs inside the viewport at 781, 800, 1024. At 768 the 5 tab-bar targets plus the wordmark and Profile links in TopBar make all 7 destinations reachable.)*
+- [x] **Desktop unchanged:** load `/dashboard`, `/dashboard/standings`, `/dashboard/league`, `/dashboard/predict/[eventId]` and `/reveal/[eventId]` at 1440px and compare against `main`. Any visual difference at ≥1024px is a bug in this plan's execution. *(2026-09-07: full-page screenshots of the branch on :3000 vs a `main` worktree on :3001, 0 diff pixels on all five routes.)*
 - [ ] **Real hardware** — the two things emulators lie about:
   1. `env(safe-area-inset-bottom)` under the tab bar and the lock bar on a notched iPhone in Safari.
   2. `dvh` behaviour as the URL bar collapses on scroll, on both iOS Safari and Android Chrome.
