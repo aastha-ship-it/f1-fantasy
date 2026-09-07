@@ -72,6 +72,46 @@ test.describe("mobile navigation", () => {
   });
 
   /**
+   * PR-2 decision lock: sign-out lives on /profile below the fork.
+   *
+   * PR-1 kept a ⏻ box in the mobile top row only because /profile had no
+   * sign-out at all; PR-2 built one there and made TopBar's form
+   * `hidden md:block`. Both halves matter — a phone with neither would strand
+   * the user signed in forever, and a phone with both would put a
+   * destructive action one thumb-width from the avatar link, which is
+   * exactly what the canvas removes.
+   *
+   * `getByRole` does not match elements outside the accessibility tree, so
+   * on /dashboard the (display:none) TopBar button resolves to nothing —
+   * which is what `toBeHidden()` asserts here.
+   */
+  test("sign-out is on /profile below the fork, and nowhere else", async ({
+    page,
+  }) => {
+    await signIn(page);
+    await page.setViewportSize({ width: 375, height: 700 });
+
+    await page.goto("/dashboard");
+    await expect(
+      page.getByRole("button", { name: "Sign out" }),
+      "sign-out must not be reachable from the mobile top bar",
+    ).toBeHidden();
+
+    await page.goto("/profile");
+    const signOut = page.getByRole("button", { name: "Sign out" });
+    await expect(
+      signOut,
+      "/profile is the only mobile sign-out — it has to be visible",
+    ).toBeVisible();
+    // The handoff's floor for anything tapped. MobButton is 52.
+    const box = (await signOut.boundingBox())!;
+    expect(
+      box.height,
+      "sign-out is under the 44px tap target",
+    ).toBeGreaterThanOrEqual(44);
+  });
+
+  /**
    * C1 regression lock (final merge review).
    *
    * `MobileTabBar` is `fixed bottom-0 z-30`; the predict lock bar was

@@ -104,10 +104,17 @@ test.describe("E2E auth", () => {
         }),
         page.getByRole("button", { name: /save.+paddock/i }).click(),
       ]);
-      // Dashboard TopBar shows the user's initial avatar + Sign out button;
-      // the redesign deliberately doesn't render the email inline. Asserting
-      // on the Sign out button + a hero heading is the precise check.
-      await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+      // Sign-out moved to /profile in PR-2 — TopBar's ⏻ form is now
+      // `hidden md:block`, so this assertion used to fail on the three phone
+      // projects. The width-independent proof that we landed signed in on
+      // the dashboard is the TopBar avatar link plus the hero heading.
+      //
+      // `.last()`, not the bare locator: at >=780 the desktop tab row also
+      // carries a "Profile" link, and two matches is a strict-mode failure.
+      // The avatar is the later of the two in DOM order at every width.
+      await expect(
+        page.getByRole("link", { name: "Profile" }).last(),
+      ).toBeVisible();
       await expect(
         page.getByRole("heading", { name: /grand prix/i }),
       ).toBeVisible();

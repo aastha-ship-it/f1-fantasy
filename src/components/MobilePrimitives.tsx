@@ -83,7 +83,19 @@ export function MobSectionHead({
         className,
       )}
     >
-      <h2 style={{ fontFamily: DISPLAY_FONT, fontSize: 16, lineHeight: 1 }}>
+      {/* `uppercase` is explicit rather than inherited. The global
+          `.font-display, [style*="Boldonse"]` rule in globals.css is meant to
+          supply it, but that attribute selector is case-sensitive and every
+          call site emits `var(--font-boldonse)` in lowercase, so it matches
+          nothing and never has (verified in-browser: `el.matches` is false
+          and computed text-transform is `none`). Every display string that
+          reads as uppercase today does so because its call site typed it that
+          way or called .toUpperCase(). Section-head titles are prose the
+          caller passes in, so they have to say it here. */}
+      <h2
+        className="uppercase"
+        style={{ fontFamily: DISPLAY_FONT, fontSize: 16, lineHeight: 1 }}
+      >
         {title}
       </h2>
       {meta !== undefined && meta !== null && (

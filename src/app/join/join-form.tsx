@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import type { JoinResult } from "./actions";
 
 /**
@@ -11,6 +12,18 @@ import type { JoinResult } from "./actions";
  *
  * The label "Invite code" + button accessible-name "Continue" are required
  * by the E2 Playwright assertion — preserve them across redesigns.
+ *
+ * 390pt fork (PR-2 §5). The canvas draws a 6-cell code grid; we keep the
+ * one field (see above — production codes are 16 chars) and give it the
+ * cell treatment instead: 56px tall, `--surface` ground, accent border once
+ * non-empty. The helper line stays today's copy, not the canvas's
+ * "6 characters · not case sensitive", which would be a lie.
+ *
+ * Every control here is pattern A — one element, mobile at base, today's
+ * value restored at `md:` — because each of them is either the submitted
+ * field or a test anchor. Only the button's VISIBLE text forks, by a pair
+ * of spans; `aria-label="Continue"` is what the tests read and it is the
+ * same string at every width.
  */
 export function JoinForm({
   action,
@@ -32,13 +45,15 @@ export function JoinForm({
           if (!result.ok) setError(result.error);
         });
       }}
-      className="flex flex-col gap-4"
+      // `flex-1` + `mt-auto` on the button bottom-anchor the CTA on a phone;
+      // `relative` lifts the form above the page's stripe wash. Both revert
+      // at md to the auto-height, static block it is today.
+      className="relative flex flex-1 flex-col gap-2.5 md:static md:flex-initial md:gap-4"
     >
       <input type="hidden" name="next" value={next} />
       <label
         htmlFor="invite-code"
-        className="text-xs uppercase text-[color:var(--fg-subtle)]"
-        style={{ letterSpacing: "0.14em" }}
+        className="text-[9px] uppercase tracking-[0.16em] text-[color:var(--fg-subtle)] md:text-xs md:tracking-[0.14em]"
         data-tabular
       >
         Invite code
@@ -55,7 +70,7 @@ export function JoinForm({
         onChange={(e) => setValue(e.currentTarget.value)}
         spellCheck={false}
         autoCapitalize="characters"
-        className="border bg-[color:var(--surface)] px-5 py-5 text-2xl uppercase text-[color:var(--fg)] outline-none transition-colors focus:border-[color:var(--accent)] disabled:opacity-50"
+        className="h-[56px] border bg-[color:var(--surface)] px-4 text-[22px] uppercase text-[color:var(--fg)] outline-none transition-colors focus:border-[color:var(--accent)] disabled:opacity-50 md:h-auto md:px-5 md:py-5 md:text-2xl"
         style={{
           fontFamily: "var(--font-mono), ui-monospace, monospace",
           letterSpacing: "0.18em",
@@ -67,7 +82,7 @@ export function JoinForm({
       {error ? (
         <p
           role="alert"
-          className="text-xs uppercase text-[color:var(--error)]"
+          className="text-[9px] uppercase text-[color:var(--error)] md:text-xs"
           style={{ letterSpacing: "0.06em" }}
           data-testid="invite-error"
         >
@@ -75,7 +90,7 @@ export function JoinForm({
         </p>
       ) : (
         <p
-          className="text-xs uppercase text-[color:var(--fg-subtle)]"
+          className="text-[9px] uppercase text-[color:var(--fg-subtle)] md:text-xs"
           style={{ letterSpacing: "0.06em" }}
         >
           Enter your code, then sign in with Google.
@@ -86,7 +101,7 @@ export function JoinForm({
         type="submit"
         disabled={pending}
         aria-label="Continue"
-        className="mt-4 flex items-center justify-center gap-2 px-6 py-5 text-base text-black transition-colors disabled:opacity-50"
+        className="mt-auto flex h-[52px] items-center justify-center gap-2 text-[13px] text-black transition-colors disabled:opacity-50 md:mt-4 md:h-auto md:px-6 md:py-5 md:text-base"
         style={{
           background: "var(--accent)",
           fontFamily: "var(--font-boldonse), ui-sans-serif",
@@ -98,10 +113,35 @@ export function JoinForm({
           "Checking…"
         ) : (
           <>
-            Continue <span aria-hidden>→ Sign in with Google</span>
+            {/* Visible text only — `aria-label="Continue"` above is the
+                accessible name at both widths, so the e2e anchor never
+                moves. The desktop string spells out where the button goes
+                next; at 390 that does not fit a 52px block. */}
+            <span className="md:hidden">Join the group →</span>
+            {/* `md:contents`, not `md:inline`: the button is a flex row with
+                `gap-2`, and today's desktop children are TWO flex items — the
+                bare "Continue" text node and the arrow <span>. An `inline`
+                wrapper would collapse them into one item and drop the 8px
+                gap (caught by the 1440 pixel diff). `display: contents`
+                dissolves the wrapper so its children stay the button's own
+                flex items. */}
+            <span className="hidden md:contents">
+              Continue <span aria-hidden>→ Sign in with Google</span>
+            </span>
           </>
         )}
       </button>
+
+      <p
+        className="text-center uppercase text-[color:var(--fg-subtle)] md:hidden"
+        data-tabular
+        style={{ fontSize: 9, letterSpacing: "0.06em" }}
+      >
+        Already a member?{" "}
+        <Link href="/login" className="text-[color:var(--accent)]">
+          Sign in
+        </Link>
+      </p>
     </form>
   );
 }

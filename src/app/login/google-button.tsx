@@ -39,11 +39,22 @@ export function GoogleSignInButton({ next }: { next: string }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* 390pt fork (PR-2 §4), pattern A — ONE control, forked by classes.
+          This is the app's only sign-in affordance and its accessible name
+          ("Sign in with Google") is an anchor, so it is never duplicated
+          into a mobile subtree; below 780 it becomes the handoff's 54px
+          square-cornered full-width block and `md:` puts today's rounded,
+          auto-width, `px-6 py-3` button back.
+
+          The size fork uses arbitrary lengths rather than `text-sm`/
+          `text-base`: the named steps also SET a line-height, and this
+          button has none today (it inherits `normal`), so `md:text-base`
+          would silently grow it by ~5px at 1440. */}
       <button
         type="button"
         onClick={onClick}
         disabled={pending}
-        className="flex items-center justify-center gap-3 rounded border border-[color:var(--border)] bg-[color:var(--surface)] px-6 py-3 text-[color:var(--fg)] transition-colors hover:bg-[color:var(--surface-2)] disabled:opacity-50"
+        className="flex h-[54px] w-full items-center justify-center gap-3 rounded-none border border-[color:var(--border)] bg-[color:var(--surface)] text-[14px] text-[color:var(--fg)] transition-colors hover:bg-[color:var(--surface-2)] disabled:opacity-50 md:h-auto md:w-auto md:rounded md:px-6 md:py-3 md:text-[16px]"
       >
         <GoogleG />
         <span className="font-medium">

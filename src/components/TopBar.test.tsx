@@ -23,7 +23,12 @@ describe("TopBar", () => {
     expect(hrefs).toHaveLength(7);
   });
 
-  it("still exposes Profile and Sign out on mobile, outside the tab row", () => {
+  // Sign-out used to be asserted here too. PR-2 moved it out of the mobile
+  // row and onto /profile (see PF3 in src/app/profile/profile-form.test.tsx);
+  // TB-F5 below now locks it as desktop-only. The avatar half stays: it is
+  // still the only route to /profile below the fork, so the mobile sign-out
+  // is only reachable through it.
+  it("still exposes Profile on mobile, outside the tab row", () => {
     render(<TopBar active="calendar" displayName="Aastha" email="a@b.test" />);
     const list = screen.getByRole("list");
     // "Profile" matches both the tab-row link and the avatar link — find the
@@ -31,9 +36,6 @@ describe("TopBar", () => {
     const profileLinks = screen.getAllByRole("link", { name: "Profile" });
     const outsideList = profileLinks.filter((link) => !list.contains(link));
     expect(outsideList).toHaveLength(1);
-
-    const signOut = screen.getByRole("button", { name: "Sign out" });
-    expect(list.contains(signOut)).toBe(false);
   });
 
   it("shows the scoring-help label only from lg up, glyph always", () => {
@@ -153,15 +155,20 @@ describe("TopBar 780px fork", () => {
     expect(avatar.className).toMatch(/(^|\s)md:text-sm(\s|$)/);
   });
 
-  it("TB-F5: sign-out survives the mobile row as a 32x32 bordered target", () => {
-    const { nav } = parts();
-    expect(nav).not.toBeNull();
-    // Deliberate deviation from the canvas, which has no mobile sign-out:
-    // /profile has none either, so this is the app's only one. PR-2 moves it
-    // into the profile screen; until then it must stay hittable.
+  it("TB-F5: sign-out is desktop-only — the mobile affordance lives on /profile", () => {
+    parts();
+    // PR-1 kept a 32x32 ⏻ box in the mobile row because /profile had no
+    // sign-out at all. PR-2 built one there, so the canvas's chrome-free
+    // mobile row is finally what ships: the <form> is the element that
+    // forks, and its `md:block` is what has to survive — dropping it would
+    // take sign-out off the desktop bar entirely.
     const signOut = screen.getByRole("button", { name: "Sign out" });
-    expect(signOut.className).toMatch(/(^|\s)size-8(\s|$)/);
-    expect(signOut.className).toContain("border-[color:var(--border)]");
+    const form = signOut.closest("form") as HTMLElement;
+    expect(form).not.toBeNull();
+    expect(form.className).toMatch(/(^|\s)hidden(\s|$)/);
+    expect(form.className).toMatch(/(^|\s)md:block(\s|$)/);
+    // The button's >=780 restoration is still load-bearing for the pixel
+    // baseline — it is what makes the desktop glyph a bare ⏻, not a box.
     expect(signOut.className).toMatch(/(^|\s)md:size-auto(\s|$)/);
     expect(signOut.className).toMatch(/(^|\s)md:border-0(\s|$)/);
   });

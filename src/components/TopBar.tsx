@@ -101,16 +101,16 @@ export function TopBar({
           >
             {initial}
           </Link>
-          <form action={signOutAction}>
-            {/* The canvas mobile bar has no sign-out, but /profile has none
-                either — this ⏻ is the app's ONLY sign-out affordance, and
-                TopBar.test.tsx locks it as reachable on mobile. So it stays,
-                promoted to a 32×32 bordered box that matches the `?` next to
-                it instead of a 12px bare glyph nobody can hit. `inline-flex`
-                (not `flex`) keeps it inline-level so `md:size-auto
-                md:border-0` restores today's inline-block glyph exactly.
-                PR-2 should move sign-out into the mobile profile screen and
-                then this can drop below `md:`. */}
+          {/* Sign-out is desktop-only as of PR-2. The mobile affordance now
+              lives on /profile (a full-width ghost submit under Calendar
+              sync, see src/app/profile/profile-form.tsx) — which is where
+              the canvas puts it and where a destructive action belongs on a
+              phone, rather than one thumb-width from the avatar link.
+              Only the <form> carries the fork: the button's own base classes
+              are inert below `md:` but its `md:size-auto md:border-0`
+              restoration is what keeps the >=780 render byte-identical, so
+              they stay exactly as PR-1 left them. */}
+          <form action={signOutAction} className="hidden md:block">
             <button
               type="submit"
               className="inline-flex size-8 items-center justify-center border border-[color:var(--border)] text-xs uppercase tracking-[0.12em] text-[color:var(--fg-subtle)] hover:text-[color:var(--fg-muted)] md:size-auto md:border-0"

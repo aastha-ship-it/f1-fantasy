@@ -177,9 +177,14 @@ describe("MobilePrimitives", () => {
       <MobSectionHead title="Scoring sessions" meta="4 · picks required" />,
     );
     const h2 = container.querySelector("h2") as HTMLElement;
-    // The literal string the global `[style*="Boldonse"]` selector matches.
     expect(h2.getAttribute("style")).toContain("var(--font-boldonse)");
     expect(h2).toHaveTextContent("Scoring sessions");
+    // Uppercase must be on the element, not inherited from the global
+    // `[style*="Boldonse"]` rule — that selector is case-sensitive and does
+    // not match the lowercase `var(--font-boldonse)` every call site emits,
+    // so it has never applied. Callers pass mixed-case prose ("Favourite
+    // team"), and the canvas draws every section head uppercase.
+    expect(h2.className).toContain("uppercase");
 
     const meta = screen.getByText("4 · picks required");
     expect(meta).toHaveAttribute("data-tabular");

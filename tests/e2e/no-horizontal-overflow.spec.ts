@@ -97,87 +97,76 @@ test.describe("no horizontal overflow", () => {
    * The /dashboard hero clips its own content with `overflow: hidden`, so a
    * cropped hero is INVISIBLE to the scrollWidth assertion above — measured:
    * `scrollWidth === clientWidth === 375` both before and after the crop was
-   * fixed. The signal is the art's own right edge (477 cropped vs 318 fixed
-   * at 375px), which is what this asserts.
+   * fixed. The signal is the art's own right edge, which is what this asserts.
    *
-   * Guards `grid-cols-1` on the hero <section>: without it the grid falls back
-   * to one implicit `auto` track floored at the 420px TrackDiagram's
-   * min-content width (484px), which overflows any viewport narrower than
-   * ~550px and gets silently cropped.
+   * RE-ANCHORED in PR-2. This used to find the desktop hero by its
+   * "Track layout" <p> and measure the diagram beside it. Below 780 that
+   * hero is now `display:none`, so the lookup would have found an element
+   * with a 0×0 rect and passed on a rotted anchor — the worst failure mode a
+   * guard can have. Of the two fixes the plan allows, asserting at >=780 is
+   * NOT the useful one: the original bug (a missing `grid-cols-1` letting the
+   * hero fall back to a 484px min-content track) can only overflow viewports
+   * narrower than ~550px, which the desktop hero no longer renders at.
+   *
+   * So this now measures at 390 and asserts the property the handoff actually
+   * argues about ("track art is INSET, never negatively offset — a clipped
+   * silhouette at 390 reads as a bug", raised twice in review): EVERY piece
+   * of track art the mobile tree paints has to sit inside the frame. It is
+   * anchored on `[role="img"]` + a rect, not on a class or a label, so there
+   * is nothing here to rot; and it fails loudly rather than skipping if the
+   * page renders no track art at all while a calendar is seeded.
    */
-  test("dashboard hero art stays inside the viewport", async ({ page }) => {
+  test("dashboard track art stays inside the viewport at 390", async ({
+    page,
+  }) => {
     await signIn(page);
+    await page.setViewportSize({ width: 390, height: 800 });
     await page.goto("/dashboard");
     await page.waitForLoadState("networkidle");
 
     const m = await page.evaluate(() => {
-      // Two distinct "no hero art" cases, never conflated: the dashboard
-      // legitimately renders EmptyHero when nothing is upcoming, versus the
-      // anchor having rotted out from under this test while a hero is right
-      // there on the page. The first is a skip, the second is a failure.
-      const emptyHero = Array.from(document.querySelectorAll("section")).some(
-        (s) => (s.textContent ?? "").includes("NO OPEN SESSIONS"),
-      );
-      // "Track layout" is unique to the real hero — EmptyHero has no such
-      // label — so this can never latch onto a round-list diagram.
-      const label = Array.from(document.querySelectorAll("p")).find(
-        (p) => (p.textContent ?? "").trim().toLowerCase() === "track layout",
-      );
-      const wrap = label?.parentElement;
-      const diag = wrap?.querySelector<HTMLElement>('[role="img"]');
-      const r = diag?.getBoundingClientRect();
+      const art = Array.from(
+        document.querySelectorAll<HTMLElement>('[role="img"]'),
+      )
+        // The F1 wordmark in the top bar is also role=img; everything else
+        // with that role on this route is a TrackDiagram.
+        .filter((el) => el.getAttribute("aria-label") !== "F1")
+        .map((el) => ({ el, r: el.getBoundingClientRect() }))
+        // display:none nodes (the whole desktop tree below the fork) report
+        // an all-zero rect and would pass trivially — drop them so they can
+        // neither pass nor mask a real offender.
+        .filter(({ r }) => r.width > 0 && r.height > 0)
+        .map(({ el, r }) => ({
+          label: el.getAttribute("aria-label") ?? "?",
+          left: Math.round(r.left),
+          right: Math.round(r.right),
+          width: Math.round(r.width),
+        }));
       return {
-        emptyHero,
-        hasLabel: !!label,
-        hasDiagram: !!diag,
-        // Debug breadcrumbs for the loud-failure path.
-        roleImgOnPage: document.querySelectorAll('[role="img"]').length,
-        rect: r
-          ? {
-              left: Math.round(r.left),
-              right: Math.round(r.right),
-              width: Math.round(r.width),
-            }
-          : null,
+        art,
         viewport: document.scrollingElement!.clientWidth,
         scrollWidth: document.scrollingElement!.scrollWidth,
       };
     });
 
-    if (m.emptyHero) {
-      test.skip(true, "no upcoming event — dashboard renders EmptyHero");
+    if (m.art.length === 0) {
+      test.skip(true, "no track art rendered — run scripts/seed-calendar.ts");
       return;
     }
 
-    // A hero IS on the page, so the anchor must resolve. Hard assertions:
-    // this guard must never quietly no-op because its locator drifted.
-    expect(
-      m.hasLabel,
-      `hero anchor rotted: no <p> reading "Track layout" on /dashboard, and ` +
-        `EmptyHero is not rendered either. Re-anchor this test — do not let it ` +
-        `skip. (${m.roleImgOnPage} [role="img"] elements on the page.)`,
-    ).toBe(true);
-
-    expect(
-      m.hasDiagram,
-      `hero anchor found but no [role="img"] beside it — TrackDiagram's ` +
-        `role/markup changed, or the label moved out of the flex wrapper. ` +
-        `Re-anchor this test. (${m.roleImgOnPage} [role="img"] on the page.)`,
-    ).toBe(true);
-
-    const rect = m.rect!;
-
-    expect.soft(
-      rect.right,
-      `hero art is cropped: right=${rect.right} exceeds the ${m.viewport}px viewport ` +
-        `(art width=${rect.width}). Note scrollWidth=${m.scrollWidth} — the hero's ` +
-        `own overflow:hidden hides this from the scrollWidth check.`,
-    ).toBeLessThanOrEqual(m.viewport + 1);
-
-    expect.soft(
-      rect.left,
-      `hero art starts off-screen: left=${rect.left}`,
-    ).toBeGreaterThanOrEqual(-1);
+    for (const a of m.art) {
+      expect.soft(
+        a.right,
+        `track art "${a.label}" is cropped: right=${a.right} exceeds the ` +
+          `${m.viewport}px viewport (width=${a.width}). Note scrollWidth=` +
+          `${m.scrollWidth} — a hero's own overflow:hidden hides this from ` +
+          `the scrollWidth check.`,
+      ).toBeLessThanOrEqual(m.viewport + 1);
+      expect.soft(
+        a.left,
+        `track art "${a.label}" starts off-screen: left=${a.left}`,
+      ).toBeGreaterThanOrEqual(-1);
+    }
   });
 
   test("dynamic routes reached by following real links", async ({ page }) => {
