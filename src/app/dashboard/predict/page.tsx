@@ -14,6 +14,7 @@ import { teamMeta } from "@/lib/design/teams";
 import { shortEventName } from "@/lib/design/eventName";
 import { circuitMeta } from "@/lib/design/circuits";
 import { formatDateRange } from "@/lib/design/dateRange";
+import { formatLockDelta } from "@/lib/design/lockDelta";
 import {
   groupByRound,
   type GroupableEvent,
@@ -28,17 +29,6 @@ const SESSION_LABEL: Record<EventRow["session_type"], string> = {
   sprint_race: "Sprint",
   sprint_quali: "Sprint Qualifying",
 };
-
-function formatDelta(msUntil: number): string {
-  if (msUntil <= 0) return "Locked";
-  const totalSec = Math.floor(msUntil / 1000);
-  const days = Math.floor(totalSec / 86_400);
-  const hours = Math.floor((totalSec % 86_400) / 3600);
-  const minutes = Math.floor((totalSec % 3600) / 60);
-  if (days > 0) return `${days}d ${hours.toString().padStart(2, "0")}h`;
-  if (hours > 0) return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
-  return `${minutes}m`;
-}
 
 function slotsFor(t: EventRow["session_type"]): string {
   return t === "sprint_quali" || t === "sprint_race"
@@ -220,7 +210,7 @@ export default async function PredictListPage() {
   // eslint-disable-next-line react-hooks/purity
   const nowMs = Date.now();
   const heroLockCountdown = nextEvent
-    ? formatDelta(new Date(nextEvent.lock_at).getTime() - nowMs)
+    ? formatLockDelta(new Date(nextEvent.lock_at).getTime() - nowMs)
     : null;
 
   const heroIsSprint =

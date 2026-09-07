@@ -17,6 +17,7 @@ import { shortEventName } from "@/lib/design/eventName";
 import { circuitMeta } from "@/lib/design/circuits";
 import { formatDateRange } from "@/lib/design/dateRange";
 import { sessionLabel } from "@/lib/sessionLabel";
+import { formatLockDelta } from "@/lib/design/lockDelta";
 import { RevealNotice, type RevealCandidate } from "./reveal-notice";
 
 type EventLite = {
@@ -32,17 +33,6 @@ type EventLite = {
 };
 
 type DriverRow = { id: number; code: string; full_name: string; team: string };
-
-function formatDelta(msUntil: number): string {
-  if (msUntil <= 0) return "Locked";
-  const totalSec = Math.floor(msUntil / 1000);
-  const days = Math.floor(totalSec / 86_400);
-  const hours = Math.floor((totalSec % 86_400) / 3600);
-  const minutes = Math.floor((totalSec % 3600) / 60);
-  if (days > 0) return `${days}d ${hours.toString().padStart(2, "0")}h ${minutes.toString().padStart(2, "0")}m`;
-  if (hours > 0) return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
-  return `${minutes}m`;
-}
 
 /**
  * "MAY 4" — the mobile calendar row's right-hand date column.
@@ -250,7 +240,9 @@ export default async function DashboardPage() {
   // eslint-disable-next-line react-hooks/purity
   const nowMs = Date.now();
   const lockCountdown = nextOpen
-    ? formatDelta(new Date(nextOpen.lock_at).getTime() - nowMs)
+    ? formatLockDelta(new Date(nextOpen.lock_at).getTime() - nowMs, {
+        precise: true,
+      })
     : null;
 
   return (

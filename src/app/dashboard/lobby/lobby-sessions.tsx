@@ -19,7 +19,12 @@ import type {
  * render the identical string — no hydration mismatch.
  */
 
-export type LobbySessionView = LobbySession & { timeLabel: string };
+export type LobbySessionView = LobbySession & {
+  /** `formatLocal` — "2 May 2026, 2:00 AM". Desktop rows. */
+  timeLabel: string;
+  /** `formatSessionClock` — "SAT 16:30 IST". The 390pt rows (PR-4 §4.1). */
+  clockLabel: string;
+};
 
 const TONE_COLOR: Record<PhaseTone, string> = {
   muted: "var(--fg-muted)",

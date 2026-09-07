@@ -35,6 +35,15 @@ export type LobbyParticipant = {
   name: string;
   isMe: boolean;
   locked: boolean;
+  /**
+   * The friend's own `users.favorite_team`, canonical DB string (resolve
+   * through `teamMeta` at render). Mobile §4.1 tints the lock-progress bar
+   * and every avatar ring by it. Null when they haven't picked one.
+   *
+   * NOT reveal-gated: a favourite team is profile data the group already
+   * sees on the league page, unrelated to what anyone predicted.
+   */
+  team: string | null;
   /** Only the slots the gate has opened. Never contains P1. */
   revealed: LobbySlotPick[];
 };
@@ -69,6 +78,7 @@ type UserRow = {
   id: string;
   display_name: string | null;
   email: string;
+  favorite_team: string | null;
 };
 type PredictionRow = {
   user_id: string;
@@ -142,8 +152,13 @@ export async function loadLobbyWeekend(
     await Promise.all([
       svc
         .from("users")
-        .select("id, display_name, email")
+        .select("id, display_name, email, favorite_team")
+        // `display_name` is not unique (and is nullable), so ordering by it
+        // alone leaves tied rows in whatever order the query plan returns —
+        // the roster could reshuffle between two identical page loads. `id`
+        // is the deterministic tiebreak.
         .order("display_name", { ascending: true })
+        .order("id", { ascending: true })
         .returns<UserRow[]>(),
       svc
         .from("predictions")
@@ -215,6 +230,7 @@ export async function loadLobbyWeekend(
         name: displayName(u),
         isMe: u.id === opts.myUserId,
         locked: pred != null,
+        team: u.favorite_team,
         revealed,
       };
     });
