@@ -29,6 +29,12 @@ import type { TopBarTab } from "@/components/TopBar";
  * variables, so growing the target cannot silently re-cover the submit
  * button. Guarded end-to-end by "the predict submit button is clickable, not
  * covered by the tab bar" in tests/e2e/mobile-nav.spec.ts.
+ *
+ * Styling is the mobile handoff's `MobTabBar`
+ * (design/design_handoff_mobile/design/screens-mobile.jsx): 60px tall on a
+ * SOLID `--surface-2` (no blur — the bar sits on opaque content and the
+ * translucency only cost a compositor layer), glyph 15 / label 8, 5px
+ * between them, accent inset on the active tab.
  */
 const TABS: { id: TopBarTab; label: string; href: string; glyph: string }[] = [
   { id: "league", label: "League", href: "/dashboard/league", glyph: "▲" },
@@ -42,10 +48,7 @@ export function MobileTabBar({ active }: { active: TopBarTab }) {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-[color:var(--border)] backdrop-blur pb-[env(safe-area-inset-bottom,0px)] md:hidden"
-      style={{
-        background: "color-mix(in oklch, var(--surface-2) 92%, transparent)",
-      }}
+      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-[color:var(--border)] bg-[color:var(--surface-2)] pb-[env(safe-area-inset-bottom,0px)] md:hidden"
     >
       {TABS.map((t) => {
         const isActive = t.id === active;
@@ -54,21 +57,24 @@ export function MobileTabBar({ active }: { active: TopBarTab }) {
             key={t.id}
             href={t.href}
             aria-current={isActive ? "page" : undefined}
-            className="flex min-h-[var(--tabbar-item-h)] flex-col items-center justify-center gap-1 pt-2 pb-1"
+            className="flex min-h-[var(--tabbar-item-h)] flex-col items-center justify-center"
             style={{
+              // 5px is off Tailwind's 4pt scale, so it stays inline rather
+              // than inviting a `gap-[5px]` arbitrary value nobody can grep.
+              gap: 5,
               color: isActive ? "var(--fg)" : "var(--fg-subtle)",
               boxShadow: isActive
                 ? "inset 0 2px 0 0 var(--accent)"
                 : undefined,
             }}
           >
-            <span aria-hidden style={{ fontSize: 16, lineHeight: 1 }}>
+            <span aria-hidden style={{ fontSize: 15, lineHeight: 1 }}>
               {t.glyph}
             </span>
             <span
               className="uppercase"
               data-tabular
-              style={{ fontSize: 9, letterSpacing: "0.1em" }}
+              style={{ fontSize: 8, letterSpacing: "0.1em" }}
             >
               {t.label}
             </span>

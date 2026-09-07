@@ -29,23 +29,34 @@ export function ScoringHelp() {
         onClick={() => ref.current?.showModal()}
         aria-haspopup="dialog"
         aria-label="How scoring works"
-        className="inline-flex cursor-pointer items-center gap-[var(--space-sm)] uppercase text-[color:var(--fg-subtle)] hover:text-[color:var(--fg)] transition-colors"
+        // Padding is a class, not inline style, for the same reason SH1 moved
+        // the dialog's: inline padding is unreachable by a breakpoint. Below
+        // the 780px fork the trigger is the handoff's 32×32 box (`size-8
+        // p-0`); `md:` restores the original pill verbatim.
+        className="inline-flex cursor-pointer size-8 items-center justify-center gap-[var(--space-sm)] p-0 uppercase text-[color:var(--fg-muted)] hover:text-[color:var(--fg)] transition-colors md:size-auto md:px-[var(--space-md)] md:py-[var(--space-xs)] md:text-[color:var(--fg-subtle)]"
         data-tabular
         style={{
           border: "1px solid var(--border)",
           background: "transparent",
-          padding: "var(--space-xs) var(--space-md)",
           fontSize: 11,
           letterSpacing: "0.1em",
         }}
       >
+        {/* Mobile glyph: a plain `?`, because the circled variant inside a
+            32×32 box reads as a target inside a target. */}
         <span
           aria-hidden="true"
+          className="md:hidden"
+          data-tabular
+          style={{ fontSize: 12, lineHeight: 1 }}
+        >
+          ?
+        </span>
+        <span
+          aria-hidden="true"
+          className="hidden items-center justify-center md:inline-flex"
           data-tabular
           style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
             width: 16,
             height: 16,
             borderRadius: "50%",

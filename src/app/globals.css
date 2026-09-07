@@ -89,8 +89,9 @@
    * the predict lock bar, tomorrow whatever else — has to clear this bar, and
    * a literal would silently rot the moment the tab target grows.
    *
-   * `--tabbar-item-h` is the tap target itself (WCAG 2.5.8 wants >=24px; 52px
-   * is the thumb-comfortable size Task 12 shipped) and is consumed by
+   * `--tabbar-item-h` is the tap target itself (WCAG 2.5.8 wants >=24px; 60px
+   * is the mobile handoff's bar height — glyph + label stacked, comfortably
+   * past the 44px tap minimum) and is consumed by
    * MobileTabBar's own min-height, so the two cannot drift. `--tabbar-h` adds
    * the 1px `border-top` the <nav> draws, giving the real occluded band.
    * The safe-area inset is NOT folded in here: it is `env()`, which resolves
@@ -100,7 +101,7 @@
    * NOT in the --spacing-* namespace on purpose — see the @theme note below;
    * defining --spacing-<name> hijacks every Tailwind utility of that name.
    */
-  --tabbar-item-h: 52px;
+  --tabbar-item-h: 60px;
   --tabbar-h: calc(var(--tabbar-item-h) + 1px);
 }
 

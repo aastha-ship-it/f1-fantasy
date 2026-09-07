@@ -8,6 +8,15 @@ import { signOutAction } from "@/app/signout/actions";
  *
  * Design canvas reference: `design/screens-auth.jsx:TopBar`. Layout:
  *   F1Mark | nav tabs ............................. season label · user · ⏻
+ *
+ * Below the 780px fork this collapses to the mobile handoff's `MobTopBar`
+ * (design/design_handoff_mobile/design/screens-mobile.jsx): a flat 52px row,
+ * solid `--bg`, 20px gutter, 16px wordmark, and 32×32 boxes on the right.
+ * Every one of those is a BASE-level class with the current desktop value
+ * restored at `md:` — at and above 780px this component must still resolve to
+ * exactly what it did before the mobile pass (note today's base `px-6` was
+ * only ever visible below 640, since `sm:px-8` covered 640–779, so `md:px-8`
+ * reproduces every >=780 value verbatim).
  */
 
 type Tab =
@@ -43,14 +52,21 @@ export function TopBar({
     .toUpperCase();
 
   return (
-    <nav className="sticky top-0 z-30 border-b border-[color:var(--border)] bg-[color:var(--bg)]/85 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-6 py-4 sm:px-8 lg:gap-8 lg:px-12 xl:px-16">
+    <nav className="sticky top-0 z-30 border-b border-[color:var(--border)] bg-[color:var(--bg)] md:bg-[color:var(--bg)]/85 md:backdrop-blur">
+      <div className="mx-auto flex h-[52px] w-full max-w-[1600px] items-center gap-3 px-5 md:h-auto md:gap-4 md:px-8 md:py-4 lg:gap-8 lg:px-12 xl:px-16">
         <Link
           href="/dashboard"
           aria-label="F1 Fantasy"
           className="flex items-center text-[color:var(--fg)]"
         >
-          <F1Mark height={22} />
+          {/* F1Mark sizes off a numeric prop, not CSS, so the fork is two
+              mutually exclusive spans rather than one responsive class. */}
+          <span className="flex md:hidden">
+            <F1Mark height={16} />
+          </span>
+          <span className="hidden md:flex">
+            <F1Mark height={22} />
+          </span>
         </Link>
 
         <ul className="hidden flex-1 items-center gap-1 text-xs uppercase tracking-[0.06em] md:flex lg:tracking-[0.12em]">
@@ -71,12 +87,12 @@ export function TopBar({
           ))}
         </ul>
 
-        <div className="ml-auto flex items-center gap-4">
+        <div className="ml-auto flex items-center gap-3 md:gap-4">
           <ScoringHelp />
           <Link
             href="/profile"
             aria-label="Profile"
-            className={`flex size-9 items-center justify-center rounded-full border text-sm ${
+            className={`flex size-8 items-center justify-center rounded-full border bg-[color:var(--surface-2)] text-xs md:size-9 md:bg-transparent md:text-sm ${
               active === "profile"
                 ? "border-[color:var(--accent)] text-[color:var(--accent)]"
                 : "border-[color:var(--border)] text-[color:var(--fg-muted)] hover:border-[color:var(--fg-muted)]"
@@ -86,9 +102,18 @@ export function TopBar({
             {initial}
           </Link>
           <form action={signOutAction}>
+            {/* The canvas mobile bar has no sign-out, but /profile has none
+                either — this ⏻ is the app's ONLY sign-out affordance, and
+                TopBar.test.tsx locks it as reachable on mobile. So it stays,
+                promoted to a 32×32 bordered box that matches the `?` next to
+                it instead of a 12px bare glyph nobody can hit. `inline-flex`
+                (not `flex`) keeps it inline-level so `md:size-auto
+                md:border-0` restores today's inline-block glyph exactly.
+                PR-2 should move sign-out into the mobile profile screen and
+                then this can drop below `md:`. */}
             <button
               type="submit"
-              className="text-xs uppercase tracking-[0.12em] text-[color:var(--fg-subtle)] hover:text-[color:var(--fg-muted)]"
+              className="inline-flex size-8 items-center justify-center border border-[color:var(--border)] text-xs uppercase tracking-[0.12em] text-[color:var(--fg-subtle)] hover:text-[color:var(--fg-muted)] md:size-auto md:border-0"
               data-tabular
               aria-label="Sign out"
             >
