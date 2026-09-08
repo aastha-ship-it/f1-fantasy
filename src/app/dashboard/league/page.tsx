@@ -153,6 +153,9 @@ export default async function LeaguePage() {
   const mobilePodium: LeaguePodiumDatum[] = podium.map((r, idx) => {
     const isMe = r.userId === me;
     const fav = teamMeta(r.user!.favorite_team);
+    const favDriverCode = r.user!.favorite_driver
+      ? driverCodeById.get(r.user!.favorite_driver) ?? null
+      : null;
     return {
       userId: r.userId,
       pos: idx + 1,
@@ -162,9 +165,11 @@ export default async function LeaguePage() {
       teamName: fav?.name ?? null,
       teamHex: fav?.hex ?? null,
       carSrc: fav?.carSrc ?? null,
-      favDriverCode: r.user!.favorite_driver
-        ? driverCodeById.get(r.user!.favorite_driver) ?? null
-        : null,
+      favDriverCode,
+      // Same column, not a new read: `favorite_driver` IS the permanent
+      // number (the drivers table is keyed by it). Null when the code is,
+      // so a driver we cannot name never shows a bare `#44`.
+      favDriverNumber: favDriverCode ? r.user!.favorite_driver : null,
     };
   });
 

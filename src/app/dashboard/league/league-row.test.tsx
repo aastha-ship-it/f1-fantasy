@@ -11,7 +11,8 @@ import {
 
 const ME: LeagueRowProps = {
   rank: 2, userId: "u-me", name: "You", initial: "Y", points: 96, pct: 82,
-  favTeam: "McLaren", favDriverCode: "NOR", perfects: 1, streak: 3,
+  favTeam: "McLaren", favDriverCode: "NOR", favDriverNumber: 4,
+  perfects: 1, streak: 3,
   isMe: true,
 };
 
@@ -28,8 +29,57 @@ describe("LeagueRowMobile", () => {
   it("exposes the deferred stats when expanded", () => {
     render(<LeagueRowMobile {...ME} />);
     expect(screen.getByText("PERFECT PODIUMS")).toBeInTheDocument();
+    // Team and driver now appear TWICE inside the panel — once in R-4's
+    // "Their colours" tile and once in the stat rows below it. The tile was
+    // added on top of the shipped panel rather than replacing it, so the
+    // duplication is the design, not a leak.
+    // The stat row uppercases in JS; the tile leaves the cased name and
+    // uppercases in CSS, so the two read the same on screen but not to a
+    // text matcher.
     expect(screen.getByText("MCLAREN")).toBeInTheDocument();
-    expect(screen.getByText("NOR")).toBeInTheDocument();
+    expect(screen.getByText("McLaren")).toBeInTheDocument();
+    expect(screen.getAllByText("NOR").length).toBeGreaterThanOrEqual(1);
+  });
+
+  // R-4: the disclosure opens with the friend's favourite team and driver.
+  // The review names this as one of the two assertions this round must add.
+  it("renders the favourite team and driver in the disclosure", () => {
+    const { container } = render(<LeagueRowMobile {...ME} />);
+    const panel = container.querySelector("details > div:last-child")!;
+    expect(panel.textContent).toContain("Their colours");
+    expect(panel.textContent).toContain("Fav team");
+    expect(panel.textContent).toContain("Fav driver");
+    // The team logo, tinted team name, driver portrait and permanent number.
+    const logo = panel.querySelector<HTMLImageElement>('img[src*="mclaren"]')!;
+    expect(logo).not.toBeNull();
+    expect(logo.getAttribute("width")).toBe("24");
+    const teamName = Array.from(panel.querySelectorAll<HTMLElement>("p")).find(
+      (el) => el.textContent === "McLaren",
+    )!;
+    // jsdom normalises colours to rgb(), so compare against the same hex
+    // put through the same normaliser. What matters is that the name takes
+    // the TEAM hex, not the `--fg-subtle` fallback a missing favourite gets.
+    const probe = document.createElement("span");
+    probe.style.color = teamMeta("McLaren")!.hex;
+    expect(teamName.style.color).toBe(probe.style.color);
+    expect(panel.textContent).toContain("#4");
+  });
+
+  // A friend with no favourites still gets a well-formed tile — em dashes,
+  // no bare "#", and no broken portrait or logo.
+  it("degrades the colours tile when a friend has no favourites", () => {
+    const { container } = render(
+      <LeagueRowMobile
+        {...ME}
+        favTeam={null}
+        favDriverCode={null}
+        favDriverNumber={null}
+      />,
+    );
+    const panel = container.querySelector("details > div:last-child")!;
+    expect(panel.querySelector("img")).toBeNull();
+    expect(panel.textContent).not.toContain("#");
+    expect(panel.textContent).toContain("Fav team");
   });
 
   it("scopes the emoji font to the flame glyph only", () => {

@@ -1,3 +1,5 @@
+import Image from "next/image";
+import { DriverPortrait } from "@/components/DriverPortrait";
 import { teamMeta } from "@/lib/design/teams";
 
 export type LeagueRowProps = {
@@ -9,6 +11,16 @@ export type LeagueRowProps = {
   pct: number;
   favTeam: string | null;
   favDriverCode: string | null;
+  /**
+   * The driver's permanent number, for the "Their colours" tile (R-4).
+   *
+   * No new read: `users.favorite_driver` IS the number — the drivers table is
+   * keyed by the smallint OpenF1 `driver_number` (CLAUDE.md, drivers.ts) — so
+   * this is the same column `favDriverCode` is already resolved from, carried
+   * through instead of being thrown away. Null whenever the code is null, so
+   * a driver we cannot name never shows a bare `#44`.
+   */
+  favDriverNumber: number | null;
   perfects: number;
   streak: number;
   isMe: boolean;
@@ -72,6 +84,9 @@ export function toLeagueRowProps(
 ): LeagueRowProps {
   const isMe = r.userId === ctx.currentUserId;
   const name = displayName(r.user!, isMe);
+  const favDriverCode = r.user!.favorite_driver
+    ? ctx.driverCodeById.get(r.user!.favorite_driver) ?? null
+    : null;
   return {
     rank: r.rank,
     userId: r.userId,
@@ -80,9 +95,8 @@ export function toLeagueRowProps(
     points: r.points,
     pct: ctx.leaderPts > 0 ? (r.points / ctx.leaderPts) * 100 : 0,
     favTeam: r.user!.favorite_team,
-    favDriverCode: r.user!.favorite_driver
-      ? ctx.driverCodeById.get(r.user!.favorite_driver) ?? null
-      : null,
+    favDriverCode: favDriverCode,
+    favDriverNumber: favDriverCode ? r.user!.favorite_driver : null,
     perfects: r.perfects,
     streak: r.streak?.current_p1_streak ?? 0,
     isMe,
@@ -273,6 +287,105 @@ export function LeagueRowMobile(p: LeagueRowProps) {
       </summary>
 
       <div className="border-b border-[color:var(--border)] bg-[color:var(--surface-2)] px-5 pb-3.5">
+        {/* THEIR COLOURS (R-4) — desktop shows each participant's favourite
+            team and driver inline on the row; the phone row has no width for
+            them, so they open in the disclosure and the collapsed row stays
+            scannable. This is ADDITIVE: the TEAM / DRIVER / PERFECT PODIUMS /
+            P1 STREAK panel below is unchanged (owner's call), so the tiles
+            give the pair a face and the stat rows keep carrying the text. */}
+        <p
+          className="pt-1 uppercase text-[color:var(--fg-subtle)]"
+          data-tabular
+          style={{ fontSize: 9, letterSpacing: "0.16em", marginBottom: 8 }}
+        >
+          Their colours
+        </p>
+        <div
+          className="grid gap-px border border-[color:var(--border)] bg-[color:var(--border)]"
+          style={{
+            gridTemplateColumns: "repeat(2, minmax(0,1fr))",
+            marginBottom: 14,
+          }}
+        >
+          <div
+            className="flex min-w-0 items-center bg-[color:var(--surface)]"
+            style={{ padding: "10px 12px", gap: 9 }}
+          >
+            {fav ? (
+              <Image
+                src={fav.logoSrc}
+                alt=""
+                aria-hidden
+                width={24}
+                height={24}
+                className="h-6 w-6 shrink-0 object-contain"
+                unoptimized
+              />
+            ) : (
+              <span aria-hidden className="h-6 w-6 shrink-0" />
+            )}
+            <div className="min-w-0">
+              <TileLabel>Fav team</TileLabel>
+              <p
+                className="truncate uppercase"
+                style={{
+                  fontFamily: "var(--font-boldonse), ui-sans-serif",
+                  fontSize: 12,
+                  marginTop: 3,
+                  color: fav?.hex ?? "var(--fg-subtle)",
+                }}
+              >
+                {fav?.name ?? "—"}
+              </p>
+            </div>
+          </div>
+          <div
+            className="flex min-w-0 items-center bg-[color:var(--surface)]"
+            style={{ padding: "10px 12px", gap: 9 }}
+          >
+            {p.favDriverCode ? (
+              /* No `team`: it only tints DriverPortrait's initial-letter
+                 fallback, and the friend's FAVOURITE team is not the
+                 driver's team — a Ferrari fan whose favourite driver is
+                 Norris would get a red ring round a McLaren driver. The
+                 driver's own team is not on this route (the drivers query
+                 selects `id, code`), so the neutral default is the honest
+                 answer rather than a confidently wrong colour. */
+              <DriverPortrait code={p.favDriverCode} size={26} />
+            ) : (
+              <span aria-hidden className="h-[26px] w-[26px] shrink-0" />
+            )}
+            <div className="min-w-0">
+              <TileLabel>Fav driver</TileLabel>
+              <p
+                className="truncate uppercase"
+                style={{
+                  fontFamily: "var(--font-boldonse), ui-sans-serif",
+                  fontSize: 12,
+                  marginTop: 3,
+                }}
+              >
+                {/* The canvas fixture prints a surname; this route's drivers
+                    query selects `id, code` only, and widening it would be a
+                    data change in a presentation-only PR. The code is how the
+                    app names drivers on every other mobile surface anyway. */}
+                {p.favDriverCode ?? "—"}
+                {p.favDriverNumber !== null && (
+                  <span
+                    className="ml-1 text-[color:var(--fg-subtle)]"
+                    data-tabular
+                    style={{
+                      fontFamily: "var(--font-mono), ui-monospace, monospace",
+                      fontSize: 9,
+                    }}
+                  >
+                    #{p.favDriverNumber}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
         <dl
           className="grid gap-x-4 gap-y-2 pt-1"
           style={{ gridTemplateColumns: "repeat(2, minmax(0,1fr))" }}
@@ -305,6 +418,23 @@ export function LeagueRowMobile(p: LeagueRowProps) {
         </dl>
       </div>
     </details>
+  );
+}
+
+/** Mono 8 tile caption — the "Fav team" / "Fav driver" line. */
+function TileLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      className="uppercase text-[color:var(--fg-subtle)]"
+      data-tabular
+      style={{
+        fontFamily: "var(--font-mono), ui-monospace, monospace",
+        fontSize: 8,
+        letterSpacing: "0.12em",
+      }}
+    >
+      {children}
+    </p>
   );
 }
 

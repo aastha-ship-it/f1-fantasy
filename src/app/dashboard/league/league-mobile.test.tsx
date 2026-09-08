@@ -17,6 +17,7 @@ const pod = (pos: number, name: string): LeaguePodiumDatum => ({
   teamHex: MCL.hex,
   carSrc: MCL.carSrc,
   favDriverCode: "NOR",
+  favDriverNumber: 4,
 });
 
 const rest = (rank: number): LeagueRowProps => ({
@@ -28,6 +29,7 @@ const rest = (rank: number): LeagueRowProps => ({
   pct: 60,
   favTeam: "McLaren",
   favDriverCode: "NOR",
+  favDriverNumber: 4,
   perfects: 0,
   streak: 0,
   isMe: false,
@@ -93,11 +95,14 @@ describe("LeagueMobile", () => {
     expect(screen.getByText(/No favorite team/i)).toBeInTheDocument();
   });
 
-  // The artboard's meta reads "P4 – P10" against a fixed 10-friend fixture;
-  // the group has no fixed size, so both ends come from the data.
-  it("labels the rest-of-field range from the actual ranks", () => {
+  // R-4 retires the rank-range meta ("P4 – P10" in the first artboard, then
+  // a data-derived "P4 – P6" here): now that a tap opens each friend's
+  // colours, the meta says what the tap is FOR. The ranks are still printed
+  // down the rows' left edge, so nothing was lost.
+  it("tells the reader what a row tap opens", () => {
     render(<LeagueMobile {...BASE} />);
-    expect(screen.getByText("P4 – P6")).toBeInTheDocument();
+    expect(screen.getByText("Tap for colours")).toBeInTheDocument();
+    expect(screen.queryByText(/^P\d+ – P\d+$/)).toBeNull();
   });
 
   it("hides the rest-of-field section when the group is three or fewer", () => {

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { DriverPortrait } from "@/components/DriverPortrait";
 import {
   MobEyebrow,
   MobSectionHead,
@@ -44,6 +45,8 @@ export type LeaguePodiumDatum = {
   /** Livery car PNG for the leader watermark; null when no favourite team. */
   carSrc: string | null;
   favDriverCode: string | null;
+  /** Permanent number for the `#num CODE` line (R-4). See `LeagueRowProps`. */
+  favDriverNumber: number | null;
 };
 
 export function LeagueMobile({
@@ -62,7 +65,6 @@ export function LeagueMobile({
 }) {
   const leader = podium[0] ?? null;
   const pair = podium.slice(1, 3);
-  const lastRank = rest.length > 0 ? rest[rest.length - 1].rank : 0;
 
   return (
     <div className="md:hidden">
@@ -173,7 +175,10 @@ export function LeagueMobile({
                   {leader.teamName
                     ? `Team ${leader.teamName}`
                     : "No favorite team"}
-                  {leader.favDriverCode && ` · ${leader.favDriverCode}`}
+                  {leader.favDriverCode &&
+                    (leader.favDriverNumber !== null
+                      ? ` · #${leader.favDriverNumber} ${leader.favDriverCode}`
+                      : ` · ${leader.favDriverCode}`)}
                 </p>
                 <p
                   className="mt-3 leading-none"
@@ -241,6 +246,27 @@ export function LeagueMobile({
                     >
                       {f.teamName ?? "No favorite team"}
                     </p>
+                    {/* Favourite driver (R-4) — the leader card names one on
+                        its team line, so P2/P3 carried a gap the artboard
+                        closes with a portrait + `#num CODE`. */}
+                    {f.favDriverCode && (
+                      <div
+                        className="flex min-w-0 items-center"
+                        style={{ gap: 6, marginTop: 8 }}
+                      >
+                        {/* No `team` — see `LeagueRowMobile`'s tile. */}
+                        <DriverPortrait code={f.favDriverCode} size={20} />
+                        <span
+                          className="truncate uppercase text-[color:var(--fg-muted)]"
+                          data-tabular
+                          style={{ fontSize: 9, letterSpacing: "0.08em" }}
+                        >
+                          {f.favDriverNumber !== null &&
+                            `#${f.favDriverNumber} `}
+                          {f.favDriverCode}
+                        </span>
+                      </div>
+                    )}
                     <p className="mt-2.5" data-tabular style={{ fontSize: 24 }}>
                       {f.points}
                     </p>
@@ -254,10 +280,10 @@ export function LeagueMobile({
 
       {rest.length > 0 && (
         <section className="mt-[26px]">
-          <MobSectionHead
-            title="Rest of the field"
-            meta={`P${rest[0].rank} – P${lastRank}`}
-          />
+          {/* The rows now open onto each friend's colours, so the meta says
+              what a tap is for rather than restating the rank range the rows
+              already print down their left edge (R-4). */}
+          <MobSectionHead title="Rest of the field" meta="Tap for colours" />
           <MobBleed>
             <ol className="border-t border-[color:var(--border)]">
               {rest.map((r) => (
