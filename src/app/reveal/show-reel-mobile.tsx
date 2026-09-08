@@ -19,22 +19,37 @@ import { pillFill } from "@/lib/reveal/pillFill";
  *
  * Server component — nothing here holds state.
  *
- * TWO DELIBERATE DEPARTURES FROM THE ARTBOARD, both because the canvas
- * fixture is "5 rounds · 5 sessions" and real rounds are not:
+ * PR-5a shipped the per-session pills as a departure from the original
+ * artboard's single `WATCH →` (a production round carries up to four revealed
+ * cinematics, SQ / S / Q / R, each its own `/reveal/[eventId]`, and one CTA
+ * would have to pick one and strand the rest). The review bundle's R-2
+ * ratifies that and fixes the layout it left open: the pills move OFF the
+ * bottom line and into their own full-width row between the round name and
+ * the podium chips, one pill per revealed session, each `flex:1` so two or
+ * four of them fill the card at 390 without wrapping.
  *
- *  1. The artboard's single `WATCH →` becomes the row of per-session pills
- *     the desktop table already uses. A production round carries up to four
- *     revealed cinematics (SQ / S / Q / R), each its own `/reveal/[eventId]`;
- *     one CTA would have to pick one and strand the rest. The pills are the
- *     links, so `WATCH →` would have no destination they don't already own.
- *  2. That pushes the pills onto their own line under the podium chips,
- *     instead of sharing the artboard's single bottom row. Four pills plus
- *     three podium chips do not fit 390 - 40 gutters on one line.
+ * The round total on the podium row is the SUM of the pills — structurally,
+ * not by coincidence: `page.tsx`'s `groupByRound` folds `totalPoints` over
+ * exactly the same session list it hands down as `sessions`, reading the
+ * same `scoreByEvent` map, so a session missing a score contributes 0 to
+ * both. `show-reel-mobile.test.tsx` pins it.
  */
 
 /** Titillium Web 900 display face. The var name is historical (CLAUDE.md). */
 const DISPLAY_FONT = "var(--font-boldonse), ui-sans-serif";
 const MONO_FONT = "var(--font-mono), ui-monospace, monospace";
+
+/**
+ * A sprint weekend is one that RAN a sprint, read off the session types —
+ * not off `sessions.length === 4`. A sprint weekend part-way through its
+ * reveals has fewer than four pills and is still a sprint weekend, and the
+ * meta line tints on the format, not on how much of it has been revealed.
+ */
+function isSprintWeekend(sessions: ShowReelSession[]): boolean {
+  return sessions.some(
+    (s) => s.sessionType === "sprint_race" || s.sessionType === "sprint_quali",
+  );
+}
 
 export type ShowReelChip = {
   /** 1 | 2 | 3 — the finishing slot this driver took. */
@@ -192,6 +207,7 @@ function EmptyState() {
 
 function RoundCard({ round: r }: { round: ShowReelRound }) {
   const edge = r.perfect ? "var(--success)" : "var(--border)";
+  const sprint = isSprintWeekend(r.sessions);
   return (
     <article
       className="relative overflow-hidden bg-[color:var(--surface)]"
@@ -238,24 +254,104 @@ function RoundCard({ round: r }: { round: ShowReelRound }) {
         )}
       </div>
 
-      <p
-        className="relative m-0 uppercase"
-        style={{
-          fontFamily: DISPLAY_FONT,
-          fontSize: 22,
-          lineHeight: 1,
-          marginTop: 8,
-        }}
+      {/* Round name + the weekend's shape. The count is what makes the pill
+          row below legible: two pills and four pills are both correct, and
+          the reader needs to know which weekend they are looking at. */}
+      <div
+        className="relative flex items-baseline justify-between"
+        style={{ marginTop: 8, gap: 10 }}
       >
-        {r.title}
-      </p>
+        <p
+          className="m-0 min-w-0 truncate uppercase"
+          style={{ fontFamily: DISPLAY_FONT, fontSize: 22, lineHeight: 1 }}
+        >
+          {r.title}
+        </p>
+        <span
+          className="shrink-0 uppercase"
+          data-tabular
+          style={{
+            fontFamily: MONO_FONT,
+            fontSize: 8,
+            letterSpacing: "0.12em",
+            color: sprint ? "var(--warning)" : "var(--fg-subtle)",
+          }}
+        >
+          {r.sessions.length}{" "}
+          {r.sessions.length === 1 ? "session" : "sessions"}
+        </span>
+      </div>
+
+      {/* One pill per revealed session, ABOVE the podium row (R-2). Each is
+          `flex:1 minWidth:0` so two or four share the card's width without
+          wrapping, and the whole pill is the tap target — the review's drift
+          list asks for the row, not just the glyph, and 44 is the floor the
+          program holds every control to. The accent outline + graded accent
+          fill is the desktop Show Reel pill's treatment, via the same shared
+          `pillFill` map, so a standout session reads identically at both
+          widths. A `--border` outline or `--surface-2` fill here would be
+          the drift the handoff names. */}
+      <div className="relative flex" style={{ marginTop: 12, gap: 5 }}>
+        {r.sessions.map((s) => (
+          <Link
+            key={s.id}
+            href={`/reveal/${s.id}`}
+            title={sessionLabel(s.sessionType)}
+            aria-label={`Watch ${sessionLabel(s.sessionType)} reveal`}
+            className="block min-w-0 flex-1 text-center"
+            style={{
+              // 6 + 11 (mono 8) + 3 + 17 (mono 13) + 7 lands the canvas pill
+              // at exactly 44 — the program's tap-target floor, which is why
+              // the whole pill is the <Link> rather than a chip inside one.
+              minHeight: 44,
+              padding: "6px 6px 7px",
+              background: `color-mix(in oklch, var(--accent) ${pillFill(
+                s.perfect,
+                s.points,
+              )}%, transparent)`,
+              border: "1px solid var(--accent)",
+            }}
+          >
+            <span
+              className="block uppercase text-[color:var(--fg-muted)]"
+              data-tabular
+              style={{
+                fontFamily: MONO_FONT,
+                fontSize: 8,
+                letterSpacing: "0.1em",
+              }}
+            >
+              {s.pillLabel}
+            </span>
+            <span
+              className="block"
+              data-tabular
+              style={{
+                fontFamily: MONO_FONT,
+                fontWeight: 600,
+                fontSize: 13,
+                marginTop: 3,
+                color: s.points == null ? "var(--fg-subtle)" : "var(--fg)",
+              }}
+            >
+              {/* A session the viewer never scored has no row, not a zero —
+                  the em dash says "you weren't in this one". */}
+              {s.points == null ? "—" : `+${s.points}`}
+            </span>
+          </Link>
+        ))}
+      </div>
 
       {/* What actually happened, and what it was worth. `podium` is empty for
           a round whose sessions have no `results` row — the chips simply
           don't render rather than drawing three dashes. */}
       <div
         className="relative flex items-center justify-between gap-3"
-        style={{ marginTop: 14 }}
+        style={{
+          marginTop: 12,
+          paddingTop: 11,
+          borderTop: "1px solid var(--border)",
+        }}
       >
         <div className="flex flex-wrap" style={{ gap: 5 }}>
           {r.podium.map((c) => (
@@ -288,63 +384,6 @@ function RoundCard({ round: r }: { round: ShowReelRound }) {
         </span>
       </div>
 
-      {/* One pill per revealed session — on mobile these ARE the cinematic
-          links, which is why the <Link> is a 44-tall hit area wrapping a
-          28-tall visible chip rather than being the chip itself. The chip
-          keeps the artboard's compact proportions; the thumb gets the
-          program's 44px minimum. Same `pillFill` emphasis map as the desktop
-          strip, so a standout session reads the same at both widths.
-
-          marginTop 4, not the 10 the rows above use: the link contributes
-          ~8px of transparent padding over the chip, so 4 lands the visible
-          gap where the artboard puts it. */}
-      <div className="relative flex flex-wrap" style={{ marginTop: 4, gap: 6 }}>
-        {r.sessions.map((s) => (
-          <Link
-            key={s.id}
-            href={`/reveal/${s.id}`}
-            aria-label={`Watch ${sessionLabel(s.sessionType)} reveal`}
-            className="flex items-center"
-            style={{ minHeight: 44 }}
-          >
-            <span
-              className="flex items-center"
-              style={{
-                gap: 6,
-                padding: "5px 8px",
-                background: `color-mix(in oklch, var(--accent) ${pillFill(
-                  s.perfect,
-                  s.points,
-                )}%, transparent)`,
-                border: "1px solid var(--accent)",
-              }}
-            >
-              <span
-                className="uppercase text-[color:var(--fg-muted)]"
-                data-tabular
-                style={{
-                  fontFamily: MONO_FONT,
-                  fontSize: 9,
-                  letterSpacing: "0.1em",
-                }}
-              >
-                {s.pillLabel}
-              </span>
-              <span
-                data-tabular
-                style={{
-                  fontFamily: MONO_FONT,
-                  fontWeight: 600,
-                  fontSize: 12,
-                  color: s.points == null ? "var(--fg-subtle)" : "var(--fg)",
-                }}
-              >
-                {s.points == null ? "—" : `+${s.points}`}
-              </span>
-            </span>
-          </Link>
-        ))}
-      </div>
     </article>
   );
 }
