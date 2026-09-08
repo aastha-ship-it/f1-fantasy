@@ -64,7 +64,62 @@ function phaseCopy(
   return { title: `${noun} · locked`, hidden: "P3 · P2 · P1 hidden" };
 }
 
-/** 44×26 slot cell — revealed takes the driver's team colour, hidden stays dashed. */
+/**
+ * The roster's column template, in ONE place.
+ *
+ * `RosterHead` and `RosterRow` both call it, so the header can never drift
+ * out of sync with the cells underneath it. The review handoff calls this
+ * out by name: a row that emits five children over a six-column template
+ * silently shifts every pick under the wrong header, and that regressed
+ * once already. Column count is `3 + slots.length` — avatar, name, lock,
+ * then one cell per slot the session takes picks for.
+ */
+function rosterTemplate(slotCount: number): string {
+  return `26px minmax(0,1fr) 22px repeat(${slotCount}, 40px)`;
+}
+
+/**
+ * Lock cell (§R-3) — the column that tells an unlocked friend apart from a
+ * locked one whose picks are still hidden. The desktop `ParticipantBlock`
+ * has carried a `✓ Locked / ✗ Not locked` badge since phase 11; the phone
+ * roster had nothing, so every row read as "waiting".
+ *
+ * `title` rather than a visible word: at 22px the glyph is the whole cell,
+ * and the legend above the roster spells both states out in full.
+ */
+function LockCell({ locked }: { locked: boolean }) {
+  return (
+    <span
+      className="grid place-items-center"
+      title={locked ? "Locked" : "Not locked"}
+      data-tabular
+      style={{
+        fontFamily: MONO,
+        fontSize: 12,
+        fontWeight: 600,
+        color: locked ? "var(--success)" : "var(--fg-subtle)",
+      }}
+    >
+      {locked ? "✓" : "✗"}
+    </span>
+  );
+}
+
+/**
+ * 40×26 slot cell — revealed takes the driver's team colour, hidden stays
+ * dashed.
+ *
+ * LOCK STATE AND REVEAL STATE ARE INDEPENDENT (§R-3). The cell reads the
+ * participant's `locked` flag and the reveal gate's `revealed` list as two
+ * separate facts and never derives one from the other:
+ *
+ *   locked + revealed    → the driver's code on their team colour
+ *   locked, not revealed → `· · ·`, i.e. "there is a pick, you can't see it"
+ *   not locked           → `—`, i.e. "there is nothing to reveal"
+ *
+ * Collapsing those last two into one glyph is exactly the ambiguity this
+ * PR exists to remove.
+ */
 function SlotCell({
   label,
   participant,
@@ -76,7 +131,10 @@ function SlotCell({
     label === "P1"
       ? undefined
       : participant.revealed.find((r) => r.label === label);
-  const hex = slot ? (teamMeta(slot.team)?.hex ?? "var(--fg-muted)") : null;
+  // An unlocked friend has no picks, so nothing of theirs can be shown even
+  // if the gate is open for everyone else.
+  const shown = participant.locked ? slot : undefined;
+  const hex = shown ? (teamMeta(shown.team)?.hex ?? "var(--fg-muted)") : null;
 
   return (
     <div
@@ -92,7 +150,7 @@ function SlotCell({
         background: hex ? "var(--surface-2)" : "transparent",
       }}
     >
-      {slot?.code ?? "· · ·"}
+      {shown?.code ?? (participant.locked ? "· · ·" : "—")}
     </div>
   );
 }
@@ -109,7 +167,10 @@ function RosterRow({
     <div
       className="grid items-center gap-[6px]"
       style={{
-        gridTemplateColumns: `26px minmax(0,1fr) repeat(${slots.length}, 44px)`,
+        gridTemplateColumns: rosterTemplate(slots.length),
+        // §R-3: an unlocked row is still information — who has not picked —
+        // so it recedes rather than disappearing.
+        opacity: p.locked ? undefined : 0.6,
       }}
     >
       <span
@@ -138,6 +199,7 @@ function RosterRow({
         {p.name}
         {p.isMe ? " (you)" : ""}
       </span>
+      <LockCell locked={p.locked} />
       {slots.map((label) => (
         <SlotCell key={label} label={label} participant={p} />
       ))}
@@ -152,7 +214,7 @@ function RosterHead({ slots }: { slots: ("P1" | "P2" | "P3")[] }) {
       className="grid items-center gap-[6px] uppercase text-[color:var(--fg-subtle)]"
       data-tabular
       style={{
-        gridTemplateColumns: `26px minmax(0,1fr) repeat(${slots.length}, 44px)`,
+        gridTemplateColumns: rosterTemplate(slots.length),
         fontFamily: MONO,
         fontSize: 8,
         letterSpacing: "0.12em",
@@ -160,11 +222,47 @@ function RosterHead({ slots }: { slots: ("P1" | "P2" | "P3")[] }) {
     >
       <span />
       <span>Friend</span>
+      <span className="text-center">Lk</span>
       {slots.map((label) => (
         <span key={label} className="text-center">
           {label}
         </span>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Lock legend (§R-3) — spells out what the `✓`/`✗` column means, once, above
+ * the roster instead of per row.
+ *
+ * Full-bleed (`-mx-5` cancels `MobDisclosureRow`'s panel gutter) so it reads
+ * as a strip separating the panel header from the roster, which is where the
+ * artboard puts it. Counts come from the session's own `lockedCount` /
+ * `totalCount` — the same two numbers the collapsed row and the lock-progress
+ * card already show, so the three can never disagree.
+ */
+function LockLegend({ locked, total }: { locked: number; total: number }) {
+  return (
+    <div
+      className="-mx-5 mb-[10px] flex items-center gap-[14px] uppercase text-[color:var(--fg-subtle)]"
+      data-tabular
+      style={{
+        padding: "7px 14px",
+        background: "var(--surface-2)",
+        borderBottom: "1px solid var(--border)",
+        fontFamily: MONO,
+        fontSize: 8,
+        letterSpacing: "0.1em",
+      }}
+    >
+      <span>
+        <span style={{ color: "var(--success)", fontWeight: 600 }}>✓</span>{" "}
+        Locked {locked}
+      </span>
+      <span>
+        <span style={{ fontWeight: 600 }}>✗</span> Not locked {total - locked}
+      </span>
     </div>
   );
 }
@@ -234,6 +332,7 @@ function SessionRow({ s }: { s: LobbySessionView }) {
           {phase.hidden}
         </span>
       </div>
+      <LockLegend locked={s.lockedCount} total={s.totalCount} />
       <div className="grid gap-[6px]">
         <RosterHead slots={slots} />
         {s.participants.map((p) => (
