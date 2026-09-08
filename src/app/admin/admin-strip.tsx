@@ -26,8 +26,21 @@ export function AdminStrip({
   displayName: string | null;
 }) {
   return (
-    <nav className="border-b border-[color:var(--accent)]">
-      <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-3 px-6 py-4 text-xs uppercase sm:px-8 md:flex-nowrap md:gap-6 lg:px-12 xl:px-16">
+    /*
+      Forks at md (pattern A). Below it the strip is the handoff's 46px mono
+      row (§6.3): `▣ ADMIN · THE GROUP` accent left, the admin's name right,
+      nothing else. `md:` restores today's row verbatim — the accent bottom
+      border that makes admin context unmistakable, the transparent ground,
+      the nav tabs and the sign-out glyph. Two notes on the equivalences:
+      `px-6 sm:px-8` resolved to px-8 at every width >= md (sm fires at 640),
+      so `md:px-8` is byte-identical there; and `flex-wrap md:flex-nowrap`
+      resolved to nowrap at every width >= md, so dropping both leaves the
+      desktop row exactly as it was. `letterSpacing` is inline on each child
+      and therefore unforkable — the artboard's 0.12em vs today's 0.14em is
+      not worth changing the 1440 render for.
+    */
+    <nav className="border-b border-[color:var(--border)] bg-[color:var(--surface)] md:border-[color:var(--accent)] md:bg-transparent">
+      <div className="mx-auto flex h-[46px] w-full max-w-[1600px] items-center justify-between gap-3 px-5 text-[9px] uppercase md:h-auto md:gap-6 md:px-8 md:py-4 md:text-xs lg:px-12 xl:px-16">
         <Link
           href="/admin"
           className="flex items-center gap-2 text-[color:var(--accent)]"
@@ -35,10 +48,17 @@ export function AdminStrip({
           data-tabular
         >
           <span aria-hidden>▣</span>
-          Admin · The Group · {CURRENT_SEASON}
+          {/* One <span>, not a bare text node plus a second span: in a flex
+              row a text node becomes an anonymous flex ITEM, so splitting the
+              season off would add a third item and an extra `gap-2` to the
+              desktop strip. */}
+          <span>
+            Admin · The Group
+            <span className="hidden md:inline"> · {CURRENT_SEASON}</span>
+          </span>
         </Link>
 
-        <ul className="flex items-center gap-6 text-[color:var(--fg-subtle)]">
+        <ul className="hidden items-center gap-6 text-[color:var(--fg-subtle)] md:flex">
           {TABS.map((t) =>
             t.href ? (
               <li key={t.id}>
@@ -72,13 +92,17 @@ export function AdminStrip({
 
         <div className="flex items-center gap-4">
           <span
-            className="text-[color:var(--fg-subtle)]"
+            className="min-w-0 truncate text-[color:var(--fg-subtle)]"
             style={{ letterSpacing: "0.14em" }}
             data-tabular
           >
-            {displayName ?? "Admin"} · admin
+            {displayName ?? "Admin"}
+            <span className="hidden md:inline"> · admin</span>
           </span>
-          <form action={signOutAction}>
+          {/* Sign-out is desktop-only, matching PR-2's ruling for `TopBar`:
+              on a phone it lives on /profile, reachable from the "Back to
+              dashboard" link at the foot of this page. */}
+          <form action={signOutAction} className="hidden md:block">
             <button
               type="submit"
               className="text-[color:var(--fg-subtle)] hover:text-[color:var(--fg-muted)]"

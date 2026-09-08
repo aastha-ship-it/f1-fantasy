@@ -31,9 +31,12 @@ import {
 } from "./recent-winners";
 import {
   DriverStandingsRowDesktop,
-  DriverStandingsRowMobile,
   type DriverRowProps,
 } from "./driver-row";
+import {
+  StandingsMobile,
+  type ConstructorRowDatum,
+} from "./standings-mobile";
 
 const CURRENT_SEASON = new Date().getUTCFullYear();
 const TOTAL_ROUNDS = 24;
@@ -335,6 +338,10 @@ export default async function StandingsPage() {
   // detail rows on S02/S03/S04.
   const winCountsByDriver = new Map<number, number>();
   const poleCountsByDriver = new Map<number, number>();
+  // Per-driver fastest laps. Same predicate as `fastestLapsCount` above (every
+  // `fastest_lap` row, not just race ones) so the S04 tile's total and the
+  // mobile split panel's column sum can never disagree.
+  const fastestLapCountsByDriver = new Map<number, number>();
   type FlByRound = { round: number; driverId: number };
   const flByRoundMap = new Map<number, number>();
   for (const r of statRows) {
@@ -348,6 +355,12 @@ export default async function StandingsPage() {
       poleCountsByDriver.set(
         r.driver_id,
         (poleCountsByDriver.get(r.driver_id) ?? 0) + 1,
+      );
+    }
+    if (r.fastest_lap) {
+      fastestLapCountsByDriver.set(
+        r.driver_id,
+        (fastestLapCountsByDriver.get(r.driver_id) ?? 0) + 1,
       );
     }
     if (r.session_kind === "race" && r.fastest_lap) {
@@ -429,6 +442,74 @@ export default async function StandingsPage() {
     })
     .filter((w): w is WinnerCardDatum => w !== null);
 
+  /* ---- Row data, shared by both trees ----------------------------------
+     One derivation, two renderers. `poles` / `fastestLaps` are new and only
+     the mobile row reads them; the desktop row ignores the extra fields, so
+     its render is unchanged. */
+  const driverRowsData: DriverRowProps[] = driverStandings.map((s, idx) => ({
+    pos: idx + 1,
+    id: s.driver.id,
+    code: s.driver.code,
+    fullName: s.driver.full_name,
+    team: s.driver.team,
+    points: s.points,
+    wins: winsByDriver.get(s.driver.id) ?? 0,
+    podiums: podiumsByDriver.get(s.driver.id) ?? 0,
+    poles: poleCountsByDriver.get(s.driver.id) ?? 0,
+    fastestLaps: fastestLapCountsByDriver.get(s.driver.id) ?? 0,
+    gap: idx === 0 ? "LEADER" : `+${leaderPts - s.points}`,
+    country: driverCountry(s.driver.code),
+    isLeader: idx === 0,
+  }));
+
+  /* ---- Mobile-only derivations (design_handoff_mobile §6.1) ------------
+     All of it reshapes data the desktop tree already has on the page; no
+     query changed. The leader name is split because the artboard stacks it
+     over two lines, and the constructor bar percentage is the same ratio the
+     desktop card's gradient wash already uses. */
+  const mobileLeader = leader && leaderTeam
+    ? {
+        firstName:
+          leader.driver.full_name.trim().split(/\s+/).slice(0, -1).join(" ") ||
+          leader.driver.full_name,
+        lastName: lastNameOf(leader.driver.full_name),
+        code: leader.driver.code,
+        team: leader.driver.team,
+        number: leader.driver.id,
+        teamName: leaderTeam.name,
+        teamHex: leaderTeam.hex,
+        liveryGround: leaderTeam.livery[1],
+        points: leader.points,
+        wins: winsByDriver.get(leader.driver.id) ?? 0,
+        podiums: podiumsByDriver.get(leader.driver.id) ?? 0,
+      }
+    : null;
+
+  const mobileConstructors: ConstructorRowDatum[] = constructorStandings
+    .map((c) => {
+      const t = teamMeta(c.team);
+      if (!t) return null;
+      return {
+        team: c.team,
+        name: t.name,
+        hex: t.hex,
+        logoSrc: t.logoSrc,
+        points: c.points,
+        pct:
+          constructorLeaderPts > 0
+            ? (c.points / constructorLeaderPts) * 100
+            : 0,
+      } satisfies ConstructorRowDatum;
+    })
+    .filter((c): c is ConstructorRowDatum => c !== null);
+
+  // `recentWinnerData` is chronological, so the last entry is the most
+  // recently ingested race — the hero's "After <GP>" line.
+  const lastEventName =
+    recentWinnerData.length > 0
+      ? recentWinnerData[recentWinnerData.length - 1].gp
+      : null;
+
   return (
     <>
       <TopBar
@@ -437,7 +518,40 @@ export default async function StandingsPage() {
         email={userData.user?.email ?? null}
       />
       <MobileTabBar active="standings" />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
+      {/*
+        Gutters fork at md (pattern A, per-side longhands so a base shorthand
+        can't outlive an `md:` one): the base values are the phone's 20px
+        gutter and the tab-bar-clearing bottom pad; `md:` restores the
+        pre-fork px-8 / py-10 / pb-10 that `px-6 py-10 pb-24 sm:px-8 md:pb-10`
+        resolved to at every width >= md.
+      */}
+      <main className="mx-auto w-full max-w-[1600px] px-5 py-5 pb-[calc(var(--tabbar-h)+env(safe-area-inset-bottom,0px)+24px)] md:px-8 md:py-10 md:pb-10 lg:px-12 xl:px-16">
+        <StandingsMobile
+          season={CURRENT_SEASON}
+          completedRounds={completedRounds}
+          totalRounds={TOTAL_ROUNDS}
+          lastEventName={lastEventName}
+          leader={mobileLeader}
+          driverRows={driverRowsData}
+          constructors={mobileConstructors}
+          distinctRaceWinners={distinctRaceWinners}
+          winnerChips={winnerChips}
+          distinctPoleSitters={distinctPoleSitters}
+          poleChips={poleChips}
+          fastestLapsCount={fastestLapsCount}
+          fastestLapRounds={fastestLapRoundData}
+          dnfsCount={dnfsCount}
+          dnfsPerRace={dnfsPerRace}
+          winners={recentWinnerData}
+        />
+
+        {/*
+          Desktop tree, unchanged. `hidden md:contents` erases this wrapper's
+          box at md so every child stays a direct child of <main> — pattern
+          B', the idiom lobby-view.tsx and reveal/page.tsx already use, and
+          what keeps the 1440 box tree intact.
+        */}
+        <div className="hidden md:contents">
         {/* Hero */}
         <section className="grid items-end gap-12 border-b border-[color:var(--border)] pb-8 lg:grid-cols-[1.4fr_1fr]">
           <div>
@@ -617,48 +731,15 @@ export default async function StandingsPage() {
                 </span>
               </div>
 
-              {(() => {
-                const rows: DriverRowProps[] = driverStandings.map(
-                  (s, idx) => ({
-                    pos: idx + 1,
-                    id: s.driver.id,
-                    code: s.driver.code,
-                    fullName: s.driver.full_name,
-                    team: s.driver.team,
-                    points: s.points,
-                    wins: winsByDriver.get(s.driver.id) ?? 0,
-                    podiums: podiumsByDriver.get(s.driver.id) ?? 0,
-                    gap: idx === 0 ? "LEADER" : `+${leaderPts - s.points}`,
-                    country: driverCountry(s.driver.code),
-                    isLeader: idx === 0,
-                  }),
-                );
-                return (
-                  <>
-                    {/* <ol>, not <div>: the desktop fork below is a list, and
-                        dropping to a bare <div> of <details> on the primary
-                        target device would cost screen-reader users the
-                        "list, N items" summary and per-row position — a
-                        regression this fork would have introduced, not an
-                        inherited one. <details> inside <li> is valid HTML.
-                        Keys are `r.id` (the driver's DB row id), never
-                        `r.code`: a display string is not an identity, the
-                        same mistake league was made to fix. */}
-                    <ol className="md:hidden">
-                      {rows.map((r) => (
-                        <li key={r.id ?? r.pos}>
-                          <DriverStandingsRowMobile {...r} />
-                        </li>
-                      ))}
-                    </ol>
-                    <ol className="hidden md:block">
-                      {rows.map((r) => (
-                        <DriverStandingsRowDesktop key={r.id ?? r.pos} {...r} />
-                      ))}
-                    </ol>
-                  </>
-                );
-              })()}
+              {/* The mobile <ol> that used to sit here moved into
+                  `StandingsMobile` — this wrapper is `hidden md:contents`,
+                  so a `md:hidden` child inside it could never render. Rows
+                  come from the one shared `driverRowsData` derivation. */}
+              <ol className="hidden md:block">
+                {driverRowsData.map((r) => (
+                  <DriverStandingsRowDesktop key={r.id ?? r.pos} {...r} />
+                ))}
+              </ol>
               <p
                 className="mt-3 hidden gap-3 text-[10px] uppercase text-[color:var(--fg-subtle)] md:grid"
                 style={{
@@ -802,6 +883,7 @@ export default async function StandingsPage() {
 
         {/* Recent Winners — design_handoff_standings § PR-2 */}
         <RecentWinners winners={recentWinnerData} />
+        </div>
       </main>
     </>
   );

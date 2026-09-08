@@ -191,6 +191,22 @@ Same pattern for circuits: OpenF1's `events.circuit` short name and Jolpica's
   staging, never the clock. `useReducedMotion()` is structurally absent, not
   throttled: wide swaps in `StaticHero`, portrait jumps straight to the end
   state (stage C alone, no skip/replay chip).
+- **390pt mobile fork** — every authenticated route forks once, at
+  `md` = 780px, and the desktop render at and above it must stay
+  byte-identical (the bar is a measured 0-pixel diff at 1440, not a look).
+  Two idioms carry it: **pattern A**, base classes are the phone's and `md:`
+  restores the desktop value (write padding per side — Tailwind sorts the
+  shorthand first, so a base `p-*` outlives an `md:px-*`); and **pattern B′**,
+  a `hidden md:contents` wrapper around the desktop tree beside a `md:hidden`
+  mobile component, for when the two designs disagree about the primitive
+  rather than the spacing (`display:contents` erases the wrapper's box at
+  `md:`, so the desktop box tree is untouched). Mobile-only components —
+  `src/components/MobilePrimitives.tsx`, `*-mobile.tsx`, and the
+  `DriverStandingsRowMobile` / `LeagueRowMobile` pair — carry **no `md:`
+  classes at all**: their values are the phone values, full stop. If one is
+  needed at desktop width that is a different component, not a breakpoint
+  bolted on. The reveal cinematic above is the one route that forks on
+  user-agent instead; do not generalise it.
 
 ## Design system
 

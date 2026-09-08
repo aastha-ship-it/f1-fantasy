@@ -5,6 +5,11 @@ import { revealEventAction } from "./actions";
 import { RevealButton } from "./reveal-button";
 import { TrackDiagram } from "@/components/TrackDiagram";
 import { AdminStrip } from "./admin-strip";
+import {
+  AdminMobile,
+  type AdminStatusTile,
+  type AdminEventRowDatum,
+} from "./admin-mobile";
 import { shortEventName, eventCountry } from "@/lib/design/eventName";
 import { countryFlag } from "@/lib/design/drivers";
 import { listLatestCronRuns } from "@/lib/cron/recordRun";
@@ -241,10 +246,100 @@ export default async function AdminHomePage() {
     (r) => r.state === "pending" || r.state === "entered",
   ).length;
 
+  /* ---- Mobile shaping (design_handoff_mobile §6.3) ---------------------
+     Reshapes what the desktop table already renders; no query changed. */
+  const mobileTiles: AdminStatusTile[] = CRON_SCHEDULE.map((c) => {
+    const last = latestByPath.get(c.path);
+    return {
+      label: c.path,
+      value: last ? formatRunTime(last.ran_at) : c.time,
+      valueColor: !last
+        ? "var(--fg-subtle)"
+        : last.status === "success"
+          ? "var(--success)"
+          : "var(--error)",
+      meta: last
+        ? last.status === "success"
+          ? `${c.label} · ✓ success${last.duration_ms ? ` · ${last.duration_ms}ms` : ""}`
+          : `${c.label} · ✗ ${last.error?.slice(0, 60) ?? "error"}`
+        : `${c.label} · scheduled`,
+      title: last?.error ?? undefined,
+    };
+  });
+
+  const mobileEventRow = (
+    r: RoundEntry,
+    primaryAction: boolean,
+  ): AdminEventRowDatum => {
+    const meta = STATE_META[r.state];
+    const needsAction = r.state === "pending" || r.state === "entered";
+    const totalSessions = r.sessions.length;
+    const withResults = r.sessions.filter((sn) => haveResults.has(sn.id)).length;
+    return {
+      round: r.round,
+      name: shortEventName(r.name),
+      date: new Date(r.weekendStart)
+        .toLocaleDateString(undefined, { month: "short", day: "numeric" })
+        .toUpperCase(),
+      stateLabel: meta.label,
+      stateColor: meta.color,
+      needsAction,
+      primaryAction,
+      picksLine:
+        r.state === "future"
+          ? "Picks open T-7d"
+          : `Picks ${r.pickCount}${
+              totalSessions > 1 ? ` · ${withResults}/${totalSessions} results` : ""
+            }`,
+      actionHref:
+        r.state === "revealed" && r.raceSession
+          ? `/reveal/${r.raceSession.id}`
+          : r.state === "pending" || r.state === "mixed"
+            ? `/admin/results/round/${r.round}`
+            : r.state === "entered" && r.actionSessionId
+              ? `/admin/results/${r.actionSessionId}`
+              : `/admin/results/round/${r.round}`,
+      actionLabel: meta.action,
+      revealEventId:
+        r.state === "entered" && r.raceSession ? r.raceSession.id : null,
+    };
+  };
+
+  /* "Action first" (the section's own meta line): rounds needing a decision,
+     then finished rounds newest-first, then what is still to come. The
+     desktop table stays in round order — a wide table is scanned as a
+     calendar, a phone stack is worked as a queue. */
+  const mobileEvents: AdminEventRowDatum[] = [
+    ...rounds
+      .filter((r) => r.state === "pending" || r.state === "entered")
+      .sort((a, b) => b.round - a.round),
+    ...rounds
+      .filter((r) => r.state === "revealed" || r.state === "mixed")
+      .sort((a, b) => b.round - a.round),
+    ...rounds.filter((r) => r.state === "future").sort((a, b) => a.round - b.round),
+  ].map((r, i) => mobileEventRow(r, i === 0 && attentionCount > 0));
+
   return (
     <>
       <AdminStrip current="events" displayName={guard.displayName ?? null} />
-      <main className="mx-auto w-full max-w-[1600px] px-6 pt-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
+      {/*
+        Gutters fork at md (pattern A). Admin renders no `MobileTabBar`, so
+        the mobile bottom pad is plain breathing room — nothing here pins to
+        `--tabbar-h` (handoff §6.3). `md:` restores the pre-fork px-8 / pt-10
+        / pb-10.
+      */}
+      <main className="mx-auto w-full max-w-[1600px] px-5 pt-5 pb-10 md:px-8 md:pt-10 lg:px-12 xl:px-16">
+        <AdminMobile
+          attentionCount={attentionCount}
+          tiles={mobileTiles}
+          events={mobileEvents}
+        />
+
+        {/*
+          Desktop tree, unchanged. `hidden md:contents` erases this wrapper's
+          box at md so every child stays a direct child of <main>.
+        */}
+        <div className="hidden md:contents">
         <p
           className="mb-3 flex items-center gap-2 text-xs uppercase text-[color:var(--accent)]"
           style={{ letterSpacing: "0.18em" }}
@@ -539,9 +634,13 @@ export default async function AdminHomePage() {
           })}
         </ul>
 
+        </div>
+
+        {/* Outside the fork: the only way back to the player app, and the
+            phone's only route to sign-out (which lives on /profile). */}
         <Link
           href="/dashboard"
-          className="mt-12 inline-block text-sm text-[color:var(--fg-subtle)] hover:text-[color:var(--fg)]"
+          className="mt-8 inline-block text-sm text-[color:var(--fg-subtle)] hover:text-[color:var(--fg)] md:mt-12"
           style={{ letterSpacing: "0.06em" }}
         >
           ← Back to dashboard

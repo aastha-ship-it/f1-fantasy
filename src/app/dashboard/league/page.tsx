@@ -6,11 +6,11 @@ import { MobileTabBar } from "@/components/MobileTabBar";
 import { teamMeta } from "@/lib/design/teams";
 import {
   LeagueRowDesktop,
-  LeagueRowMobile,
   displayName,
   toLeagueRowProps,
   type LeagueRowProps,
 } from "./league-row";
+import { LeagueMobile, type LeaguePodiumDatum } from "./league-mobile";
 
 type ScoreRow = { user_id: string; points: number; perfect_bonus: boolean };
 type UserRow = {
@@ -139,6 +139,35 @@ export default async function LeaguePage() {
   const rest = ranked.slice(3);
   const leaderPts = ranked[0]?.points ?? 0;
 
+  /* One derivation of the "rest of the field" rows, two renderers. */
+  const restRows: LeagueRowProps[] = rest.map((r) =>
+    toLeagueRowProps(r, { leaderPts, currentUserId: me, driverCodeById }),
+  );
+
+  /* Mobile podium (design_handoff_mobile §6.2). Same rows the desktop
+     section renders, reshaped: the phone stacks the leader full-bleed above
+     a 2-up P2/P3 pair, so it wants them in RANK order, not the desktop's
+     visual P2 | P1 | P3. `favTeam` is the raw free-form string on purpose —
+     `teamMeta` alias-resolves it, and round-tripping through a slug would
+     drop Kick Sauber/Audi favourites (see `toLeagueRowProps`). */
+  const mobilePodium: LeaguePodiumDatum[] = podium.map((r, idx) => {
+    const isMe = r.userId === me;
+    const fav = teamMeta(r.user!.favorite_team);
+    return {
+      userId: r.userId,
+      pos: idx + 1,
+      name: displayName(r.user!, isMe),
+      points: r.points,
+      perfects: r.perfects,
+      teamName: fav?.name ?? null,
+      teamHex: fav?.hex ?? null,
+      carSrc: fav?.carSrc ?? null,
+      favDriverCode: r.user!.favorite_driver
+        ? driverCodeById.get(r.user!.favorite_driver) ?? null
+        : null,
+    };
+  });
+
   return (
     <>
       <TopBar
@@ -147,7 +176,27 @@ export default async function LeaguePage() {
         email={userData.user?.email ?? null}
       />
       <MobileTabBar active="league" />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 pb-24 sm:px-8 md:pb-10 lg:px-12 xl:px-16">
+      {/*
+        Gutters fork at md (pattern A, per-side longhands): base values are
+        the phone's 20px gutter and the tab-bar-clearing bottom pad; `md:`
+        restores the pre-fork px-8 / py-10 / pb-10 that `px-6 py-10 pb-24
+        sm:px-8 md:pb-10` resolved to at every width >= md.
+      */}
+      <main className="mx-auto w-full max-w-[1600px] px-5 py-5 pb-[calc(var(--tabbar-h)+env(safe-area-inset-bottom,0px)+24px)] md:px-8 md:py-10 md:pb-10 lg:px-12 xl:px-16">
+        <LeagueMobile
+          season={CURRENT_SEASON}
+          revealedCount={revealedEventsCount ?? 0}
+          totalRounds={totalRoundsCount ?? 24}
+          podium={mobilePodium}
+          rest={restRows}
+        />
+
+        {/*
+          Desktop tree, unchanged. `hidden md:contents` erases this wrapper's
+          box at md so every child stays a direct child of <main> — pattern
+          B', the same idiom lobby-view.tsx uses.
+        */}
+        <div className="hidden md:contents">
         {/* Hero */}
         <section className="grid items-end gap-8 border-b border-[color:var(--border)] pb-8 lg:grid-cols-[2fr_1fr]">
           <div>
@@ -358,36 +407,22 @@ export default async function LeaguePage() {
               })}
             </section>
 
-            {/* Rest of the field — bar chart rows */}
-            {rest.length > 0 && (
+            {/* Rest of the field — bar chart rows. The `md:hidden` twin that
+                used to sit beside this moved into `LeagueMobile`: this whole
+                subtree is `hidden md:contents`, so a `md:hidden` child inside
+                it could never render. */}
+            {restRows.length > 0 && (
               <section className="mt-8 border border-[color:var(--border)] bg-[color:var(--surface)]">
-                {(() => {
-                  const rowsData: LeagueRowProps[] = rest.map((r) =>
-                    toLeagueRowProps(r, {
-                      leaderPts,
-                      currentUserId: me,
-                      driverCodeById,
-                    }),
-                  );
-                  return (
-                    <>
-                      <div className="md:hidden">
-                        {rowsData.map((r) => (
-                          <LeagueRowMobile key={r.userId} {...r} />
-                        ))}
-                      </div>
-                      <div className="hidden md:block">
-                        {rowsData.map((r) => (
-                          <LeagueRowDesktop key={r.userId} {...r} />
-                        ))}
-                      </div>
-                    </>
-                  );
-                })()}
+                <div className="hidden md:block">
+                  {restRows.map((r) => (
+                    <LeagueRowDesktop key={r.userId} {...r} />
+                  ))}
+                </div>
               </section>
             )}
           </>
         )}
+        </div>
       </main>
     </>
   );

@@ -52,16 +52,35 @@ describe("LeagueRowMobile", () => {
   // Same guard, same wording as the standings sibling in
   // `../standings/driver-row.test.tsx`. `list-none` + the
   // -webkit-details-marker reset strip the native triangle, leaving a touch
-  // user no signal that anything expands. Delete the marker span (or the
-  // `group` class it hangs off) and this fails.
+  // user no signal that anything expands. The affordance is now the
+  // artboard's `+`/`-` PAIR swapped by `group-open:` (design_handoff_mobile
+  // §6.2, and what `MobDisclosureRow` already draws) rather than one rotated
+  // chevron — one glyph cannot read as both states. Delete either span, or
+  // the `group` class they hang off, and this fails.
   it("keeps an expand affordance inside the summary after stripping the native marker", () => {
     const { container } = render(<LeagueRowMobile {...ME} />);
     const summary = container.querySelector("summary")!;
     expect(summary.className).toContain("list-none");
-    const marker = summary.querySelector('[aria-hidden][class*="group-open"]');
-    expect(marker, "no expand marker inside <summary>").not.toBeNull();
-    expect(marker!.className).toContain("group-open:rotate-90");
+    const markers = Array.from(
+      summary.querySelectorAll('[aria-hidden][class*="group-open"]'),
+    );
+    expect(markers.map((m) => m.textContent)).toEqual(["+", "\u2212"]);
+    expect(markers[0].className).toContain("group-open:hidden");
+    expect(markers[1].className).toContain("group-open:inline");
     expect(container.querySelector("details")!.className).toContain("group");
+  });
+
+  // The bar is the only thing on the row that answers "how far behind am I",
+  // and a bar you must tap to see cannot be compared against the row above
+  // it. §6.2 puts it under the name in the always-visible summary; it used
+  // to live in the expanded panel.
+  it("renders the progress bar inside the summary, scaled to pct", () => {
+    const { container } = render(<LeagueRowMobile {...ME} />);
+    const summary = container.querySelector("summary")!;
+    const fill = summary.querySelector<HTMLElement>('[aria-hidden] > span');
+    expect(fill, "no progress fill inside <summary>").not.toBeNull();
+    expect(fill!.style.width).toBe("82%");
+    expect(fill!.style.background).toBe("rgb(255, 128, 0)");
   });
 });
 

@@ -176,28 +176,43 @@ export function LeagueRowDesktop(p: LeagueRowProps) {
 }
 
 /**
- * Mobile "rest of the field" league row — four columns you actually scan
- * (rank, avatar, name, points) with everything else behind a native
- * <details>. <details> deliberately over a client component: zero JS, free
- * keyboard and screen-reader semantics, and page.tsx stays a server
- * component.
+ * Mobile "rest of the field" league row — 390pt fork
+ * (design_handoff_mobile §6.2, canvas
+ * `screens-mobile-b.jsx:MobLeagueScreen`).
+ *
+ * Five-column 62px summary (position / initial avatar / name + progress bar
+ * / points / disclosure glyph) with the rest behind a native <details>.
+ * <details> deliberately over a client component: zero JS, free keyboard and
+ * screen-reader semantics, and page.tsx stays a server component.
+ *
+ * MOBILE TREE ONLY — no `md:` classes, same contract as `MobilePrimitives`.
+ * Rendered exclusively from `LeagueMobile`, inside a `md:hidden` subtree.
+ *
+ * The progress bar moved OUT of the expanded panel and into the summary row:
+ * the artboard puts it under the name where it is always visible, which is
+ * also the only place it does any work — a bar you have to tap to see cannot
+ * be compared against the row above it.
  */
 export function LeagueRowMobile(p: LeagueRowProps) {
   const fav = p.favTeam ? teamMeta(p.favTeam) : null;
+  const hex = fav?.hex ?? "var(--fg-subtle)";
   return (
     <details
-      className="group border-b border-[color:var(--border)] last:border-b-0"
+      className="group"
       style={{ background: p.isMe ? "var(--surface-2)" : "transparent" }}
     >
       <summary
-        className="grid cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden"
-        style={{ gridTemplateColumns: "28px 36px minmax(0,1fr) auto auto" }}
+        className="grid cursor-pointer list-none items-center gap-2.5 border-b border-[color:var(--border)] px-5 group-open:border-b-0 group-open:bg-[color:var(--surface-2)] [&::-webkit-details-marker]:hidden"
+        style={{
+          height: 62,
+          gridTemplateColumns: "24px 28px minmax(0,1fr) auto 14px",
+        }}
       >
         <span
           className="leading-none"
           style={{
             fontFamily: "var(--font-boldonse), ui-sans-serif",
-            fontSize: 18,
+            fontSize: 16,
           }}
           data-tabular
         >
@@ -206,60 +221,60 @@ export function LeagueRowMobile(p: LeagueRowProps) {
         <span
           className="grid place-items-center rounded-full"
           style={{
-            width: 32,
-            height: 32,
+            width: 26,
+            height: 26,
             background: "var(--surface-2)",
             border: `1px solid ${fav?.hex ?? "var(--border)"}`,
             fontFamily: "var(--font-boldonse), ui-sans-serif",
-            fontSize: 13,
+            fontSize: 10,
           }}
         >
           {p.initial}
         </span>
-        <span className="min-w-0 truncate text-sm">{p.name}</span>
-        <span
-          style={{
-            fontFamily: "var(--font-boldonse), ui-sans-serif",
-            fontSize: 20,
-          }}
-          data-tabular
-        >
+        <span className="min-w-0">
+          <span className="block truncate" style={{ fontSize: 13, fontWeight: 500 }}>
+            {p.name}
+          </span>
+          <span
+            aria-hidden
+            className="mt-[7px] block h-1"
+            style={{ background: "var(--bg)" }}
+          >
+            <span
+              className="block h-full"
+              style={{ width: `${p.pct}%`, background: hex }}
+            />
+          </span>
+        </span>
+        <span data-tabular style={{ fontSize: 16 }}>
           {p.points}
         </span>
-        {/* Expand affordance — identical to the standings sibling in
-            `../standings/driver-row.tsx` on purpose; the two mobile
-            disclosure rows must read the same. `list-none` + the
-            -webkit-details-marker reset strip the native triangle, leaving a
-            touch user no signal that team/driver/perfects/streak are one tap
-            away. Earned motion (real open/close only); the global
-            `prefers-reduced-motion` block collapses the transition. Must live
-            INSIDE <summary> — only the first <summary> lands in <details>'s
+        {/* Two glyphs swapped by `group-open:`, identical to the standings
+            sibling in `../standings/driver-row.tsx` on purpose; the two
+            mobile disclosure rows must read the same. Must live INSIDE
+            <summary> — only the first <summary> lands in <details>'s
             always-visible slot. */}
         <span
           aria-hidden
-          className="inline-block leading-none text-[color:var(--fg-subtle)] transition-transform group-open:rotate-90"
-          style={{ fontSize: 16 }}
+          className="leading-none group-open:hidden"
+          data-tabular
+          style={{ fontSize: 11, color: "var(--fg-subtle)" }}
         >
-          ›
+          +
+        </span>
+        <span
+          aria-hidden
+          className="hidden leading-none group-open:inline"
+          data-tabular
+          style={{ fontSize: 11, color: "var(--fg-subtle)" }}
+        >
+          −
         </span>
       </summary>
 
-      <div className="px-4 pb-4">
-        <div
-          className="relative mb-3 h-1.5"
-          style={{ background: "var(--bg)" }}
-          aria-hidden
-        >
-          <div
-            className="absolute inset-y-0 left-0"
-            style={{
-              width: `${p.pct}%`,
-              background: fav?.hex ?? "var(--fg-subtle)",
-            }}
-          />
-        </div>
+      <div className="border-b border-[color:var(--border)] bg-[color:var(--surface-2)] px-5 pb-3.5">
         <dl
-          className="grid gap-x-4 gap-y-2"
+          className="grid gap-x-4 gap-y-2 pt-1"
           style={{ gridTemplateColumns: "repeat(2, minmax(0,1fr))" }}
         >
           <Stat label="TEAM" value={fav ? fav.name.toUpperCase() : "—"} />
@@ -272,12 +287,12 @@ export function LeagueRowMobile(p: LeagueRowProps) {
           {p.streak > 0 && (
             <div className="flex items-baseline justify-between gap-2">
               <dt
-                className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
-                style={{ letterSpacing: "0.1em" }}
+                className="uppercase text-[color:var(--fg-subtle)]"
+                style={{ fontSize: 9, letterSpacing: "0.1em" }}
               >
                 P1 STREAK
               </dt>
-              <dd className="text-sm" data-tabular>
+              <dd data-tabular style={{ fontSize: 12 }}>
                 {/* Emoji font scoped to the glyph only — commit 93212e1.
                     Applying it to the row would swap the whole row's face. */}
                 <span aria-hidden style={{ fontFamily: EMOJI_FONT }}>
@@ -307,12 +322,16 @@ function Stat({
   return (
     <div className="flex items-baseline justify-between gap-2">
       <dt
-        className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
-        style={{ letterSpacing: "0.1em" }}
+        className="uppercase text-[color:var(--fg-subtle)]"
+        style={{ fontSize: 9, letterSpacing: "0.1em" }}
       >
         {label}
       </dt>
-      <dd className="text-sm" data-tabular={tabularValue || undefined}>
+      <dd
+        className="min-w-0 truncate"
+        style={{ fontSize: 12 }}
+        data-tabular={tabularValue || undefined}
+      >
         {value}
       </dd>
     </div>

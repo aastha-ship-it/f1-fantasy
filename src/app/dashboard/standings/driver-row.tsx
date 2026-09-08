@@ -21,6 +21,13 @@ export type DriverRowProps = {
    * it; falls back to `pos` when absent.
    */
   id?: number;
+  /**
+   * Season poles / fastest laps — the mobile row's four-tile split panel
+   * (design_handoff_mobile §6.1). Optional because the desktop row does not
+   * render them and fixtures predate them; both default to 0.
+   */
+  poles?: number;
+  fastestLaps?: number;
 };
 
 /**
@@ -132,128 +139,133 @@ export function DriverStandingsRowDesktop(p: DriverRowProps) {
 }
 
 /**
- * Mobile driver-standings row — four columns you actually scan (position,
- * portrait, name, points) with everything else behind a native <details>.
- * <details> deliberately over a client component: zero JS, free keyboard
- * and screen-reader semantics, and page.tsx stays a server component.
+ * Mobile driver-standings row — 390pt fork (design_handoff_mobile §6.1,
+ * canvas `screens-mobile-b.jsx:MobWorldStandingsScreen`).
+ *
+ * Six-column 60px summary (position / portrait / name+team / team edge /
+ * points / disclosure glyph) with the season splits behind a native
+ * <details>. <details> deliberately over a client component: zero JS, free
+ * keyboard and screen-reader semantics, and the page stays a server
+ * component.
+ *
+ * MOBILE TREE ONLY — carries no `md:` classes, same contract as
+ * `MobilePrimitives`. It is rendered exclusively from `StandingsMobile`,
+ * which lives inside a `md:hidden` subtree.
+ *
+ * The expanded panel is the artboard's four-tile split (Wins · Podiums ·
+ * Poles · Fast lap), which replaced the previous GAP/WINS/PODIUMS/TEAM/
+ * COUNTRY list: team and country moved up into the always-visible summary
+ * line, and GAP is gone because the artboard does not draw it. `poles` and
+ * `fastestLaps` are derived in page.tsx from the SAME `historical_results`
+ * rows the season-summary strip already aggregates — no new query.
  */
 export function DriverStandingsRowMobile(p: DriverRowProps) {
   const t = teamMeta(p.team);
+  const hex = t?.hex ?? "var(--fg-subtle)";
   return (
-    <details
-      className="group border-b border-[color:var(--border)]"
-      style={{ background: p.isLeader ? "var(--surface-2)" : "transparent" }}
-    >
+    <details className="group">
       <summary
-        className="relative grid cursor-pointer list-none items-center gap-3 py-3 pl-3 pr-4 [&::-webkit-details-marker]:hidden"
-        style={{ gridTemplateColumns: "28px 40px minmax(0,1fr) auto auto" }}
+        className="grid cursor-pointer list-none items-center gap-2.5 border-b border-[color:var(--border)] px-5 group-open:border-b-0 group-open:bg-[color:var(--surface-2)] [&::-webkit-details-marker]:hidden"
+        style={{
+          height: 60,
+          gridTemplateColumns: "24px 34px minmax(0,1fr) 3px auto 14px",
+        }}
       >
-        <span
-          aria-hidden
-          className="absolute left-0 top-2 bottom-0 w-[3px]"
-          style={{ background: t?.hex ?? "var(--fg-subtle)" }}
-        />
         <span
           className="leading-none"
           style={{
             fontFamily: "var(--font-boldonse), ui-sans-serif",
-            fontSize: 18,
+            fontSize: 16,
             color: p.isLeader ? "var(--accent)" : "var(--fg)",
           }}
           data-tabular
         >
           {p.pos}
         </span>
-        <DriverPortrait code={p.code} team={p.team} size={40} />
+        <DriverPortrait code={p.code} team={p.team} size={30} />
         <span className="min-w-0">
           <span
-            className="block truncate leading-none"
-            style={{
-              fontFamily: "var(--font-boldonse), ui-sans-serif",
-              fontSize: 15,
-            }}
+            className="block truncate"
+            style={{ fontSize: 13, fontWeight: 500 }}
           >
-            {p.code}
-          </span>
-          <span className="block truncate text-[10px] text-[color:var(--fg-subtle)]">
             {p.fullName}
           </span>
+          <span
+            className="mt-0.5 block truncate uppercase"
+            data-tabular
+            style={{ fontSize: 9, letterSpacing: "0.1em", color: hex }}
+          >
+            {t?.short ?? p.team.slice(0, 3).toUpperCase()}
+            {p.country && ` · ${p.country}`}
+          </span>
         </span>
-        <span
-          style={{
-            fontFamily: "var(--font-boldonse), ui-sans-serif",
-            fontSize: 20,
-          }}
-          data-tabular
-        >
-          {p.points}
-        </span>
-        {/* Expand affordance. `list-none` + the -webkit-details-marker reset
-            above strip the native triangle, which on touch left ~20 rows with
-            no signal that gap/wins/podiums/team/country are one tap away —
-            `cursor-pointer` says nothing to a finger. Earned motion: it turns
-            only on a real open/close, and the global
-            `prefers-reduced-motion` block in globals.css collapses the
-            transition. Must live INSIDE <summary>: only the first <summary>
-            lands in <details>'s always-visible slot, so a marker placed
-            outside it would be hidden while collapsed — exactly the trap the
-            team-colour stripe hit in Task 7. */}
+        {/* 3px team-colour edge — the sanctioned exception in CLAUDE.md, and
+            a grid CELL here rather than an absolutely-positioned stripe: the
+            artboard puts it between the name and the points, not on the row
+            edge, so it needs a track of its own. */}
         <span
           aria-hidden
-          className="inline-block leading-none text-[color:var(--fg-subtle)] transition-transform group-open:rotate-90"
-          style={{ fontSize: 16 }}
+          className="block"
+          style={{ width: 3, height: 24, background: hex }}
+        />
+        <span data-tabular style={{ fontSize: 16 }}>
+          {p.points}
+        </span>
+        {/* Two glyphs swapped by `group-open:`, matching MobDisclosureRow —
+            `+`/`−` is what the artboards draw. Inside <summary> on purpose:
+            only the first <summary> lands in <details>'s always-visible
+            slot, so a marker outside it would vanish while collapsed. */}
+        <span
+          aria-hidden
+          className="leading-none group-open:hidden"
+          data-tabular
+          style={{ fontSize: 11, color: "var(--fg-subtle)" }}
         >
-          ›
+          +
+        </span>
+        <span
+          aria-hidden
+          className="hidden leading-none group-open:inline"
+          data-tabular
+          style={{ fontSize: 11, color: "var(--fg-subtle)" }}
+        >
+          −
         </span>
       </summary>
 
-      <div className="relative">
-        {/* Second segment of the team-colour edge — <summary>'s stripe only
-            covers the always-visible slot, so the expanded <dl> panel (only
-            rendered into the disclosure-content region while open) needs its
-            own segment to keep the edge running down the full expanded row,
-            not just alongside the collapsed summary. */}
-        <span
-          aria-hidden
-          className="absolute left-0 top-0 bottom-2 w-[3px]"
-          style={{ background: t?.hex ?? "var(--fg-subtle)" }}
-        />
-        <dl
-          className="grid gap-x-4 gap-y-2 px-3 pb-4 pl-3"
-          style={{ gridTemplateColumns: "repeat(2, minmax(0,1fr))" }}
-        >
-          {/* `data-tabular` (Geist Mono) is mandatory for NUMERICS only —
-              CLAUDE.md's design system, not for labels. The third tuple slot
-              is that gate, mirroring `Stat`'s `tabularValue` in
-              `../league/league-row.tsx`: the two mobile disclosure rows share
-              a screen family and must not implement the same rule in opposite
-              directions. Deliberately NOT importing league's `Stat` — that
-              would make a standings route file depend on a league route file
-              for a five-line presentational div. TEAM is a name and COUNTRY
-              is a flag emoji; neither is a numeric. */}
-          {(
-            [
-              ["GAP", p.gap, true],
-              ["WINS", String(p.wins), true],
-              ["PODIUMS", String(p.podiums), true],
-              ["TEAM", t?.name ?? p.team, false],
-              ["COUNTRY", p.country ? countryFlag(p.country) : "—", false],
-            ] as const
-          ).map(([label, value, numeric]) => (
-            <div key={label} className="flex items-baseline justify-between gap-2">
-              <dt
-                className="text-[10px] uppercase text-[color:var(--fg-subtle)]"
-                style={{ letterSpacing: "0.1em" }}
-              >
-                {label}
-              </dt>
-              <dd className="text-sm" data-tabular={numeric || undefined}>
-                {value}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </div>
+      <dl
+        className="grid gap-px border-b border-[color:var(--border)] bg-[color:var(--surface-2)] px-5 pb-4"
+        style={{ gridTemplateColumns: "repeat(4, minmax(0,1fr))" }}
+      >
+        {(
+          [
+            ["Wins", p.wins],
+            ["Podiums", p.podiums],
+            ["Poles", p.poles ?? 0],
+            ["Fast lap", p.fastestLaps ?? 0],
+          ] as const
+        ).map(([label, value]) => (
+          // `flex-col-reverse`, not a dd-then-dt source order: `dl > div`
+          // is only valid HTML with its <dt> first, and the artboard draws
+          // the numeral above its label. Order in the DOM, reversed in the
+          // box.
+          <div
+            key={label}
+            className="flex flex-col-reverse border border-[color:var(--border)] bg-[color:var(--surface)] px-2 py-2.5"
+          >
+            <dt
+              className="mt-1 uppercase text-[color:var(--fg-subtle)]"
+              data-tabular
+              style={{ fontSize: 8, letterSpacing: "0.1em" }}
+            >
+              {label}
+            </dt>
+            <dd className="m-0" data-tabular style={{ fontSize: 18 }}>
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </details>
   );
 }
