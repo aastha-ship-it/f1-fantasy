@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, beforeAll } from "vitest";
-import { render } from "@testing-library/react";
+import { fireEvent, render, within } from "@testing-library/react";
 import { RevealStage } from "./reveal-stage";
 
 /**
@@ -169,11 +169,13 @@ describe("RevealStage variant prop (behavioural)", () => {
     expect(portraitHtml).not.toContain("grid-template-columns: 1fr 1fr 1fr");
     expect(portraitHtml).not.toContain("data-podium");
 
-    // Stage C's row shape (§5.2: 46px tall, 24 / 1fr / auto / 40 tracks).
+    // Stage C's row shape. R-5 collapsed the row from 46px to 40px and
+    // added the disclosure-glyph track, so the pre-R-5 values below are
+    // updated rather than kept: 20 / 1fr / auto / 36 / 12.
     expect(portraitHtml).toContain(
-      "grid-template-columns: 24px minmax(0,1fr) auto 40px",
+      "grid-template-columns: 20px minmax(0,1fr) auto 36px 12px",
     );
-    expect(portraitHtml).toContain("height: 46px");
+    expect(portraitHtml).toContain("height: 40px");
   });
 
   it("defaults to 'wide' rendering when variant is omitted", () => {
@@ -186,5 +188,220 @@ describe("RevealStage variant prop (behavioural)", () => {
     explicitWide.unmount();
 
     expect(omittedHtml).toBe(explicitWideHtml);
+  });
+});
+
+/**
+ * R-5 — the portrait stage-C scorecard disclosure.
+ *
+ * `window.matchMedia` is stubbed above to force reduced motion, so portrait
+ * renders the end state (stage C alone) and every row is present from the
+ * first paint — which is exactly the state these assertions want.
+ *
+ * The point of the suite is that the panel restates the score rather than
+ * re-deriving it: the verdict strings below are `slotBadge`'s own output and
+ * the bucket number is `wrongSlotBucket`'s, so a change to either helper
+ * fails here instead of silently making the mobile reveal disagree with the
+ * `scores` row it is describing.
+ */
+describe("RevealStage portrait stage-C scorecards (R-5)", () => {
+  // Two participants, so "yours is open, theirs is not" is observable.
+  // u1 (you) took 3 exact for a perfect 18; u2 got P1 exact and put the other
+  // two podium finishers in the wrong slots — 5 + bucket(2) = 7.
+  const twoUp = {
+    ...baseProps,
+    predictions: [
+      { user_id: "u1", p1_driver_id: 1, p2_driver_id: 2, p3_driver_id: 3 },
+      { user_id: "u2", p1_driver_id: 1, p2_driver_id: 3, p3_driver_id: 2 },
+    ],
+    scores: [
+      {
+        user_id: "u1",
+        points: 18,
+        exact_matches: 3,
+        slot_mismatches: 0,
+        dnf_zeros: 0,
+        perfect_bonus: true,
+      },
+      {
+        user_id: "u2",
+        points: 7,
+        exact_matches: 1,
+        slot_mismatches: 2,
+        dnf_zeros: 0,
+        perfect_bonus: false,
+      },
+    ],
+    users: [
+      { id: "u1", email: "aastha@example.com", display_name: "Aastha" },
+      { id: "u2", email: "sam@example.com", display_name: "Sam" },
+    ],
+  };
+
+  const rows = (c: HTMLElement) =>
+    Array.from(c.querySelectorAll<HTMLElement>("li[data-friend-row]"));
+  const cards = (c: HTMLElement) => c.querySelectorAll("[data-scorecard]");
+
+  it("opens your own row by default and leaves the others closed", () => {
+    const r = render(<RevealStage {...twoUp} variant="portrait" />);
+    try {
+      // Exactly one panel, and it belongs to the row tagged YOU.
+      expect(cards(r.container)).toHaveLength(1);
+
+      // Two participants → two rows, and the open one is yours.
+      expect(rows(r.container)).toHaveLength(2);
+      const mine = rows(r.container).find((li) =>
+        li.textContent?.includes("YOU"),
+      );
+      expect(mine).toBeTruthy();
+      expect(mine!.querySelector("[data-scorecard]")).not.toBeNull();
+
+      const theirs = rows(r.container).find((li) =>
+        li.textContent?.includes("Sam"),
+      );
+      expect(theirs).toBeTruthy();
+      expect(theirs!.querySelector("[data-scorecard]")).toBeNull();
+      expect(
+        within(theirs as HTMLElement).getByRole("button"),
+      ).toHaveAttribute("aria-expanded", "false");
+    } finally {
+      r.unmount();
+    }
+  });
+
+  it("renders slotBadge's verdicts and a tally built from the score row", () => {
+    const r = render(<RevealStage {...twoUp} variant="portrait" />);
+    try {
+      const card = cards(r.container)[0] as HTMLElement;
+      const text = card.textContent ?? "";
+
+      // Three picks, all exact — slotBadge("exact").text, verbatim.
+      expect(card.querySelectorAll("li")).toHaveLength(3);
+      expect(text.match(/✓ Exact \+5/g) ?? []).toHaveLength(3);
+      expect(text).not.toContain("⊙ On podium");
+      expect(text).not.toContain("× Miss");
+
+      // Tally reads off `scores`: 3 exact, perfect bonus, 18 total. No
+      // bucket clause, because exact === 3.
+      expect(text).toContain("3 exact +15");
+      expect(text).toContain("perfect +3");
+      expect(text).not.toContain("on podium +");
+      expect(text).toContain("+18");
+    } finally {
+      r.unmount();
+    }
+  });
+
+  it("shows the non-linear bucket, not the raw mismatch count", () => {
+    const r = render(<RevealStage {...twoUp} variant="portrait" />);
+    try {
+      const theirs = rows(r.container).find((li) =>
+        li.textContent?.includes("Sam"),
+      ) as HTMLElement;
+      fireEvent.click(within(theirs).getAllByRole("button")[0]);
+
+      const card = theirs.querySelector("[data-scorecard]") as HTMLElement;
+      const text = card.textContent ?? "";
+      expect(text).toContain("1 exact +5");
+      // wrongSlotBucket(2) === 2 — the coincidence that 2 → 2 is why the
+      // 3 → 4 case is asserted separately below.
+      expect(text).toContain("2 on podium +2");
+      expect(text).toContain("+7");
+      expect(text.match(/⊙ On podium/g) ?? []).toHaveLength(2);
+    } finally {
+      r.unmount();
+    }
+  });
+
+  it("scores three wrong-slot picks as the bucket's +4, never +3", () => {
+    const allWrong = {
+      ...twoUp,
+      predictions: [
+        { user_id: "u1", p1_driver_id: 2, p2_driver_id: 3, p3_driver_id: 1 },
+      ],
+      scores: [
+        {
+          user_id: "u1",
+          points: 4,
+          exact_matches: 0,
+          slot_mismatches: 3,
+          dnf_zeros: 0,
+          perfect_bonus: false,
+        },
+      ],
+      users: [{ id: "u1", email: "a@example.com", display_name: "Aastha" }],
+    };
+    const r = render(<RevealStage {...allWrong} variant="portrait" />);
+    try {
+      const text = (cards(r.container)[0] as HTMLElement).textContent ?? "";
+      expect(text).toContain("0 exact +0");
+      expect(text).toContain("3 on podium +4");
+      expect(text).not.toContain("perfect");
+    } finally {
+      r.unmount();
+    }
+  });
+
+  it("gives a sprint one pick row, not three", () => {
+    const sprint = {
+      ...twoUp,
+      predictions: [
+        { user_id: "u1", p1_driver_id: 1, p2_driver_id: null, p3_driver_id: null },
+      ],
+      scores: [
+        {
+          user_id: "u1",
+          points: 5,
+          exact_matches: 1,
+          slot_mismatches: 0,
+          dnf_zeros: 0,
+          perfect_bonus: false,
+        },
+      ],
+      users: [{ id: "u1", email: "a@example.com", display_name: "Aastha" }],
+      isSprint: true,
+    };
+    const r = render(<RevealStage {...sprint} variant="portrait" />);
+    try {
+      const card = cards(r.container)[0] as HTMLElement;
+      expect(card.querySelectorAll("li")).toHaveLength(1);
+      const text = card.textContent ?? "";
+      expect(text).toContain("✓ Exact +5");
+      expect(text).toContain("1 exact +5");
+      expect(text).not.toContain("on podium +");
+    } finally {
+      r.unmount();
+    }
+  });
+
+  it("expand-all opens every row, and toggles back to collapse-all", () => {
+    const r = render(<RevealStage {...twoUp} variant="portrait" />);
+    try {
+      expect(cards(r.container)).toHaveLength(1);
+
+      const toggle = r.getByRole("button", { name: /All 2 scorecards/i });
+      fireEvent.click(toggle);
+      expect(cards(r.container)).toHaveLength(2);
+
+      // The label is the state, so the control is never a dead end.
+      const collapse = r.getByRole("button", { name: /Collapse all/i });
+      expect(collapse).toHaveAttribute("aria-expanded", "true");
+      fireEvent.click(collapse);
+      expect(cards(r.container)).toHaveLength(0);
+      expect(
+        r.getByRole("button", { name: /All 2 scorecards/i }),
+      ).toHaveAttribute("aria-expanded", "false");
+    } finally {
+      r.unmount();
+    }
+  });
+
+  it("keeps the scorecard off the wide variant entirely", () => {
+    const r = render(<RevealStage {...twoUp} variant="wide" />);
+    try {
+      expect(cards(r.container)).toHaveLength(0);
+    } finally {
+      r.unmount();
+    }
   });
 });

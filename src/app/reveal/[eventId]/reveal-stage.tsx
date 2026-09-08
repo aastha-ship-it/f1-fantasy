@@ -11,7 +11,12 @@ import {
   isPortraitRightFacing,
 } from "@/lib/design/drivers";
 import { teamMeta, type TeamMeta } from "@/lib/design/teams";
-import { slotOutcome, slotBadge, wrongSlotBucket } from "@/lib/computeScores";
+import {
+  slotOutcome,
+  slotBadge,
+  wrongSlotBucket,
+  type Actual,
+} from "@/lib/computeScores";
 
 type Driver = { id: number; code: string; full_name: string; team: string };
 type User = { id: string; email: string; display_name: string | null };
@@ -161,6 +166,16 @@ export function RevealStage({
         { pos: 2, id: result.p2_driver_id },
         { pos: 3, id: result.p3_driver_id },
       ];
+  // The §4 classifier's view of the result. Built here, from `result`,
+  // exactly as FriendCard builds it (and NOT re-derived from `resultSlots`,
+  // whose ids are nullable) so the wide and portrait scorecards classify
+  // every pick against an identically-shaped object.
+  const actual: Actual = {
+    p1: result.p1_driver_id,
+    p2: result.p2_driver_id,
+    p3: result.p3_driver_id,
+  };
+
   // Visual order P2 | P1 | P3 (centre-leader podium block).
   const visualOrder = isSprint ? [0] : [1, 0, 2];
   // Stagger: P3 first → P2 → P1.
@@ -209,6 +224,8 @@ export function RevealStage({
         sweepTeam={sweepTeam}
         reduce={reduce}
         resultSlots={resultSlots}
+        actual={actual}
+        isSprint={isSprint}
         driverById={driverById}
         friendRows={friendRows}
         currentUserId={currentUserId}
@@ -1087,6 +1104,8 @@ function PortraitCinematic({
   sweepTeam,
   reduce,
   resultSlots,
+  actual,
+  isSprint,
   driverById,
   friendRows,
   currentUserId,
@@ -1097,6 +1116,8 @@ function PortraitCinematic({
   sweepTeam: TeamMeta | null;
   reduce: boolean;
   resultSlots: ResultSlot[];
+  actual: Actual;
+  isSprint: boolean;
   driverById: Map<number, Driver>;
   friendRows: FriendRow[];
   currentUserId: string | null;
@@ -1133,6 +1154,8 @@ function PortraitCinematic({
       <PortraitStageC
         hero={hero}
         resultSlots={resultSlots}
+        actual={actual}
+        isSprint={isSprint}
         driverById={driverById}
         friendRows={friendRows}
         currentUserId={currentUserId}
@@ -1506,10 +1529,19 @@ function PortraitPodiumRow({
   );
 }
 
-/** Stage C — the group, scored. Fades in 4600→5000 and stays. */
+/**
+ * Stage C — the group, scored. Fades in 4600→5000 and stays.
+ *
+ * R-5 restructures this into a disclosure list: the rows collapse to 40px
+ * and each one opens a scorecard panel carrying the same pick-by-pick
+ * breakdown the wide variant's `FriendCard` shows. Your own row is open on
+ * arrival so the scoring reads without a tap.
+ */
 function PortraitStageC({
   hero,
   resultSlots,
+  actual,
+  isSprint,
   driverById,
   friendRows,
   currentUserId,
@@ -1518,6 +1550,8 @@ function PortraitStageC({
 }: {
   hero: RevealHero;
   resultSlots: ResultSlot[];
+  actual: Actual;
+  isSprint: boolean;
   driverById: Map<number, Driver>;
   friendRows: FriendRow[];
   currentUserId: string | null;
@@ -1527,6 +1561,24 @@ function PortraitStageC({
   const winnerId = resultSlots[0]?.id ?? null;
   const winner = winnerId !== null ? driverById.get(winnerId) : null;
   const winnerLast = winner?.full_name.split(" ").slice(-1)[0] ?? null;
+
+  // Open rows are keyed by `prediction.user_id` — always present — rather
+  // than `user.id`, which is undefined whenever the users join came back
+  // short. `isMe` still compares `user.id`, exactly as the row always did.
+  const myRowId =
+    friendRows.find((r) => r.user?.id === currentUserId)?.prediction.user_id ??
+    null;
+  const [openIds, setOpenIds] = useState<ReadonlySet<string>>(
+    () => new Set(myRowId !== null ? [myRowId] : []),
+  );
+  const allOpen = friendRows.length > 0 && openIds.size === friendRows.length;
+
+  const toggleRow = (id: string) =>
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
 
   return (
     <motion.div
@@ -1541,25 +1593,39 @@ function PortraitStageC({
           : { duration: TIMELINE, times: [...STAGE_C_TIMES], ease: "linear" }
       }
     >
-      <p
-        className="m-0"
-        data-tight
-        style={{
-          fontFamily: "var(--font-boldonse), ui-sans-serif",
-          fontSize: 36,
-          lineHeight: 0.88,
-          textTransform: "uppercase",
-        }}
-      >
-        The
-        <br />
-        Group
-      </p>
+      <div className="flex items-end justify-between gap-2.5">
+        <p
+          className="m-0"
+          data-tight
+          style={{
+            fontFamily: "var(--font-boldonse), ui-sans-serif",
+            fontSize: 30,
+            lineHeight: 0.88,
+            textTransform: "uppercase",
+          }}
+        >
+          The
+          <br />
+          Group
+        </p>
+        <p
+          className="m-0 text-right uppercase text-[color:var(--fg-subtle)]"
+          style={{
+            fontFamily: "var(--font-mono), ui-monospace, monospace",
+            fontSize: 8,
+            letterSpacing: "0.12em",
+          }}
+        >
+          Tap a row for
+          <br />
+          the scorecard
+        </p>
+      </div>
       <p
         className="mt-2 uppercase text-[color:var(--fg-subtle)]"
         style={{
           fontFamily: "var(--font-mono), ui-monospace, monospace",
-          fontSize: 9,
+          fontSize: 8,
           letterSpacing: "0.14em",
         }}
         data-tabular
@@ -1572,25 +1638,68 @@ function PortraitStageC({
           No one submitted a pick for this session.
         </p>
       ) : (
-        // The rows scroll inside the stage when the group outgrows the
-        // window. The sequence itself still never scrolls (README:297) —
-        // this is a list inside stage C, not the page.
-        <ul className="mt-[14px] min-h-0 flex-1 overflow-y-auto border-t border-[color:var(--border)]">
-          {friendRows.map((row, i) => (
-            <PortraitFriendRow
-              key={row.prediction.user_id}
-              row={row}
-              isMe={row.user?.id === currentUserId}
-              driverById={driverById}
-              delay={atEnd ? 0 : baseDelay + i * PICK_STAGGER}
-              atEnd={atEnd}
-            />
-          ))}
-        </ul>
+        <>
+          {/* The rows scroll inside the stage when the group outgrows the
+              window. The sequence itself still never scrolls (README:297) —
+              this is a list inside stage C, not the page. */}
+          {/* Not `flex-1`: the list sizes to its rows so the footer stays
+              attached to the last one instead of a void opening between them
+              on a short roster. It still shrinks (and scrolls) when the
+              group outgrows the stage — `min-h-0` is what allows that. */}
+          <ul className="mt-[14px] min-h-0 overflow-y-auto border-t border-[color:var(--border)]">
+            {friendRows.map((row, i) => (
+              <PortraitFriendRow
+                key={row.prediction.user_id}
+                row={row}
+                isMe={row.user?.id === currentUserId}
+                isSprint={isSprint}
+                actual={actual}
+                driverById={driverById}
+                open={openIds.has(row.prediction.user_id)}
+                onToggle={() => toggleRow(row.prediction.user_id)}
+                delay={atEnd ? 0 : baseDelay + i * PICK_STAGGER}
+                atEnd={atEnd}
+              />
+            ))}
+          </ul>
+
+          {/* The canvas's `ALL {n} SCORECARDS →` footer links to "the reveal
+              recap" — which portrait has no route to: page.tsx renders the
+              cinematic *alone* on a phone UA, so the wide FriendCard grid is
+              unreachable here. It is an expand-all toggle instead (owner
+              decision): the scorecards already are the rows, so there is
+              nothing to navigate to. Sits outside the <ul> so it stays put
+              while a long roster scrolls. */}
+          <button
+            type="button"
+            onClick={() =>
+              setOpenIds(
+                allOpen
+                  ? new Set<string>()
+                  : new Set(friendRows.map((r) => r.prediction.user_id)),
+              )
+            }
+            aria-expanded={allOpen}
+            className="flex w-full shrink-0 items-center justify-between border-b border-[color:var(--border)] pr-1.5 uppercase text-[color:var(--fg-subtle)]"
+            style={{
+              fontFamily: "var(--font-mono), ui-monospace, monospace",
+              fontSize: 9,
+              letterSpacing: "0.12em",
+              height: 32,
+            }}
+          >
+            <span>
+              {allOpen
+                ? "Collapse all"
+                : `All ${friendRows.length} scorecard${friendRows.length === 1 ? "" : "s"}`}
+            </span>
+            <span aria-hidden>{allOpen ? "↑" : "↓"}</span>
+          </button>
+        </>
       )}
 
       <motion.div
-        className="mt-4 shrink-0"
+        className="mt-auto shrink-0 pt-4"
         initial={atEnd ? false : { opacity: 0 }}
         animate={atEnd ? undefined : { opacity: 1 }}
         transition={
@@ -1606,56 +1715,81 @@ function PortraitStageC({
 function PortraitFriendRow({
   row,
   isMe,
+  isSprint,
+  actual,
   driverById,
+  open,
+  onToggle,
   delay,
   atEnd,
 }: {
   row: FriendRow;
   isMe: boolean;
+  isSprint: boolean;
+  actual: Actual;
   driverById: Map<number, Driver>;
+  open: boolean;
+  onToggle: () => void;
   delay: number;
   atEnd: boolean;
 }) {
   const name = displayName(row.user, isMe);
+  // Every number here comes off the stored score row, exactly as FriendCard
+  // reads it — the panel can restate the score but must never re-derive it.
   const pts = row.score?.points ?? 0;
   const perfect = row.score?.perfect_bonus ?? false;
-  const picks = [
-    row.prediction.p1_driver_id,
-    row.prediction.p2_driver_id,
-    row.prediction.p3_driver_id,
-  ]
-    .map((id) => (id !== null ? driverById.get(id)?.code : null))
-    .filter((c): c is string => Boolean(c));
+  const exact = row.score?.exact_matches ?? 0;
+  const wrongSlot = row.score?.slot_mismatches ?? 0;
+
+  // Sprint scores P1 only (CLAUDE.md §4) — one pick row, not three.
+  const picks: Array<{
+    label: string;
+    pos: "p1" | "p2" | "p3";
+    id: number | null;
+  }> = isSprint
+    ? [{ label: "P1", pos: "p1", id: row.prediction.p1_driver_id }]
+    : [
+        { label: "P1", pos: "p1", id: row.prediction.p1_driver_id },
+        { label: "P2", pos: "p2", id: row.prediction.p2_driver_id },
+        { label: "P3", pos: "p3", id: row.prediction.p3_driver_id },
+      ];
 
   return (
     <motion.li
-      className="grid items-center gap-2 border-b border-[color:var(--border)] pr-2"
-      style={{
-        gridTemplateColumns: "24px minmax(0,1fr) auto 40px",
-        height: 46,
-        background: isMe ? "var(--surface-2)" : "transparent",
-        // The sanctioned 3px prediction-row edge (CLAUDE.md's exception to
-        // the left-stripe ban), in accent because this row is *yours*.
-        boxShadow: isMe ? "inset 3px 0 0 0 var(--accent)" : "none",
-        paddingLeft: isMe ? 8 : 0,
-      }}
+      data-friend-row
+      className="border-b border-[color:var(--border)]"
       initial={atEnd ? false : { opacity: 0, y: 12 }}
       animate={atEnd ? undefined : { opacity: 1, y: 0 }}
       transition={atEnd ? undefined : { duration: PICK_DUR, delay }}
     >
-      <span
-        className="grid size-[22px] place-items-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)]"
+      {/* The whole row is the control, not just the glyph. */}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="grid w-full items-center gap-2 pr-1.5 text-left"
         style={{
-          fontFamily: "var(--font-boldonse), ui-sans-serif",
-          fontSize: 9,
+          gridTemplateColumns: "20px minmax(0,1fr) auto 36px 12px",
+          height: 40,
+          background: isMe ? "var(--surface-2)" : "transparent",
+          // The sanctioned 3px prediction-row edge (CLAUDE.md's exception to
+          // the left-stripe ban), in accent because this row is *yours*.
+          boxShadow: isMe ? "inset 3px 0 0 0 var(--accent)" : "none",
+          paddingLeft: isMe ? 8 : 0,
         }}
-        aria-hidden
       >
-        {name.charAt(0).toUpperCase()}
-      </span>
+        <span
+          className="grid size-[20px] place-items-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)]"
+          style={{
+            fontFamily: "var(--font-boldonse), ui-sans-serif",
+            fontSize: 8,
+          }}
+          aria-hidden
+        >
+          {name.charAt(0).toUpperCase()}
+        </span>
 
-      <span className="block min-w-0">
-        <span className="block truncate text-xs font-medium">
+        <span className="block min-w-0 truncate text-xs font-medium">
           {name}
           {isMe && (
             <span
@@ -1670,52 +1804,162 @@ function PortraitFriendRow({
             </span>
           )}
         </span>
+
+        {perfect ? (
+          <span
+            className="border px-1 py-0.5 uppercase"
+            style={{
+              fontFamily: "var(--font-mono), ui-monospace, monospace",
+              fontSize: 8,
+              letterSpacing: "0.1em",
+              color: "var(--success)",
+              borderColor: "var(--success)",
+            }}
+          >
+            PP
+          </span>
+        ) : (
+          <span />
+        )}
+
         <span
-          className="mt-0.5 block truncate text-[color:var(--fg-subtle)]"
+          className="text-right"
           style={{
             fontFamily: "var(--font-mono), ui-monospace, monospace",
-            fontSize: 8,
-            letterSpacing: "0.08em",
+            fontSize: 14,
+            color:
+              pts === 0
+                ? "var(--fg-subtle)"
+                : perfect
+                  ? "var(--success)"
+                  : "var(--fg)",
           }}
           data-tabular
         >
-          {picks.join(" · ") || "—"}
+          +{pts}
         </span>
-      </span>
 
-      {perfect ? (
         <span
-          className="border px-1 py-0.5 uppercase"
+          className="text-right text-[color:var(--fg-subtle)]"
           style={{
             fontFamily: "var(--font-mono), ui-monospace, monospace",
-            fontSize: 8,
-            letterSpacing: "0.1em",
-            color: "var(--success)",
-            borderColor: "var(--success)",
+            fontSize: 11,
+          }}
+          aria-hidden
+        >
+          {open ? "−" : "+"}
+        </span>
+      </button>
+
+      {open && (
+        <div
+          data-scorecard
+          style={{
+            background: "var(--surface-2)",
+            // Same 3px edge as the row, so the panel reads as attached to it.
+            // Accent only on your own panel — everyone else's takes --border,
+            // keeping the accent the ~10% "this is you" signal.
+            boxShadow: `inset 3px 0 0 0 ${
+              isMe ? "var(--accent)" : "var(--border)"
+            }`,
+            padding: "9px 8px 11px 11px",
           }}
         >
-          PP
-        </span>
-      ) : (
-        <span />
-      )}
+          <ul className="grid gap-1">
+            {picks.map((p) => {
+              const d = p.id !== null ? driverById.get(p.id) : null;
+              const t = d ? teamMeta(d.team) : null;
+              // The shared §4 classifier and its badge — the wide FriendCard
+              // renders from these same two calls, so the two scorecards
+              // cannot drift (and the bucket is never recomputed inline).
+              const o = slotOutcome(p.id, actual, p.pos);
+              const badge = slotBadge(o);
+              return (
+                <li
+                  key={p.label}
+                  className="grid items-center"
+                  style={{
+                    gridTemplateColumns: "18px 20px minmax(0,1fr) auto",
+                    gap: 7,
+                    padding: "4px 7px",
+                    border: `1px solid ${
+                      o !== "miss" && t ? t.hex : "var(--border)"
+                    }`,
+                    background:
+                      o === "exact" && t
+                        ? `color-mix(in oklch, ${t.hex} 12%, transparent)`
+                        : "transparent",
+                  }}
+                >
+                  <span
+                    className="text-[color:var(--fg-subtle)]"
+                    style={{
+                      fontFamily: "var(--font-mono), ui-monospace, monospace",
+                      fontSize: 9,
+                    }}
+                    data-tabular
+                  >
+                    {p.label}
+                  </span>
+                  {d ? (
+                    <DriverPortrait code={d.code} team={d.team} size={20} />
+                  ) : (
+                    <span />
+                  )}
+                  <span
+                    className="min-w-0 truncate"
+                    style={{
+                      fontFamily: "var(--font-boldonse), ui-sans-serif",
+                      fontSize: 11,
+                    }}
+                  >
+                    {d?.code ?? "—"}
+                  </span>
+                  <span
+                    className="whitespace-nowrap uppercase"
+                    style={{
+                      fontFamily: "var(--font-mono), ui-monospace, monospace",
+                      fontSize: 8,
+                      letterSpacing: "0.1em",
+                      color: badge.color,
+                      fontWeight: badge.weight,
+                    }}
+                  >
+                    {badge.text}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
 
-      <span
-        className="text-right"
-        style={{
-          fontFamily: "var(--font-mono), ui-monospace, monospace",
-          fontSize: 15,
-          color:
-            pts === 0
-              ? "var(--fg-subtle)"
-              : perfect
-                ? "var(--success)"
-                : "var(--fg)",
-        }}
-        data-tabular
-      >
-        +{pts}
-      </span>
+          <div
+            className="mt-2 flex items-center justify-between gap-2 border-t border-[color:var(--border)] pt-[7px] text-[color:var(--fg-muted)]"
+            style={{
+              fontFamily: "var(--font-mono), ui-monospace, monospace",
+              fontSize: 9,
+              letterSpacing: "0.04em",
+            }}
+            data-tabular
+          >
+            <span>
+              {exact} exact +{exact * 5}
+              {wrongSlot > 0 && exact < 3
+                ? ` · ${wrongSlot} on podium +${wrongSlotBucket(wrongSlot)}`
+                : ""}
+              {perfect ? " · perfect +3" : ""}
+            </span>
+            <span
+              style={{
+                fontSize: 13,
+                color: perfect ? "var(--success)" : "var(--fg)",
+              }}
+              data-tabular
+            >
+              +{pts}
+            </span>
+          </div>
+        </div>
+      )}
     </motion.li>
   );
 }
