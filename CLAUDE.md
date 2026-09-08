@@ -178,9 +178,19 @@ Same pattern for circuits: OpenF1's `events.circuit` short name and Jolpica's
 - **Reveal cinematic** (`src/app/reveal/[eventId]/reveal-stage.tsx`) — the
   canvas timeline ported entirely to Framer Motion (no RAF): title slam →
   livery sweep → SVG track-draw → P3→P2→P1 podium → friend-card cascade.
-  Replay bumps a `playKey` that re-keys every motion node. `useReducedMotion()`
-  swaps in a `StaticHero` and collapses delays to 0 — the cinematic is
-  structurally absent for that audience, not throttled.
+  Replay bumps a `playKey` that re-keys every motion node. **This route forks
+  on the server by user-agent** (`isPhoneUA` in `page.tsx` → `variant`),
+  not on the `md:` breakpoint the rest of the mobile work uses — so a narrow
+  desktop window still gets the wide tree, and the pixel harness (Desktop
+  Chrome UA) only ever sees it. Portrait renders §5.2's three stages
+  cross-fading through one `100dvh - 52px` box; wide keeps the scrolling
+  hero → podium → group stack.
+  **One timing table serves both** — `PODIUM_BASE_DELAY` / `PODIUM_STAGGER` /
+  `PODIUM_DUR` / `PODIUM_P1_DUR` must never fork between variants (guarded by
+  `reveal-stage.test.ts` and `reveal-portrait.spec.ts` R4); what differs is
+  staging, never the clock. `useReducedMotion()` is structurally absent, not
+  throttled: wide swaps in `StaticHero`, portrait jumps straight to the end
+  state (stage C alone, no skip/replay chip).
 
 ## Design system
 

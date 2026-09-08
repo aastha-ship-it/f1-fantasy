@@ -5,6 +5,7 @@ import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { ShareButton } from "./share-button";
 import { DriverPortrait } from "@/components/DriverPortrait";
+import { MobButton } from "@/components/MobilePrimitives";
 import {
   driverPortraitSrc,
   isPortraitRightFacing,
@@ -51,26 +52,64 @@ export type RevealHero = {
 
 const EASE_OUT_QUART = [0.22, 1, 0.36, 1] as const;
 
-// Cinematic timing (seconds). Kept aligned with the design canvas:
-//   title  0.0–1.4   slam in (translateX + skew + opacity)
-//   sweep  0.6–2.2   livery car translates across band, blur+opacity envelope
-//   draw   2.0–2.9   SVG path stroke draw
-//   silence 2.9–3.3
-//   podium 3.3–4.9   P3 → P2 → P1 (180ms/card stagger, 300ms each)
-//   silence 4.9–5.3
-//   friends 5.3–...  150ms stagger
-const TITLE_DUR = 1.4;
-const SWEEP_DELAY = 0.6;
+// Cinematic timing (seconds) — ONE table, shared by both variants.
+//
+// These are the mobile handoff's retimed beats (README §5.2 / the canvas's
+// MOB_BEATS in design/design_handoff_mobile/design/screens-mobile-d.jsx),
+// adopted at BOTH widths so portrait and wide stay in lockstep. The wide
+// cinematic is deliberately quicker than it was before chunk 5b; the owner
+// chose a single timeline over forking the constants, and RS "keeps exactly
+// one set of timing constants" + reveal-portrait R4 both guard that.
+//
+//   title    0.0–1.2   slam in (translateX + skew + opacity)
+//   sweep    0.4–2.0   livery car crosses the band, blur+opacity envelope
+//   draw     1.4–2.1   SVG path stroke draw (wide only — §5.2's stage A
+//                        has no track band, so portrait never shows it)
+//   silence  2.1–2.3
+//   podium   2.3–4.3   P3 → P2 → P1 (600ms/card stagger; P3/P2 600ms,
+//                        P1 800ms so the leader lands with more weight)
+//   silence  4.3–4.9
+//   group    4.9–7.4   friend rows stagger in
+//   cta      7.4–8.0
+const TITLE_DUR = 1.2;
+const SWEEP_DELAY = 0.4;
 const SWEEP_DUR = 1.6;
-const DRAW_DELAY = 2.0;
-const DRAW_DUR = 0.9;
-const POST_INTRO_SILENCE = 0.4;
-const PODIUM_BASE_DELAY = DRAW_DELAY + DRAW_DUR + POST_INTRO_SILENCE; // 3.3s
-const PODIUM_STAGGER = 0.18;
-const PODIUM_DUR = 0.3;
-const POST_PODIUM_SILENCE = 0.4;
-const PICK_STAGGER = 0.15;
-const PICK_DUR = 0.3;
+const DRAW_DELAY = 1.4;
+const DRAW_DUR = 0.7;
+const POST_INTRO_SILENCE = 0.2;
+const PODIUM_BASE_DELAY = DRAW_DELAY + DRAW_DUR + POST_INTRO_SILENCE; // 2.3s
+const PODIUM_STAGGER = 0.6;
+const PODIUM_DUR = 0.6;
+// P1 holds longer than P3/P2 (§5.2: 3500→4300 vs 600ms each) — it is the
+// beat the whole cinematic is built around.
+const PODIUM_P1_DUR = 0.8;
+const POST_PODIUM_SILENCE = 0.6;
+// §5.2 spends 4900→7400 on the group and the canvas ramps row i over
+// groupP*8 - i, i.e. eight rows each taking an eighth of the window. Deriving
+// both numbers from that keeps the spec's cadence for the common case; a
+// group larger than eight simply trails a little past the window.
+const GROUP_DUR = 2.5;
+const GROUP_ROWS_IN_WINDOW = 8;
+const PICK_STAGGER = GROUP_DUR / GROUP_ROWS_IN_WINDOW; // 0.3125
+const PICK_DUR = GROUP_DUR / GROUP_ROWS_IN_WINDOW;
+const CTA_DELAY = 7.4;
+const CTA_DUR = 0.6;
+
+// Portrait stage cross-fade windows (§5.2), as fractions of the full
+// timeline. Expressed as Framer Motion `times` arrays rather than the
+// canvas's requestAnimationFrame clock — .impeccable.md and CLAUDE.md both
+// rule out RAF here, and a keyframed opacity track reaches the same windows
+// declaratively.
+const TIMELINE = 8.0;
+const at = (ms: number): number => ms / 1000 / TIMELINE;
+// A (title+sweep) out 1900→2300 · B (podium) in 2000→2400, out 4500→4900
+// · C (group) in 4600→5000.
+const STAGE_A_TIMES = [0, at(1900), at(2300), 1] as const;
+const STAGE_A_OPACITY = [1, 1, 0, 0];
+const STAGE_B_TIMES = [0, at(2000), at(2400), at(4500), at(4900), 1] as const;
+const STAGE_B_OPACITY = [0, 0, 1, 1, 0, 0];
+const STAGE_C_TIMES = [0, at(4600), at(5000), 1] as const;
+const STAGE_C_OPACITY = [0, 0, 1, 1];
 
 function displayName(u: User | undefined, isMe: boolean): string {
   if (!u) return "?";
@@ -148,12 +187,36 @@ export function RevealStage({
 
   // When reduced, the cinematic is suppressed and downstream delays collapse.
   const podiumBaseDelay = reduce ? 0 : PODIUM_BASE_DELAY;
-  const pickFlipBaseDelay = reduce
-    ? 0
-    : podiumBaseDelay +
-      resultSlots.length * PODIUM_STAGGER +
-      PODIUM_DUR +
-      POST_PODIUM_SILENCE;
+  // The moment the last card (P1) finishes: it starts after (n-1) staggers,
+  // not n — the old expression over-counted by one stagger, which only went
+  // unnoticed because the stagger was 180ms. At §5.2's 600ms it would push
+  // the group a full beat late, so it is fixed here rather than absorbed.
+  const podiumSettle =
+    PODIUM_BASE_DELAY +
+    Math.max(0, resultSlots.length - 1) * PODIUM_STAGGER +
+    PODIUM_P1_DUR;
+  const pickFlipBaseDelay = reduce ? 0 : podiumSettle + POST_PODIUM_SILENCE;
+
+  // ─── Portrait: §5.2's three cross-fading stages in one viewport ───────
+  // The wide tree below scrolls (hero → podium → group). A phone has no room
+  // for that, so portrait holds one fixed box and cross-fades A → B → C
+  // through it. Same beats, same constants — only the staging differs.
+  if (isPortrait) {
+    return (
+      <PortraitCinematic
+        key={`portrait-${playKey}`}
+        hero={hero}
+        sweepTeam={sweepTeam}
+        reduce={reduce}
+        resultSlots={resultSlots}
+        driverById={driverById}
+        friendRows={friendRows}
+        currentUserId={currentUserId}
+        pickFlipBaseDelay={pickFlipBaseDelay}
+        onReplay={() => setPlayKey((k) => k + 1)}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-12">
@@ -206,7 +269,7 @@ export function RevealStage({
                 key={`podium-${slot.pos}-${playKey}`}
                 reduce={reduce}
                 delay={podiumBaseDelay + flipDelayFor(slot.pos)}
-                duration={PODIUM_DUR}
+                duration={slot.pos === 1 ? PODIUM_P1_DUR : PODIUM_DUR}
               >
                 <PodiumCard pos={slot.pos} driver={d} variant={variant} />
               </FlipCard>
@@ -990,5 +1053,669 @@ function FriendCard({
         </div>
       )}
     </article>
+  );
+}
+
+/* ─── Portrait cinematic (§5.2) ───────────────────────────────────────── */
+
+type FriendRow = {
+  prediction: Prediction;
+  score: Score | undefined;
+  user: User | undefined;
+};
+
+type ResultSlot = { pos: number; id: number | null };
+
+/**
+ * The phone cinematic: one fixed box, three stages cross-fading through it.
+ *
+ * Ports `📱 Reveal · Mobile 390 — LIVE animation` (the canvas's
+ * `MobRevealPlayScreen`, design/design_handoff_mobile/design/screens-mobile-d.jsx)
+ * and README §5.2. Two deliberate departures from that reference:
+ *
+ *  1. The canvas drives everything from a `requestAnimationFrame` clock
+ *     ticking a `t` state. .impeccable.md and CLAUDE.md both rule out RAF on
+ *     this route, so every window here is a Framer Motion keyframe track with
+ *     an explicit `times` array instead. Same windows, no clock, and reduced
+ *     motion can drop the whole thing structurally rather than throttling it.
+ *  2. §5.2 draws the stage chrome-free at a flat 844. The owner chose to keep
+ *     TopBar on this route, so the box is `100dvh - 52px` (TopBar's mobile
+ *     row) rather than a hard 844 — the stages size to whatever is left.
+ */
+function PortraitCinematic({
+  hero,
+  sweepTeam,
+  reduce,
+  resultSlots,
+  driverById,
+  friendRows,
+  currentUserId,
+  pickFlipBaseDelay,
+  onReplay,
+}: {
+  hero: RevealHero;
+  sweepTeam: TeamMeta | null;
+  reduce: boolean;
+  resultSlots: ResultSlot[];
+  driverById: Map<number, Driver>;
+  friendRows: FriendRow[];
+  currentUserId: string | null;
+  pickFlipBaseDelay: number;
+  onReplay: () => void;
+}) {
+  // `skipped` is the SKIP chip's destination and is exactly the same render
+  // reduced motion gets: the end state, with no sequence at all. Keeping one
+  // code path for both means SKIP can never drift from the reduced-motion
+  // fallback the design calls for.
+  const [skipped, setSkipped] = useState(false);
+  const atEnd = reduce || skipped;
+
+  return (
+    <div
+      className="relative overflow-hidden bg-[color:var(--bg)]"
+      style={{
+        // TopBar's mobile row is 52px (TopBar.tsx: `h-[52px]`). `dvh` so the
+        // mobile browser's collapsing address bar doesn't crop stage C.
+        height: "calc(100dvh - 52px)",
+        minHeight: 560,
+      }}
+    >
+      {!atEnd && (
+        <>
+          <PortraitStageA hero={hero} sweepTeam={sweepTeam} />
+          <PortraitStageB
+            resultSlots={resultSlots}
+            driverById={driverById}
+          />
+        </>
+      )}
+
+      <PortraitStageC
+        hero={hero}
+        resultSlots={resultSlots}
+        driverById={driverById}
+        friendRows={friendRows}
+        currentUserId={currentUserId}
+        baseDelay={pickFlipBaseDelay}
+        atEnd={atEnd}
+      />
+
+      {/* SKIP — present for the whole sequence (§5.2), then becomes the way
+          to run it again, so the chip is never a dead control. Suppressed
+          entirely under reduced motion: there is no sequence to skip and
+          nothing a replay could show, and .impeccable.md wants the cinematic
+          structurally absent for that audience rather than merely inert. */}
+      {!reduce && (
+      <button
+        type="button"
+        onClick={() => {
+          if (atEnd) {
+            setSkipped(false);
+            onReplay();
+          } else {
+            setSkipped(true);
+          }
+        }}
+        className="absolute right-[14px] top-[14px] z-10 grid h-11 place-items-center px-[9px] uppercase text-[color:var(--fg-subtle)]"
+        style={{
+          fontFamily: "var(--font-mono), ui-monospace, monospace",
+          fontSize: 9,
+          letterSpacing: "0.14em",
+          border: "1px solid var(--border)",
+          background: "color-mix(in oklch, var(--bg) 60%, transparent)",
+        }}
+      >
+        {atEnd ? "↻ Replay" : "Skip"}
+      </button>
+      )}
+    </div>
+  );
+}
+
+/** Stage A — stripe field, livery sweep, title slam. Fades out 1900→2300. */
+function PortraitStageA({
+  hero,
+  sweepTeam,
+}: {
+  hero: RevealHero;
+  sweepTeam: TeamMeta | null;
+}) {
+  return (
+    <motion.div
+      aria-hidden
+      data-stage="a"
+      className="pointer-events-none absolute inset-0"
+      initial={{ opacity: 1 }}
+      animate={{ opacity: STAGE_A_OPACITY }}
+      transition={{
+        duration: TIMELINE,
+        times: [...STAGE_A_TIMES],
+        ease: "linear",
+      }}
+    >
+      <motion.div
+        className="absolute inset-0"
+        style={{
+          background:
+            "repeating-linear-gradient(115deg, transparent 0 40px, oklch(58% 0.22 27 / 0.05) 40px 42px)",
+        }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: TITLE_DUR, ease: EASE_OUT_QUART }}
+      />
+
+      {sweepTeam && (
+        <motion.div
+          className="absolute"
+          style={{ top: "52%", left: 0, willChange: "transform, opacity" }}
+          initial={{ x: -420, y: "-50%", opacity: 0, filter: "blur(3px)" }}
+          animate={{ x: 450, y: "-50%", opacity: [0, 1, 1, 0] }}
+          transition={{
+            duration: SWEEP_DUR,
+            delay: SWEEP_DELAY,
+            ease: "linear",
+            opacity: {
+              duration: SWEEP_DUR,
+              delay: SWEEP_DELAY,
+              times: [0, 0.06, 0.94, 1],
+            },
+          }}
+        >
+          <Image
+            src={sweepTeam.carSrc}
+            alt=""
+            width={620}
+            height={240}
+            unoptimized
+            className="max-w-none select-none"
+            style={{
+              width: 620,
+              height: "auto",
+              filter: "drop-shadow(0 16px 34px rgba(0,0,0,0.6))",
+            }}
+          />
+        </motion.div>
+      )}
+
+      <motion.div
+        className="absolute inset-0 flex flex-col justify-center px-5"
+        initial={{ opacity: 0, x: -50, skewX: -8 }}
+        animate={{ opacity: 1, x: 0, skewX: 0 }}
+        transition={{ duration: TITLE_DUR, ease: EASE_OUT_QUART }}
+      >
+        <p
+          className="mb-[14px] uppercase text-[color:var(--accent)]"
+          style={{
+            fontFamily: "var(--font-mono), ui-monospace, monospace",
+            fontSize: 10,
+            letterSpacing: "0.2em",
+          }}
+          data-tabular
+        >
+          ● Round {String(hero.round).padStart(2, "0")} · The reveal
+        </p>
+
+        <p
+          className="relative m-0 italic"
+          data-tight
+          style={{
+            fontFamily: "var(--font-boldonse), ui-sans-serif",
+            fontSize: 58,
+            lineHeight: 0.86,
+            textTransform: "uppercase",
+          }}
+        >
+          {hero.short}
+          <br />
+          {/* §5.2 strokes "GRAND PRIX" in accent until 60% of the title beat,
+              then goes solid. A stroke width can't tween, so the solid word
+              sits in flow and an outlined copy is stacked over it — the two
+              swap with opacity at 0.72s (60% of TITLE_DUR). */}
+          <span className="relative inline-block">
+            <motion.span
+              className="block"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{
+                duration: 0.25,
+                delay: TITLE_DUR * 0.6,
+                ease: EASE_OUT_QUART,
+              }}
+            >
+              Grand Prix
+            </motion.span>
+            <motion.span
+              aria-hidden
+              className="absolute inset-0 block"
+              style={{
+                WebkitTextStroke: "2px var(--accent)",
+                color: "transparent",
+              }}
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 0 }}
+              transition={{
+                duration: 0.25,
+                delay: TITLE_DUR * 0.6,
+                ease: EASE_OUT_QUART,
+              }}
+            >
+              Grand Prix
+            </motion.span>
+          </span>
+        </p>
+
+        <p
+          className="mt-5 uppercase text-[color:var(--fg-muted)]"
+          style={{
+            fontFamily: "var(--font-mono), ui-monospace, monospace",
+            fontSize: 10,
+            letterSpacing: "0.14em",
+          }}
+          data-tabular
+        >
+          {hero.circuit.toUpperCase()}
+          {hero.laps != null && <> · {hero.laps} LAPS</>}
+        </p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/** Stage B — P3 → P2 → P1 flipping in. Fades in 2000→2400, out 4500→4900. */
+function PortraitStageB({
+  resultSlots,
+  driverById,
+}: {
+  resultSlots: ResultSlot[];
+  driverById: Map<number, Driver>;
+}) {
+  // Reveal order is P3 → P2 → P1, which is also the stacking order here.
+  const ordered = [...resultSlots].sort((a, b) => b.pos - a.pos);
+  return (
+    <motion.div
+      aria-hidden
+      data-stage="b"
+      className="pointer-events-none absolute inset-0 px-5"
+      style={{ paddingTop: 40 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: STAGE_B_OPACITY }}
+      transition={{
+        duration: TIMELINE,
+        times: [...STAGE_B_TIMES],
+        ease: "linear",
+      }}
+    >
+      <p
+        className="uppercase text-[color:var(--accent)]"
+        style={{
+          fontFamily: "var(--font-mono), ui-monospace, monospace",
+          fontSize: 9,
+          letterSpacing: "0.16em",
+        }}
+        data-tabular
+      >
+        Revealing the podium
+      </p>
+      {/* `data-podium` marks the one podium container on the page — the R3
+          invariant in tests/e2e/reveal-portrait.spec.ts uses it to prove that
+          only one choreography ever mounts, never both variants at once. */}
+      <div data-podium className="mt-4 grid gap-[10px]">
+        {ordered.map((slot, i) => (
+          <PortraitPodiumRow
+            key={slot.pos}
+            pos={slot.pos}
+            driver={slot.id !== null ? driverById.get(slot.id) : null}
+            delay={PODIUM_BASE_DELAY + i * PODIUM_STAGGER}
+            duration={slot.pos === 1 ? PODIUM_P1_DUR : PODIUM_DUR}
+          />
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+function PortraitPodiumRow({
+  pos,
+  driver,
+  delay,
+  duration,
+}: {
+  pos: number;
+  driver: Driver | null | undefined;
+  delay: number;
+  duration: number;
+}) {
+  const isP1 = pos === 1;
+  const t = driver ? teamMeta(driver.team) : null;
+  const height = isP1 ? 168 : 116;
+
+  return (
+    <motion.div
+      data-podium-card
+      className="relative flex items-center gap-[14px] overflow-hidden px-4"
+      style={{
+        height,
+        transformPerspective: 700,
+        transformOrigin: "center bottom",
+      }}
+      initial={{
+        rotateX: -70,
+        opacity: 0.6,
+        backgroundColor: "var(--surface)",
+        borderColor: "var(--border)",
+      }}
+      animate={{
+        rotateX: 0,
+        opacity: 1,
+        backgroundColor: t ? t.livery[1] : "var(--surface)",
+        borderColor: ["var(--accent)", "var(--accent)", "var(--border)"],
+        boxShadow: [
+          "inset 0 -3px 0 rgba(0,0,0,0)",
+          "inset 0 -3px 0 rgba(0,0,0,0)",
+          `inset 0 -3px 0 ${t?.hex ?? "rgba(0,0,0,0)"}`,
+        ],
+      }}
+      transition={{
+        duration,
+        delay,
+        ease: EASE_OUT_QUART,
+        borderColor: { duration, delay, times: [0, 0.85, 1] },
+        boxShadow: { duration, delay, times: [0, 0.85, 1] },
+      }}
+    >
+      <span
+        style={{
+          borderWidth: 1,
+          borderStyle: "solid",
+          position: "absolute",
+          inset: 0,
+          borderColor: "inherit",
+          pointerEvents: "none",
+        }}
+      />
+      <span
+        className="shrink-0"
+        style={{
+          fontFamily: "var(--font-boldonse), ui-sans-serif",
+          fontSize: isP1 ? 68 : 46,
+          lineHeight: 0.82,
+          color: "var(--fg)",
+        }}
+        data-tight
+      >
+        P{pos}
+      </span>
+
+      {/* The placeholder and the revealed content cross-fade in place rather
+          than switching on a clock reading — same reason the whole file has
+          no RAF. */}
+      <motion.span
+        className="absolute uppercase text-[color:var(--fg-subtle)]"
+        style={{
+          left: isP1 ? 108 : 82,
+          fontFamily: "var(--font-mono), ui-monospace, monospace",
+          fontSize: 11,
+          letterSpacing: "0.16em",
+        }}
+        initial={{ opacity: 1 }}
+        animate={{ opacity: 0 }}
+        transition={{ duration: duration * 0.4, delay }}
+      >
+        · · · · ·
+      </motion.span>
+
+      {driver && t && (
+        <motion.span
+          className="flex min-w-0 items-center gap-[14px]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: duration * 0.6, delay: delay + duration * 0.3 }}
+        >
+          <DriverPortrait
+            code={driver.code}
+            team={driver.team}
+            size={isP1 ? 64 : 52}
+          />
+          <span className="block min-w-0">
+            <span
+              className="block truncate"
+              style={{
+                fontFamily: "var(--font-boldonse), ui-sans-serif",
+                fontSize: isP1 ? 24 : 20,
+                textTransform: "uppercase",
+              }}
+            >
+              {driver.full_name.split(" ").slice(-1)[0]}
+            </span>
+            <span
+              className="mt-1 block uppercase"
+              style={{
+                fontFamily: "var(--font-mono), ui-monospace, monospace",
+                fontSize: 9,
+                letterSpacing: "0.1em",
+                color: t.hex,
+              }}
+              data-tabular
+            >
+              {t.name} · #{driver.id}
+            </span>
+          </span>
+        </motion.span>
+      )}
+    </motion.div>
+  );
+}
+
+/** Stage C — the group, scored. Fades in 4600→5000 and stays. */
+function PortraitStageC({
+  hero,
+  resultSlots,
+  driverById,
+  friendRows,
+  currentUserId,
+  baseDelay,
+  atEnd,
+}: {
+  hero: RevealHero;
+  resultSlots: ResultSlot[];
+  driverById: Map<number, Driver>;
+  friendRows: FriendRow[];
+  currentUserId: string | null;
+  baseDelay: number;
+  atEnd: boolean;
+}) {
+  const winnerId = resultSlots[0]?.id ?? null;
+  const winner = winnerId !== null ? driverById.get(winnerId) : null;
+  const winnerLast = winner?.full_name.split(" ").slice(-1)[0] ?? null;
+
+  return (
+    <motion.div
+      data-stage="c"
+      className="absolute inset-0 flex flex-col px-5 pb-5"
+      style={{ paddingTop: 36 }}
+      initial={atEnd ? false : { opacity: 0 }}
+      animate={atEnd ? undefined : { opacity: STAGE_C_OPACITY }}
+      transition={
+        atEnd
+          ? undefined
+          : { duration: TIMELINE, times: [...STAGE_C_TIMES], ease: "linear" }
+      }
+    >
+      <p
+        className="m-0"
+        data-tight
+        style={{
+          fontFamily: "var(--font-boldonse), ui-sans-serif",
+          fontSize: 36,
+          lineHeight: 0.88,
+          textTransform: "uppercase",
+        }}
+      >
+        The
+        <br />
+        Group
+      </p>
+      <p
+        className="mt-2 uppercase text-[color:var(--fg-subtle)]"
+        style={{
+          fontFamily: "var(--font-mono), ui-monospace, monospace",
+          fontSize: 9,
+          letterSpacing: "0.14em",
+        }}
+        data-tabular
+      >
+        {hero.short} · {winnerLast ? `${winnerLast} wins · ` : ""}scored
+      </p>
+
+      {friendRows.length === 0 ? (
+        <p className="mt-4 border border-dashed border-[color:var(--border)] px-4 py-3 text-sm text-[color:var(--fg-subtle)]">
+          No one submitted a pick for this session.
+        </p>
+      ) : (
+        // The rows scroll inside the stage when the group outgrows the
+        // window. The sequence itself still never scrolls (README:297) —
+        // this is a list inside stage C, not the page.
+        <ul className="mt-[14px] min-h-0 flex-1 overflow-y-auto border-t border-[color:var(--border)]">
+          {friendRows.map((row, i) => (
+            <PortraitFriendRow
+              key={row.prediction.user_id}
+              row={row}
+              isMe={row.user?.id === currentUserId}
+              driverById={driverById}
+              delay={atEnd ? 0 : baseDelay + i * PICK_STAGGER}
+              atEnd={atEnd}
+            />
+          ))}
+        </ul>
+      )}
+
+      <motion.div
+        className="mt-4 shrink-0"
+        initial={atEnd ? false : { opacity: 0 }}
+        animate={atEnd ? undefined : { opacity: 1 }}
+        transition={
+          atEnd ? undefined : { duration: CTA_DUR, delay: CTA_DELAY }
+        }
+      >
+        <MobButton href="/dashboard/league">See league table →</MobButton>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function PortraitFriendRow({
+  row,
+  isMe,
+  driverById,
+  delay,
+  atEnd,
+}: {
+  row: FriendRow;
+  isMe: boolean;
+  driverById: Map<number, Driver>;
+  delay: number;
+  atEnd: boolean;
+}) {
+  const name = displayName(row.user, isMe);
+  const pts = row.score?.points ?? 0;
+  const perfect = row.score?.perfect_bonus ?? false;
+  const picks = [
+    row.prediction.p1_driver_id,
+    row.prediction.p2_driver_id,
+    row.prediction.p3_driver_id,
+  ]
+    .map((id) => (id !== null ? driverById.get(id)?.code : null))
+    .filter((c): c is string => Boolean(c));
+
+  return (
+    <motion.li
+      className="grid items-center gap-2 border-b border-[color:var(--border)] pr-2"
+      style={{
+        gridTemplateColumns: "24px minmax(0,1fr) auto 40px",
+        height: 46,
+        background: isMe ? "var(--surface-2)" : "transparent",
+        // The sanctioned 3px prediction-row edge (CLAUDE.md's exception to
+        // the left-stripe ban), in accent because this row is *yours*.
+        boxShadow: isMe ? "inset 3px 0 0 0 var(--accent)" : "none",
+        paddingLeft: isMe ? 8 : 0,
+      }}
+      initial={atEnd ? false : { opacity: 0, y: 12 }}
+      animate={atEnd ? undefined : { opacity: 1, y: 0 }}
+      transition={atEnd ? undefined : { duration: PICK_DUR, delay }}
+    >
+      <span
+        className="grid size-[22px] place-items-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)]"
+        style={{
+          fontFamily: "var(--font-boldonse), ui-sans-serif",
+          fontSize: 9,
+        }}
+        aria-hidden
+      >
+        {name.charAt(0).toUpperCase()}
+      </span>
+
+      <span className="block min-w-0">
+        <span className="block truncate text-xs font-medium">
+          {name}
+          {isMe && (
+            <span
+              className="ml-1.5 text-[color:var(--accent)]"
+              style={{
+                fontFamily: "var(--font-mono), ui-monospace, monospace",
+                fontSize: 8,
+                letterSpacing: "0.12em",
+              }}
+            >
+              YOU
+            </span>
+          )}
+        </span>
+        <span
+          className="mt-0.5 block truncate text-[color:var(--fg-subtle)]"
+          style={{
+            fontFamily: "var(--font-mono), ui-monospace, monospace",
+            fontSize: 8,
+            letterSpacing: "0.08em",
+          }}
+          data-tabular
+        >
+          {picks.join(" · ") || "—"}
+        </span>
+      </span>
+
+      {perfect ? (
+        <span
+          className="border px-1 py-0.5 uppercase"
+          style={{
+            fontFamily: "var(--font-mono), ui-monospace, monospace",
+            fontSize: 8,
+            letterSpacing: "0.1em",
+            color: "var(--success)",
+            borderColor: "var(--success)",
+          }}
+        >
+          PP
+        </span>
+      ) : (
+        <span />
+      )}
+
+      <span
+        className="text-right"
+        style={{
+          fontFamily: "var(--font-mono), ui-monospace, monospace",
+          fontSize: 15,
+          color:
+            pts === 0
+              ? "var(--fg-subtle)"
+              : perfect
+                ? "var(--success)"
+                : "var(--fg)",
+        }}
+        data-tabular
+      >
+        +{pts}
+      </span>
+    </motion.li>
   );
 }

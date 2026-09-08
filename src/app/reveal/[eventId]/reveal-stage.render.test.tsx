@@ -137,7 +137,7 @@ describe("RevealStage variant prop (behavioural)", () => {
     expect(html).toContain("max-width: none;");
   });
 
-  it("portrait differs from wide — single-column stacked podium with portrait-scaled geometry", () => {
+  it("portrait replaces the wide tree with §5.2's staged cinematic", () => {
     const wide = render(<RevealStage {...baseProps} variant="wide" />);
     const wideHtml = wide.container.innerHTML;
     wide.unmount();
@@ -148,27 +148,32 @@ describe("RevealStage variant prop (behavioural)", () => {
     const portraitHtml = portrait.container.innerHTML;
     portrait.unmount();
 
-    // Guard against both renders vacuously agreeing (e.g. a regression that
-    // returns null for every variant would trivially satisfy "differs" via
-    // some other accidental mismatch while both are actually empty).
-    // "THE GROUP" is the friend-cascade section heading, present in every
-    // non-degenerate render of RevealStage regardless of variant.
+    // Guard against both renders vacuously agreeing (a regression returning
+    // null for every variant would trivially "differ" while both are empty).
     expect(wideHtml).toContain("THE GROUP");
-    expect(portraitHtml).toContain("THE GROUP");
-
-    // The actual assertion this task's rendering change makes true: wide
-    // and portrait output is no longer byte-identical.
+    expect(portraitHtml).toContain("Group");
     expect(portraitHtml).not.toBe(wideHtml);
 
-    // Concrete portrait-only signatures — not just "some string changed".
-    expect(portraitHtml).toContain("grid-template-columns: 1fr;");
+    // `window.matchMedia` is stubbed to force reduced motion in this file, so
+    // portrait renders §5.2's jump-to-end-state: stage C alone. Stages A and
+    // B are structurally absent, not merely transparent — .impeccable.md's
+    // reduced-motion rule — and with no sequence to skip the chip is gone too.
+    expect(portraitHtml).toContain("calc(100dvh - 52px)");
+    expect(portraitHtml).toContain("See league table");
+    expect(portraitHtml).not.toContain("Revealing the podium");
+    expect(portraitHtml).not.toContain("Skip");
+    expect(portraitHtml).not.toContain("Replay");
+
+    // Chunk 5b retired the stacked PodiumCard column portrait used to render;
+    // neither the wide three-across grid nor the card itself appears here.
     expect(portraitHtml).not.toContain("grid-template-columns: 1fr 1fr 1fr");
-    expect(portraitHtml).toContain("min-height: 260px"); // P1 card
-    expect(portraitHtml).toContain("min-height: 230px"); // P2/P3 cards
-    expect(portraitHtml).toContain("height: 104px;"); // P1 top band
-    expect(portraitHtml).toContain("height: 92px;"); // P2/P3 top band
-    expect(portraitHtml).toContain("font-size: 22px"); // P2/P3 footer code
-    expect(portraitHtml).toContain("max-width: 100%;"); // contained watermark
+    expect(portraitHtml).not.toContain("data-podium");
+
+    // Stage C's row shape (§5.2: 46px tall, 24 / 1fr / auto / 40 tracks).
+    expect(portraitHtml).toContain(
+      "grid-template-columns: 24px minmax(0,1fr) auto 40px",
+    );
+    expect(portraitHtml).toContain("height: 46px");
   });
 
   it("defaults to 'wide' rendering when variant is omitted", () => {

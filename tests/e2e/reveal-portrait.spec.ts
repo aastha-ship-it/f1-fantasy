@@ -77,11 +77,73 @@ async function waitForPodiumSettled(page: Page): Promise<void> {
       return cards.every((c) => {
         const wrapper = c.parentElement;
         if (!wrapper) return false;
-        return parseFloat(getComputedStyle(wrapper).opacity) >= 0.99;
+        // The two trees animate opacity at different levels: wide puts it on
+        // the FlipCard *wrapper* and leaves the card opaque; portrait (chunk
+        // 5b) animates the card itself (0.6 → 1) under a static grid. Gating
+        // on both means this helper measures the real flip in either tree —
+        // checking only the wrapper would report portrait settled at mount.
+        return (
+          parseFloat(getComputedStyle(wrapper).opacity) >= 0.99 &&
+          parseFloat(getComputedStyle(c).opacity) >= 0.99
+        );
       });
     },
     { timeout: 15_000 },
   );
+}
+
+/**
+ * Milliseconds from the FIRST podium card settling to the LAST one settling.
+ *
+ * This is deliberately not "navigation → settled". That interval bundles the
+ * animation together with routing, hydration and image decode, and an emulated
+ * phone context pays noticeably more for those than a desktop one does when
+ * the two run concurrently — which is why the old measurement drifted 250–370ms
+ * apart under load while passing in isolation, with nothing forked at all.
+ *
+ * The span between the first and last card is pure choreography: it is
+ * (n-1) × PODIUM_STAGGER by construction, starts from a rendered state rather
+ * than a wall-clock guess, and cancels out every fixed cost both contexts pay.
+ * A genuine fork in the timing constants still moves it immediately.
+ */
+async function measurePodiumSpanMs(page: Page): Promise<number> {
+  const settledCount = () =>
+    page.evaluate(() => {
+      const cards = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-podium-card]"),
+      );
+      return cards.filter((c) => {
+        const wrapper = c.parentElement;
+        if (!wrapper) return false;
+        return (
+          parseFloat(getComputedStyle(wrapper).opacity) >= 0.99 &&
+          parseFloat(getComputedStyle(c).opacity) >= 0.99
+        );
+      }).length;
+    });
+
+  await page.waitForFunction(
+    () =>
+      Array.from(
+        document.querySelectorAll<HTMLElement>("[data-podium-card]"),
+      ).some((c) => {
+        const wrapper = c.parentElement;
+        if (!wrapper) return false;
+        return (
+          parseFloat(getComputedStyle(wrapper).opacity) >= 0.99 &&
+          parseFloat(getComputedStyle(c).opacity) >= 0.99
+        );
+      }),
+    { timeout: 15_000 },
+  );
+  const t0 = Date.now();
+  expect(
+    await settledCount(),
+    "expected the cards to settle one at a time — if they all settle together the stagger has collapsed",
+  ).toBeLessThan(3);
+
+  await waitForPodiumSettled(page);
+  return Date.now() - t0;
 }
 
 /** Waits for the friend-card cascade (the section below the podium) to have
@@ -199,48 +261,41 @@ test.describe("reveal portrait choreography", () => {
     // 3 cards for a non-sprint event, stacked (identical left edge).
     const cards = page.locator("[data-podium-card]");
     await expect(cards).toHaveCount(3);
+    // offsetLeft, not getBoundingClientRect().left: stage B flips its cards
+    // on `perspective(700px) rotateX(-70deg → 0)`, and a perspective
+    // transform foreshortens the *visual* box, so two cards at different
+    // points in the same flip legitimately report different client rects.
+    // The claim here is about layout — one full-bleed column — which
+    // offsetLeft states directly and without waiting on the choreography.
+    // (All three share an offsetParent: stage B's positioned root.)
     const lefts = await cards.evaluateAll((els) =>
-      els.map((e) => Math.round(e.getBoundingClientRect().left)),
+      els.map((e) => (e as HTMLElement).offsetLeft),
     );
     expect(new Set(lefts).size, "portrait cards must share a left edge").toBe(1);
 
     const { sw, cw } = await measureNoOverflow(page);
     expect(sw).toBeLessThanOrEqual(cw + 1);
 
-    // MINOR 2 (fix round 2): the livery-sweep width fork inside
-    // `CinematicHero` (`isPortrait ? "min(1100px, 150vw)" : "min(1100px,
-    // 70vw)"`, reveal-stage.tsx:353) had zero coverage — it never mounts in
-    // the jsdom unit tests (reduced motion is forced there) and wasn't
-    // asserted in this spec either. This test doesn't force reduced motion,
-    // so `CinematicHero` is guaranteed to have mounted here.
+    // The livery sweep lives in stage A of the portrait cinematic (chunk 5b).
+    // It is no longer the viewport-relative `min(1100px, 150vw)` fork that
+    // CinematicHero used — §5.2 fixes the car at 620px and translates it
+    // -420 → +450 across the frame, so the sweep reads the same on 375, 390
+    // and 412 instead of growing with the viewport.
     //
-    // Scoping: `page.locator("section").first()` is NOT `CinematicHero` —
-    // TopBar's "How scoring works" popover (`ScoringLegend.tsx`) renders
-    // its own (hidden but DOM-present) `<section>` elements earlier in the
-    // document, so `.first()` silently matched the wrong section and found
-    // 0 images. `CinematicHero`'s root section is uniquely identified by
-    // its literal className combination instead.
-    //
-    // Assertion target: the *specified* CSS text, not the rendered/used
-    // pixel width. The used width of this particular `<img>` (absolutely
-    // positioned, filtered, no explicit parent width) is subject to a
-    // pre-existing browser layout quirk under mobile viewport emulation —
-    // verified by hand that even a hardcoded `width: 585px` (no viewport
-    // units at all) on this element measures short of 585px via
-    // `getBoundingClientRect()`, so a used-value pixel assertion would be
-    // testing that quirk, not this task's isPortrait fork. Pinning the
-    // specified style text is deterministic and directly proves which
-    // branch of the ternary React applied — the same approach
-    // reveal-stage.render.test.tsx already uses for the other forks.
+    // Assertion target is the *specified* CSS text, not the used pixel width:
+    // this <img> is absolutely positioned inside a filtered, transformed
+    // parent, and its used width measures short under mobile viewport
+    // emulation (verified by hand — a hardcoded width does it too), so a
+    // measured assertion would be testing that quirk rather than the fork.
     const sweepImg = page
-      .locator("section.relative.overflow-hidden.border-b")
+      .locator('[data-stage="a"]')
       .locator('img[alt=""]')
       .first();
     await expect(sweepImg).toHaveCount(1);
     const sweepStyleWidth = await sweepImg.evaluate(
       (el) => (el as HTMLElement).style.width,
     );
-    expect(sweepStyleWidth).toBe("min(1100px, 150vw)");
+    expect(sweepStyleWidth).toBe("620px");
 
     if (CAPTURE_EVIDENCE) {
       // Not required by any R1–R6 resolution — extra evidence beyond the
@@ -355,12 +410,15 @@ test.describe("reveal portrait choreography", () => {
   }
 
   /**
-   * R6 — reduced motion is a real audience, not a fallback. StaticHero (the
-   * prefers-reduced-motion path) must get the same portrait treatment as
-   * the cinematic path, verified with a real `emulateMedia` at a phone
-   * viewport rather than by reading the diff.
+   * R6 — reduced motion is a real audience, not a fallback. Chunk 5b changed
+   * what "reduced" means on a phone: portrait no longer renders StaticHero
+   * under the old stacked podium, it jumps straight to the cinematic's END
+   * STATE (§5.2's `reduced` flag) — stage C, the scored group, alone. Stages
+   * A and B are structurally absent rather than played at zero duration,
+   * which is .impeccable.md's rule for this audience. StaticHero still backs
+   * the WIDE tree; that coverage moved into its own case below.
    */
-  test("reduced motion at a phone viewport renders StaticHero with portrait sizing intact (R6)", async ({
+  test("reduced motion at a phone viewport jumps to the end state (R6)", async ({
     browser,
   }) => {
     phoneCtx = await browser.newContext({ ...devices["iPhone 14"] });
@@ -374,52 +432,91 @@ test.describe("reveal portrait choreography", () => {
     await page.waitForURL(/\/reveal\/[^/]+$/);
     await page.waitForLoadState("networkidle");
 
-    // The CinematicHero-only "Replay" button proves which hero mounted.
-    // Its absence, plus the static heading text, proves StaticHero mounted.
+    // Stage C is the whole render: present, and the only stage mounted.
+    await expect(page.locator('[data-stage="c"]')).toHaveCount(1);
+    await expect(page.locator('[data-stage="a"]')).toHaveCount(0);
+    await expect(page.locator('[data-stage="b"]')).toHaveCount(0);
+    // No podium choreography at all — stage B is where it lives.
+    await expect(page.locator("[data-podium]")).toHaveCount(0);
+
+    // With no sequence there is nothing to skip or replay, so neither chip
+    // is offered (a "Skip" that skips nothing is a dead control).
+    await expect(page.getByRole("button", { name: /skip|replay/i })).toHaveCount(
+      0,
+    );
+
+    // The end state is the group stage, fully formed. Matched case-sensitively
+    // against the DOM text ("The Group") rather than the rendered "THE GROUP":
+    // the caps come from `text-transform`, which textContent never sees.
+    await expect(page.locator('[data-stage="c"]')).toContainText("Group");
+    await expect(
+      page.getByRole("link", { name: /see league table/i }),
+    ).toBeVisible();
+
+    const { sw, cw } = await measureNoOverflow(page);
+    expect(sw).toBeLessThanOrEqual(cw + 1);
+  });
+
+  /**
+   * R6b — StaticHero, the reduced-motion path, still backs the WIDE tree.
+   * This is the coverage the old phone-viewport R6 carried before chunk 5b
+   * repointed portrait at the end state; dropping it would have left
+   * StaticHero with no browser-level test at all.
+   */
+  test("reduced motion at a desktop viewport still renders StaticHero (R6b)", async ({
+    browser,
+  }) => {
+    wideCtx = await browser.newContext({ ...devices["Desktop Chrome"] });
+    const page = await wideCtx.newPage();
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await signIn(page, "reduced-motion-wide");
+    await page.goto("/reveal");
+    const links = nonSprintRaceLinks(page);
+    expect(await links.count()).toBeGreaterThan(0);
+    await links.first().click();
+    await page.waitForURL(/\/reveal\/[^/]+$/);
+    await page.waitForLoadState("networkidle");
+
+    // The CinematicHero-only "Replay" button proves which hero mounted. Its
+    // absence, plus the static heading, proves StaticHero did.
     await expect(
       page.getByRole("button", { name: "Replay reveal animation" }),
     ).toHaveCount(0);
     await expect(page.getByText("GRAND PRIX")).toBeVisible();
 
-    // Portrait clamp: clamp(40px, 13vw, 96px) at a 390px-wide iPhone 14
-    // viewport evaluates to 13vw = 50.7px — inside the clamp's floor/ceiling,
-    // so this pins the actual formula rather than merely "some font-size".
-    const h1FontPx = await page
-      .locator("h1")
-      .first()
-      .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-    const viewportWidth = page.viewportSize()!.width;
-    const expectedPx = (13 / 100) * viewportWidth;
-    expect(Math.abs(h1FontPx - expectedPx)).toBeLessThan(1);
-
-    const { sw, cw } = await measureNoOverflow(page);
-    expect(sw).toBeLessThanOrEqual(cw + 1);
-
-    // Podium underneath is unaffected by reduced motion — still one
-    // full-bleed stacked column for the non-sprint race event.
+    // The wide podium is unaffected by reduced motion — still three across.
     await expect(page.locator("[data-podium]")).toHaveCount(1);
-    const cards = page.locator("[data-podium-card]");
-    await expect(cards).toHaveCount(3);
-    const lefts = await cards.evaluateAll((els) =>
-      els.map((e) => Math.round(e.getBoundingClientRect().left)),
-    );
-    expect(new Set(lefts).size).toBe(1);
+    await expect(page.locator("[data-podium-card]")).toHaveCount(3);
+    const lefts = await page
+      .locator("[data-podium-card]")
+      .evaluateAll((els) =>
+        els.map((e) => Math.round(e.getBoundingClientRect().left)),
+      );
+    expect(
+      new Set(lefts).size,
+      "wide cards must NOT share a left edge — they sit three across",
+    ).toBe(3);
   });
 
   /**
    * R4 — timing must not fork. PODIUM_BASE_DELAY / PODIUM_STAGGER /
-   * PODIUM_DUR stay one shared source of truth; portrait only changes
-   * geometry/type scale. This programmatically asserts the acceptance test
-   * from the brief's Step 5 hand-check item 4 ("total runtime matches a
-   * desktop viewer's within ~0.2s") by measuring, from navigation to the
-   * moment the LAST (P1) podium card's flip transition finishes, in both a
-   * phone-portrait and a desktop-wide context, and diffing the two
-   * elapsed durations.
+   * PODIUM_DUR / PODIUM_P1_DUR stay one shared source of truth.
+   *
+   * Chunk 5b retimed the whole cinematic to README §5.2's beat table and the
+   * owner ruled that the new timings land on BOTH widths, so this invariant
+   * survives the retime unchanged — only the numbers behind it moved. What
+   * forked in 5b is the staging (portrait cross-fades three stages through
+   * one viewport; wide still scrolls), never the clock. If a future change
+   * wants portrait to run at its own pace, this is the test that should stop
+   * it until that is a deliberate, reviewed decision.
+   *
+   * Measures navigation → the moment the LAST (P1) card's flip finishes, in a
+   * phone-portrait and a desktop-wide context, and diffs the two.
    */
   test("portrait and wide podium timelines finish within ~0.2s of each other (R4)", async ({
     browser,
   }) => {
-    async function measureRuntimeMs(
+    async function measureSpanMs(
       device: Parameters<typeof browser.newContext>[0],
       tag: string,
     ): Promise<number> {
@@ -429,31 +526,30 @@ test.describe("reveal portrait choreography", () => {
       await page.goto("/reveal");
       const links = nonSprintRaceLinks(page);
       expect(await links.count()).toBeGreaterThan(0);
-      const t0 = Date.now();
       await links.first().click();
       await page.waitForURL(/\/reveal\/[^/]+$/);
-      // The moment every card settles is PODIUM_BASE_DELAY + 2*PODIUM_STAGGER
-      // + PODIUM_DUR after mount (P1 lands last) — identical in both variants
-      // because Task 15 changes geometry only, never PODIUM_BASE_DELAY /
-      // PODIUM_STAGGER / PODIUM_DUR.
-      await waitForPodiumSettled(page);
-      const elapsed = Date.now() - t0;
+      // The span from the first card settling to the last is (n-1) ×
+      // PODIUM_STAGGER = 2 × 0.6s under §5.2's beat table, plus the extra
+      // 200ms P1 holds over P3/P2 (PODIUM_P1_DUR 0.8 vs PODIUM_DUR 0.6).
+      // Identical in both variants: chunk 5b changed the staging and the
+      // geometry, never the timing constants.
+      const span = await measurePodiumSpanMs(page);
       await ctx.close();
-      return elapsed;
+      return span;
     }
 
-    const portraitMs = await measureRuntimeMs(
+    const portraitMs = await measureSpanMs(
       { ...devices["iPhone 14"] },
       "runtime-portrait",
     );
-    const wideMs = await measureRuntimeMs(
+    const wideMs = await measureSpanMs(
       { ...devices["Desktop Chrome"] },
       "runtime-wide",
     );
 
     expect(
       Math.abs(portraitMs - wideMs),
-      `portrait ${portraitMs}ms vs wide ${wideMs}ms — PODIUM_* timing constants must not fork between variants`,
+      `portrait ${portraitMs}ms vs wide ${wideMs}ms podium span — PODIUM_* timing constants must not fork between variants`,
     ).toBeLessThan(200);
   });
 });

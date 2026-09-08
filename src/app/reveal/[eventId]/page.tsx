@@ -203,7 +203,17 @@ export default async function RevealPage({
   return (
     <>
       <TopBar active="reveal" displayName={myDisplayName} email={userData.user?.email ?? null} />
-      <main className="mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16">
+      {/* Portrait runs the cinematic full-bleed: §5.2 wants the stages to own
+          the viewport, and the page gutters would both crop stage C's row
+          list and stop the livery sweep reaching the screen edges. The wide
+          shell is untouched. */}
+      <main
+        className={
+          variant === "portrait"
+            ? "w-full"
+            : "mx-auto w-full max-w-[1600px] px-6 py-10 sm:px-8 lg:px-12 xl:px-16"
+        }
+      >
         <RevealStage
           event={event}
           hero={cinematicHero}
