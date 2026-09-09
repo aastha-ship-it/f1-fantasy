@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type { SubmitPredictionResult } from "@/lib/submitPrediction";
 import { DriverPortrait } from "@/components/DriverPortrait";
 import { MobSectionHead } from "@/components/MobilePrimitives";
@@ -128,14 +128,59 @@ export function DriverPicker({
   const canSubmit = !isClosed && !pending && allFilled && distinctFilled;
 
   const driverById = new Map(drivers.map((d) => [d.id, d]));
-  const pickedIds = new Set(
-    slots.map((s) => picks[s]).filter((v): v is number => v !== null),
+  // R-1 replaced the old `pickedIds` Set: the grid no longer just needs to
+  // know THAT a driver is picked (to dim it), it needs WHICH slot, to print
+  // the `P{n}` badge that replaced the dim.
+  const slotByDriverId = new Map<number, number>(
+    slots.flatMap((s, i) => {
+      const id = picks[s];
+      return id == null ? [] : [[id, i] as [number, number]];
+    }),
   );
+  // One derivation feeds three call sites — the heading's `Next: P{n}` chip,
+  // the "tap a driver to fill P{n}" prompt, and the hot-picks line that R-1
+  // lifts out of the P3 telemetry panel. -1 means the podium is full.
+  const nextEmptyIdx = slots.findIndex((s) => picks[s] === null);
+  const nextEmptySlot = nextEmptyIdx === -1 ? null : slots[nextEmptyIdx];
+
+  const podiumRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * R-1's scroll-to-podium. Base-level only, and structurally absent under
+   * reduced motion.
+   *
+   * Two gates, both deliberate:
+   *  - `max-width: 779.98px` — at and above the fork the podium sits ABOVE
+   *    the grid, so scrolling to it would yank the page backwards. The
+   *    reorder is base-only; so is its affordance.
+   *  - `prefers-reduced-motion` — the README says SKIP the scroll, not run
+   *    it instantly. Same rule the reveal cinematic follows: motion is
+   *    removed, not throttled.
+   *
+   * `matchMedia` is feature-detected because jsdom doesn't implement it and
+   * a unit test that clicks a grid button would otherwise throw.
+   */
+  function scrollToPodium() {
+    const el = podiumRef.current;
+    if (!el || typeof window.matchMedia !== "function") return;
+    if (!window.matchMedia("(max-width: 779.98px)").matches) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // After the pick paints, so the card that just filled is the one measured.
+    requestAnimationFrame(() =>
+      el.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  }
 
   function fillNextEmpty(driverId: number) {
     if (isClosed || pending) return;
     setFeedback(null);
     setJustSaved(null);
+    // Read from the rendered `picks`, not from inside the updater: the
+    // updater is re-invoked in StrictMode, and scrolling is a side effect.
+    // A tap that toggles a driver OFF, or that lands on a full podium,
+    // must not scroll — only a real fill does.
+    const willFill =
+      !slots.some((s) => picks[s] === driverId) && nextEmptySlot !== null;
     setPicks((prev) => {
       // If already picked, remove it (toggle off).
       const slotWith = slots.find((s) => prev[s] === driverId);
@@ -145,6 +190,7 @@ export function DriverPicker({
       if (!empty) return prev;
       return { ...prev, [empty]: driverId };
     });
+    if (willFill) scrollToPodium();
   }
 
   function clearSlot(slot: Slot) {
@@ -194,6 +240,30 @@ export function DriverPicker({
       className="pb-[calc(8rem+var(--tabbar-h)+env(safe-area-inset-bottom,0px))] md:pb-32"
       data-testid="driver-picker"
     >
+      {/* R-1 REORDER — pattern B'. At 390 the grid comes first and the podium
+          summary fills below it; at md the podium is first, as it always was.
+          No `md:` utility can reverse two siblings, so both sections move
+          under one `flex flex-col` wrapper whose `order` decides the phone
+          layout — and `md:contents` erases that wrapper's box entirely above
+          the fork, handing both sections back to the <form> in source order.
+          `order` is inert in block layout, so it needs no `md:` counterpart.
+
+          The podium half needs its own inner wrapper for the same reason: its
+          section is a `grid`, so the "Your podium" head cannot live inside it
+          without becoming a grid item. Wrapper #2 is `md:contents` too, and
+          the head is `md:hidden` — a display:none element in the desktop DOM,
+          zero pixels, the same idiom "The Grid" head already uses. */}
+      <div className="flex flex-col md:contents">
+        <div className="order-2 mt-[26px] md:contents">
+          {/* Scroll target for a grid tap (see `scrollToPodium`). The 61px
+              scroll margin clears the sticky TopBar — 52px bar + 1px border
+              + 8px of air — or the heading lands underneath it. */}
+          <div ref={podiumRef} className="scroll-mt-[61px] md:hidden">
+            <MobSectionHead
+              title="Your podium"
+              meta={`${filledCount} of ${slots.length} chosen`}
+            />
+          </div>
       {/* Slot cards — single full-width column below md; 1.2fr 1fr 1fr
           (P1 wider) at md and up. Sprint shows just P1 full-width at every
           width. */}
@@ -201,8 +271,11 @@ export function DriverPicker({
           stacked with a 10px gap; at md this is the original 1px-hairline
           grid (gap-px over a --border ground, cards borderless). Gap and
           ground moved out of the inline style so they can fork at all. */}
+      {/* The section's own `mt-10` moves to the wrapper above at base (the
+          26px gap belongs between the grid and the "Your podium" head, not
+          between the head and the cards); `md:mt-10` restores it verbatim. */}
       <section
-        className={`mt-10 grid gap-2.5 border-0 border-[color:var(--border)] bg-transparent md:gap-px md:border md:bg-[color:var(--border)] ${
+        className={`mt-0 grid gap-2.5 border-0 border-[color:var(--border)] bg-transparent md:mt-10 md:gap-px md:border md:bg-[color:var(--border)] ${
           isSprint
             ? "grid-cols-[1fr]"
             : "grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr]"
@@ -218,10 +291,24 @@ export function DriverPicker({
           return (
             <div
               key={slot}
-              className="relative flex min-h-[96px] flex-col gap-2 overflow-hidden border border-[color:var(--border)] p-4 md:min-h-[320px] md:gap-5 md:border-0 md:p-7"
-              style={{
-                background: isP1 ? "var(--surface-2)" : "var(--surface)",
-              }}
+              /* R-1: an EMPTY card goes dashed-and-transparent at 390 — it is
+                 a hole to fill, and drawing it on the same solid surface as a
+                 filled card made the two read alike. The card ground was an
+                 inline `background`, which no `md:` class can beat, so it
+                 moves to a custom property the classes reference; desktop
+                 resolves to the same colour it always did. The `md:border-0`
+                 already in the base string means the dashed edge cannot leak
+                 upward — `md:border-solid` is belt-and-braces. */
+              className={`relative flex min-h-[96px] flex-col gap-2 overflow-hidden border p-4 md:min-h-[320px] md:gap-5 md:border-0 md:p-7 ${
+                d
+                  ? "border-[color:var(--border)] bg-[var(--card-bg)]"
+                  : "border-dashed border-[color:var(--border)] bg-transparent md:border-solid md:bg-[var(--card-bg)]"
+              }`}
+              style={
+                {
+                  "--card-bg": isP1 ? "var(--surface-2)" : "var(--surface)",
+                } as React.CSSProperties
+              }
             >
               {/* Watermark livery car. Wrapped in a mask div that fades the
                   bottom ~45% to transparent so the telemetry panel below it
@@ -297,6 +384,11 @@ export function DriverPicker({
               <div className="relative flex items-center gap-3.5 md:contents">
               <div className="relative flex shrink-0 items-baseline justify-between md:shrink">
                 <span
+                  /* Empty slots drop to `--fg-subtle` at 390 (canvas): the
+                     dashed card has no other cue that P2 is still open. */
+                  className={
+                    d ? "" : "text-[color:var(--fg-subtle)] md:text-[color:var(--fg)]"
+                  }
                   style={{
                     fontFamily: "var(--font-boldonse), ui-sans-serif",
                     // Minimums are the canvas's mobile sizes (52 / 40).
@@ -367,8 +459,17 @@ export function DriverPicker({
                 // child above the fork — the wrapper exists only to hang the
                 // canvas's accent prompt underneath at phone width.
                 <div className="relative md:contents">
+                  {/* Two elements, not one with forked classes: R-1 changes
+                      both the string and the inline size (14 vs 16), and the
+                      arrow now points UP because the grid moved above. */}
                   <p
-                    className="relative italic text-[color:var(--fg-muted)]"
+                    className="relative italic text-[color:var(--fg-muted)] md:hidden"
+                    style={{ fontWeight: 500, fontSize: 14 }}
+                  >
+                    Still open
+                  </p>
+                  <p
+                    className="relative hidden italic text-[color:var(--fg-muted)] md:block"
                     style={{ fontWeight: 500, fontSize: 16 }}
                   >
                     Who&rsquo;s on the podium?
@@ -378,9 +479,31 @@ export function DriverPicker({
                     data-tabular
                     style={{ fontSize: 9, letterSpacing: "0.12em" }}
                   >
-                    Tap to pick →
+                    ↑ Pick from the grid
                   </p>
                 </div>
+              )}
+
+              {/* R-1 puts `CHANGE` at the right edge of the filled card's
+                  header row. It is a real <button>, not the canvas's inert
+                  label — `clearSlot` is the only non-toggle way to empty a
+                  slot — so it is rendered TWICE, B'-style: this one below the
+                  fork, the underlined one below the telemetry panel at `md:`.
+                  Only ever one is in the box tree (the other is
+                  `display:none`, so it also leaves the a11y tree). The 44px
+                  tap floor costs no height: the row already carries a 52px
+                  portrait. */}
+              {d && (
+                <button
+                  type="button"
+                  onClick={() => clearSlot(slot)}
+                  disabled={isClosed || pending}
+                  className="relative ml-auto flex min-h-[44px] shrink-0 items-center self-center pl-2 uppercase text-[color:var(--fg-subtle)] disabled:opacity-50 md:hidden"
+                  data-tabular
+                  style={{ fontSize: 9, letterSpacing: "0.1em", zIndex: 1 }}
+                >
+                  Change
+                </button>
               )}
               </div>
 
@@ -395,8 +518,15 @@ export function DriverPicker({
                   Padding is written per side on both sides of the fork:
                   Tailwind sorts the `p-*` shorthand BEFORE `pt-*`/`pb-*`, so
                   a base longhand would outlive an `md:` shorthand. */}
+              {/* R-1: EMPTY cards carry no telemetry below the fork — there
+                  is no driver to report on, and the two fallbacks this panel
+                  used to show there (hot picks, "pick a driver to see form")
+                  now live as one line under the whole section. `md:block` is
+                  the div's own default display, so `md:` is byte-identical. */}
               <div
-                className="relative mt-1.5 border-t border-[color:var(--border)] bg-transparent px-0 pt-3 pb-0 md:mt-auto md:border-t-[color:var(--tele-edge)] md:bg-[var(--tele-tint)] md:px-[var(--space-lg)] md:pt-[var(--space-lg)] md:pb-[var(--space-lg)]"
+                className={`relative mt-1.5 border-t border-[color:var(--border)] bg-transparent px-0 pt-3 pb-0 ${
+                  d ? "" : "hidden md:block"
+                } md:mt-auto md:border-t-[color:var(--tele-edge)] md:bg-[var(--tele-tint)] md:px-[var(--space-lg)] md:pt-[var(--space-lg)] md:pb-[var(--space-lg)]`}
                 aria-label={`Telemetry for ${d?.code ?? `slot P${idx + 1}`}`}
                 style={
                   {
@@ -563,11 +693,16 @@ export function DriverPicker({
                   type="button"
                   onClick={() => clearSlot(slot)}
                   disabled={isClosed || pending}
-                  /* The canvas omits this control; we keep it because
-                     `clearSlot` is the only non-toggle way to empty a slot.
-                     It is an 11px text button, so it gets the 44px tap floor
-                     below the fork and its original box back at `md:`. */
-                  className="relative flex min-h-[44px] items-center self-start text-[11px] uppercase text-[color:var(--fg-muted)] underline underline-offset-[3px] disabled:opacity-50 md:block md:min-h-0"
+                  /* The `md:` half of the pair above. R-1 moved this control
+                     into the header row at 390, so the underlined version is
+                     now desktop-only — `hidden md:block` resolves to exactly
+                     what `md:block md:min-h-0` resolved to before, since
+                     `flex`/`min-h-[44px]`/`items-center` only ever applied
+                     below the fork. `relative self-start` stay: the first
+                     pairs with `zIndex:1` over the livery watermark, the
+                     second is what keeps the button content-width in the
+                     card's stretch-aligned flex column. */
+                  className="relative hidden self-start text-[11px] uppercase text-[color:var(--fg-muted)] underline underline-offset-[3px] disabled:opacity-50 md:block"
                   style={{ letterSpacing: "0.04em", zIndex: 1 }}
                   data-tabular
                 >
@@ -579,13 +714,74 @@ export function DriverPicker({
         })}
       </section>
 
+          {/* R-1: the group's hot picks used to live inside the empty slot's
+              telemetry panel, once per empty slot. Below the fork empty cards
+              carry no telemetry at all, so the signal survives as one mono-9
+              line closing the section — for the slot you are about to fill,
+              not for all of them. `md:` keeps the per-panel version. */}
+          {nextEmptySlot && hotPicks && hotPicks[nextEmptySlot].length > 0 && (
+            <p
+              className="mt-2.5 text-[color:var(--fg-subtle)] md:hidden"
+              data-tabular
+              style={{
+                fontSize: 9,
+                letterSpacing: "0.06em",
+                lineHeight: 1.6,
+              }}
+            >
+              Group&rsquo;s hot picks for P{nextEmptyIdx + 1} ·{" "}
+              <span className="text-[color:var(--fg-muted)]">
+                {hotPicks[nextEmptySlot].join(" · ")}
+              </span>
+            </p>
+          )}
+        </div>
+
       {/* The Grid — 10 (or 5 on smaller breakpoints) col driver picker */}
-      <section className="mt-10">
+      <section className="order-1 mt-[22px] md:mt-10">
+        {/* R-1 heading. Hand-rolled rather than `MobSectionHead` because the
+            canvas wants a 20px display title and that component is locked at
+            16 — its contract is that its values ARE the phone values, so
+            adding a size prop would make them negotiable. The canvas drops
+            "The Grid" here entirely: at 390 this block is the first thing
+            under the countdown, so it has to say what to DO, not what it is.
+            Desktop's `THE GRID` heading below is untouched. */}
         <div className="md:hidden">
-          <MobSectionHead
-            title="The Grid"
-            meta={`2026 · ${drivers.length} drivers`}
-          />
+          <div className="flex items-baseline justify-between gap-2.5">
+            <p
+              className="uppercase"
+              style={{
+                fontFamily: "var(--font-boldonse), ui-sans-serif",
+                fontSize: 20,
+                lineHeight: 1,
+              }}
+            >
+              Pick your podium
+            </p>
+            {!isClosed && nextEmptySlot && (
+              <p
+                className="uppercase text-[color:var(--accent)]"
+                data-tabular
+                style={{ fontSize: 9, letterSpacing: "0.12em" }}
+              >
+                Next: P{nextEmptyIdx + 1}
+              </p>
+            )}
+          </div>
+          {/* The canvas only draws the 2-of-3 state; the full and locked
+              strings are ours. Neither can say "tap a driver to fill P{n}" —
+              there is no next slot to name. */}
+          <p
+            className="mt-2 text-[color:var(--fg-muted)]"
+            data-tabular
+            style={{ fontSize: 10, letterSpacing: "0.02em" }}
+          >
+            {isClosed
+              ? `Predictions closed · ${filledCount} of ${slots.length} chosen`
+              : nextEmptySlot
+                ? `Tap a driver to fill P${nextEmptyIdx + 1} · ${filledCount} of ${slots.length} chosen`
+                : `${filledCount} of ${slots.length} chosen · tap a pick to clear it`}
+          </p>
         </div>
         <div className="mb-4 hidden items-baseline justify-between md:flex">
           <p
@@ -610,22 +806,39 @@ export function DriverPicker({
             `grid-cols-*` utility, so the variant wins cleanly. Side borders
             drop below the fork so the bled list reads as hairline rules. */}
         <ul
-          className="-mx-5 grid grid-cols-[repeat(4,minmax(0,1fr))] border-x-0 border-y border-[color:var(--border)] md:mx-0 md:grid-cols-[repeat(auto-fill,minmax(96px,1fr))] md:border-x"
+          className="-mx-5 mt-4 grid grid-cols-[repeat(4,minmax(0,1fr))] border-x-0 border-y border-[color:var(--border)] md:mx-0 md:mt-0 md:grid-cols-[repeat(auto-fill,minmax(96px,1fr))] md:border-x"
           style={{ gap: 1, background: "var(--border)" }}
         >
           {drivers.map((d) => {
             const t = teamMeta(d.team);
-            const inPicks = pickedIds.has(d.id);
+            const slotIdx = slotByDriverId.get(d.id) ?? -1;
+            const inPicks = slotIdx > -1;
             return (
               <li key={d.id}>
                 <button
                   type="button"
                   onClick={() => fillNextEmpty(d.id)}
                   disabled={isClosed || pending}
-                  className="relative flex min-h-[92px] w-full flex-col items-center gap-[5px] px-1 pt-2.5 pb-3 text-center disabled:cursor-not-allowed md:min-h-[44px] md:gap-1.5 md:px-2 md:pt-3 md:pb-3"
+                  /* R-1: a picked driver is no longer DIMMED at 390 — it goes
+                     to `--surface-2` at full opacity and carries a `P{n}`
+                     badge instead, because a dimmed cell reads as disabled
+                     on a screen where the grid is the primary control.
+                     Both properties were inline, and inline beats every
+                     `md:` class, so both had to become classNames for the
+                     desktop values (opacity .4 on `--surface`) to survive.
+                     `isClosed` still wins at both widths, unchanged. */
+                  className={`relative flex min-h-[92px] w-full flex-col items-center gap-[5px] px-1 pt-2.5 pb-3 text-center disabled:cursor-not-allowed md:min-h-[44px] md:gap-1.5 md:px-2 md:pt-3 md:pb-3 ${
+                    inPicks
+                      ? "bg-[color:var(--surface-2)] md:bg-[color:var(--surface)]"
+                      : "bg-[color:var(--surface)]"
+                  } ${
+                    isClosed
+                      ? "opacity-[0.45]"
+                      : inPicks
+                        ? "opacity-100 md:opacity-40"
+                        : "opacity-100"
+                  }`}
                   style={{
-                    background: "var(--surface)",
-                    opacity: isClosed ? 0.45 : inPicks ? 0.4 : 1,
                     borderTop: `3px solid ${t?.hex ?? "var(--fg-subtle)"}`,
                   }}
                   aria-pressed={inPicks}
@@ -657,17 +870,36 @@ export function DriverPicker({
                     #{d.id}
                   </span>
                   {inPicks && (
-                    <span
-                      className="absolute right-1.5 top-1.5 text-[9px]"
-                      style={{
-                        color: "var(--accent)",
-                        fontFamily:
-                          "var(--font-mono), ui-monospace, monospace",
-                        letterSpacing: "0.1em",
-                      }}
-                    >
-                      ✓
-                    </span>
+                    <>
+                      {/* The badge that replaced the dim: it has to say WHICH
+                          slot, which a ✓ cannot. Desktop keeps the ✓ — it
+                          still has the dim to carry "picked", and its slot
+                          cards are visible in the same viewport anyway. */}
+                      <span
+                        className="absolute right-[5px] top-[5px] px-1 py-px md:hidden"
+                        data-tabular
+                        style={{
+                          fontSize: 8,
+                          letterSpacing: "0.06em",
+                          lineHeight: 1.3,
+                          color: "var(--accent)",
+                          border: "1px solid var(--accent)",
+                        }}
+                      >
+                        P{slotIdx + 1}
+                      </span>
+                      <span
+                        className="absolute right-1.5 top-1.5 hidden text-[9px] md:inline"
+                        style={{
+                          color: "var(--accent)",
+                          fontFamily:
+                            "var(--font-mono), ui-monospace, monospace",
+                          letterSpacing: "0.1em",
+                        }}
+                      >
+                        ✓
+                      </span>
+                    </>
                   )}
                 </button>
               </li>
@@ -675,6 +907,7 @@ export function DriverPicker({
           })}
         </ul>
       </section>
+      </div>
 
       {feedback && (
         <p

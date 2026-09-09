@@ -224,6 +224,11 @@ export default async function PredictEventPage({
           The desktop 3-column hero below is `display:none` here.
           `uppercase` is explicit: the global `[style*="Boldonse"]` selector
           is case-sensitive and matches nothing (MobilePrimitives.tsx).
+
+          R-1 shrinks this block (h1 36 -> 32, TrackDiagram 54 -> 48, card
+          padding 16/14 -> 14/12, countdown 26 -> 24). Those are not taste:
+          the grid-first reorder below pushes ~200px of picker above the fold,
+          and the 390x1540 artboard only closes if the hero gives it back.
         */}
         <div className="md:hidden">
           <MobEyebrow>
@@ -235,7 +240,7 @@ export default async function PredictEventPage({
               className="m-0 uppercase"
               style={{
                 fontFamily: "var(--font-boldonse), ui-sans-serif",
-                fontSize: 36,
+                fontSize: 32,
                 lineHeight: 0.9,
               }}
             >
@@ -246,12 +251,12 @@ export default async function PredictEventPage({
             <div className="shrink-0" aria-hidden>
               <TrackDiagram
                 circuit={event.ergast_circuit_id ?? event.circuit}
-                height={54}
+                height={48}
                 stroke="var(--fg-muted)"
               />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between gap-3 border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3.5">
+          <div className="mt-4 flex items-center justify-between gap-3 border border-[color:var(--border)] bg-[color:var(--surface)] px-3.5 py-3">
             <div>
               <MobEyebrow>Locks in</MobEyebrow>
               <p
@@ -259,7 +264,7 @@ export default async function PredictEventPage({
                 data-tabular
                 style={{
                   fontFamily: "var(--font-mono), ui-monospace, monospace",
-                  fontSize: 26,
+                  fontSize: 24,
                   lineHeight: 1.1,
                 }}
               >

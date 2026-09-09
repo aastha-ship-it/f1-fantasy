@@ -199,7 +199,11 @@ Same pattern for circuits: OpenF1's `events.circuit` short name and Jolpica's
   shorthand first, so a base `p-*` outlives an `md:px-*`); and **pattern B′**,
   a `hidden md:contents` wrapper around the desktop tree beside a `md:hidden`
   mobile component, for when the two designs disagree about the primitive
-  rather than the spacing (`display:contents` erases the wrapper's box at
+  rather than the spacing, **or about the order** — a `flex flex-col
+  md:contents` wrapper plus base-only `order-*` is how the predict screen puts
+  the grid above the podium at 390 and below it at `md:`, since `order` is
+  inert in block layout and needs no `md:` counterpart (`display:contents`
+  erases the wrapper's box at
   `md:`, so the desktop box tree is untouched). Mobile-only components —
   `src/components/MobilePrimitives.tsx`, `*-mobile.tsx`, and the
   `DriverStandingsRowMobile` / `LeagueRowMobile` pair — carry **no `md:`
