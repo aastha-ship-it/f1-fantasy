@@ -290,9 +290,10 @@ export function LeagueRowMobile(p: LeagueRowProps) {
         {/* THEIR COLOURS (R-4) — desktop shows each participant's favourite
             team and driver inline on the row; the phone row has no width for
             them, so they open in the disclosure and the collapsed row stays
-            scannable. This is ADDITIVE: the TEAM / DRIVER / PERFECT PODIUMS /
-            P1 STREAK panel below is unchanged (owner's call), so the tiles
-            give the pair a face and the stat rows keep carrying the text. */}
+            scannable. These tiles REPLACE the panel's old TEAM / DRIVER stat
+            rows: R-4 shipped them additively and the pair then read twice in
+            one panel, once with a logo and a portrait and once as bare text.
+            The stat rows below now carry only what the tiles don't say. */}
         <p
           className="pt-1 uppercase text-[color:var(--fg-subtle)]"
           data-tabular
@@ -390,8 +391,9 @@ export function LeagueRowMobile(p: LeagueRowProps) {
           className="grid gap-x-4 gap-y-2 pt-1"
           style={{ gridTemplateColumns: "repeat(2, minmax(0,1fr))" }}
         >
-          <Stat label="TEAM" value={fav ? fav.name.toUpperCase() : "—"} />
-          <Stat label="DRIVER" value={p.favDriverCode ?? "—"} />
+          {/* No TEAM / DRIVER rows here: the "Their colours" tiles above are
+              the single source for the favourite pair. They shipped alongside
+              these rows in R-4 and said the same thing twice. */}
           <Stat
             label="PERFECT PODIUMS"
             value={String(p.perfects)}

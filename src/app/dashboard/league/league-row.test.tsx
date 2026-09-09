@@ -29,16 +29,19 @@ describe("LeagueRowMobile", () => {
   it("exposes the deferred stats when expanded", () => {
     render(<LeagueRowMobile {...ME} />);
     expect(screen.getByText("PERFECT PODIUMS")).toBeInTheDocument();
-    // Team and driver now appear TWICE inside the panel — once in R-4's
-    // "Their colours" tile and once in the stat rows below it. The tile was
-    // added on top of the shipped panel rather than replacing it, so the
-    // duplication is the design, not a leak.
-    // The stat row uppercases in JS; the tile leaves the cased name and
-    // uppercases in CSS, so the two read the same on screen but not to a
-    // text matcher.
-    expect(screen.getByText("MCLAREN")).toBeInTheDocument();
+    // The favourite pair appears ONCE, in R-4's "Their colours" tile. R-4
+    // first shipped the tile on top of the panel's TEAM / DRIVER stat rows,
+    // so team and driver each read twice — logo-and-portrait, then bare
+    // text. The stat rows went; the tile stayed.
+    //
+    // The tile leaves the team name cased and uppercases in CSS, where the
+    // removed stat row uppercased in JS — so "MCLAREN" is exactly the string
+    // only the duplicate produced, and its absence is the regression guard.
     expect(screen.getByText("McLaren")).toBeInTheDocument();
-    expect(screen.getAllByText("NOR").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("MCLAREN")).toBeNull();
+    expect(screen.queryByText("TEAM")).toBeNull();
+    expect(screen.queryByText("DRIVER")).toBeNull();
+    expect(screen.getAllByText("NOR")).toHaveLength(1);
   });
 
   // R-4: the disclosure opens with the friend's favourite team and driver.
